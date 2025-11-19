@@ -1,5 +1,6 @@
 import NumberFlow from "@number-flow/react";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import * as Recharts from "recharts";
 
 import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
@@ -10,6 +11,10 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "../ui/select";
+import { Badge } from "../ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import { ChartContainer, ChartTooltipContent } from "../ui/chart";
+import { Progress } from "../ui/progress";
 import useSimStream from "./useSimStream";
 import {
 	type MarketEvent,
@@ -148,7 +153,7 @@ export default function SimulatorPanel() {
 					...data.orderBook,
 					midPrice: 0,
 					spread: 0,
-					timestamp: Date.now()
+					timestamp: Date.now(),
 				} as OrderBookSnapshot;
 				setBook(snapshot);
 				clearError("orderbook");
@@ -455,8 +460,8 @@ export default function SimulatorPanel() {
 
 	useSimStream(handleStreamEvent, handleStreamError, { accountId });
 
-	const topAsks = useMemo(() => (book?.asks ?? []).slice(0, 10), [book]);
-	const topBids = useMemo(() => (book?.bids ?? []).slice(0, 10), [book]);
+	const topAsks = useMemo(() => (book?.asks ?? []).slice(0, 12), [book]);
+	const topBids = useMemo(() => (book?.bids ?? []).slice(0, 12), [book]);
 
 	const accountMetrics = useMemo(() => {
 		if (!account) return [];
@@ -472,16 +477,21 @@ export default function SimulatorPanel() {
 		);
 
 		const metrics = [
-			{ label: "Account Value", value: formatUsd(account.equity) },
-			{ label: "Available Cash", value: formatUsd(available) },
-			{ label: "Realized PnL", value: formatUsd(account.totalRealizedPnl) },
-			{ label: "Unrealized PnL", value: formatUsd(account.totalUnrealizedPnl) },
+			{ label: "Account Value", value: account.equity, change: null },
+			{ label: "Available Cash", value: available, change: null },
+			{ label: "Realized PnL", value: account.totalRealizedPnl, change: null },
+			{
+				label: "Unrealized PnL",
+				value: account.totalUnrealizedPnl,
+				change: null,
+			},
 		];
 
 		if (borrowed > 0.005) {
 			metrics.splice(2, 0, {
 				label: "Margin Used",
-				value: formatUsd(borrowed),
+				value: borrowed,
+				change: null,
 			});
 		}
 
@@ -502,6 +512,7 @@ export default function SimulatorPanel() {
 				maxLeverage: null,
 				avgConfidence: null,
 				medianConfidence: null,
+				winRate: null,
 			} as const;
 		}
 
@@ -531,6 +542,10 @@ export default function SimulatorPanel() {
 			(trade) => trade.direction === "LONG",
 		).length;
 
+		const winningTrades = completedTrades.filter(
+			(trade) => trade.realizedPnl > 0,
+		).length;
+
 		return {
 			totalTrades,
 			totalRealized,
@@ -543,6 +558,7 @@ export default function SimulatorPanel() {
 			maxLeverage: leverageValues.length ? Math.max(...leverageValues) : null,
 			avgConfidence: average(confidenceValues),
 			medianConfidence: median(confidenceValues),
+			winRate: totalTrades > 0 ? winningTrades / totalTrades : null,
 		} as const;
 	}, [completedTrades]);
 
@@ -614,11 +630,6 @@ export default function SimulatorPanel() {
 				value: tradeSummary.avgTradeSize,
 			},
 			{
-				label: "Median Trade Size",
-				variant: "currency" as const,
-				value: tradeSummary.medianTradeSize,
-			},
-			{
 				label: "% Long Trades",
 				variant: "percent" as const,
 				value: tradeSummary.percentLong,
@@ -629,138 +640,455 @@ export default function SimulatorPanel() {
 				value: tradeSummary.expectancy,
 			},
 			{
+				label: "Win Rate",
+				variant: "percent" as const,
+				value: tradeSummary.winRate,
+			},
+			{
 				label: "Avg Leverage",
 				variant: "leverage" as const,
 				value: tradeSummary.avgLeverage,
-			},
-			{
-				label: "Median Leverage",
-				variant: "leverage" as const,
-				value: tradeSummary.medianLeverage,
-			},
-			{
-				label: "Max Leverage",
-				variant: "leverage" as const,
-				value: tradeSummary.maxLeverage,
 			},
 			{
 				label: "Avg Confidence",
 				variant: "percent" as const,
 				value: tradeSummary.avgConfidence,
 			},
-			{
-				label: "Median Confidence",
-				variant: "percent" as const,
-				value: tradeSummary.medianConfidence,
-			},
 		],
 		[account?.equity, tradeSummary],
 	);
 
+	const chartData = useMemo(() => {
+		if (completedTrades.length === 0) return [];
+
+		return [...completedTrades]
+			.reverse()
+			.slice(0, 30)
+			.map((trade, index) => ({
+				name: `#${completedTrades.length - index}`,
+				pnl: trade.realizedPnl,
+				confidence: normalizeConfidenceRatio(trade.confidence) ?? 0,
+				leverage: trade.leverage ?? 0,
+			}));
+	}, [completedTrades]);
+
+	const leverageDistribution = useMemo(() => {
+		if (completedTrades.length === 0) return [];
+
+		const buckets: Record<string, number> = {
+			"0-2x": 0,
+			"2-5x": 0,
+			"5-10x": 0,
+			"10x+": 0,
+		};
+
+		completedTrades.forEach((trade) => {
+			if (trade.leverage) {
+				if (trade.leverage <= 2) buckets["0-2x"]++;
+				else if (trade.leverage <= 5) buckets["2-5x"]++;
+				else if (trade.leverage <= 10) buckets["5-10x"]++;
+				else buckets["10x+"]++;
+			}
+		});
+
+		return Object.entries(buckets).map(([range, count]) => ({
+			range,
+			count,
+		}));
+	}, [completedTrades]);
+
 	return (
 		<div className="flex flex-col gap-6">
-			<Card>
-				<CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-					<div className="space-y-1">
-						<CardTitle className="text-xl font-semibold">
-							Simulator Control Panel
-						</CardTitle>
-						<p className="text-muted-foreground text-sm">
-							Interact with the simulated exchange and monitor account state in
-							real time.
-						</p>
-					</div>
-					<div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-4">
-						<div className="space-y-1">
-							<span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-								Account
-							</span>
-							<Select value={accountId} onValueChange={setAccountId}>
-								<SelectTrigger id={accountSelectId} className="w-56">
-									<SelectValue placeholder="Select account" />
-								</SelectTrigger>
-								<SelectContent>
-									{accountOptions.map((option) => (
-										<SelectItem key={option.id} value={option.id}>
-											{option.label}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-						</div>
-						<Button
-							type="button"
-							variant="outline"
-							size="sm"
-							className="self-start"
-							onClick={() => resetAccount(accountId)}
-							disabled={!accountId || isResetting}
+			{/* Account Controls */}
+			<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+				<div className="flex flex-wrap items-center gap-3">
+					<div className="flex items-center gap-2">
+						<span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+							Symbol:
+						</span>
+						<Tabs
+							value={symbol}
+							onValueChange={(value) =>
+								setSymbol(value as (typeof SYMBOLS)[number])
+							}
+							className=""
 						>
-							{isResetting ? "Resetting…" : "Reset balance"}
-						</Button>
+							<TabsList className="h-9">
+								{SYMBOLS.map((item) => (
+									<TabsTrigger key={item} value={item} className="h-7">
+										{item}
+									</TabsTrigger>
+								))}
+							</TabsList>
+						</Tabs>
 					</div>
-				</CardHeader>
-				{accountMetrics.length > 0 && (
-					<CardContent>
-						<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-							{accountMetrics.map((metric) => (
-								<div
-									key={metric.label}
-									className="rounded-lg border bg-muted/30 p-4"
-								>
-									<p className="text-sm text-muted-foreground">
-										{metric.label}
-									</p>
-									<p className="text-lg font-semibold">{metric.value}</p>
-								</div>
-							))}
-						</div>
-					</CardContent>
-				)}
-			</Card>
+				</div>
+				<div className="flex items-center gap-3">
+					<div className="flex items-center gap-2">
+						<span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+							Account:
+						</span>
+						<Select value={accountId} onValueChange={setAccountId}>
+							<SelectTrigger
+								id={accountSelectId}
+								className="w-56 bg-background"
+							>
+								<SelectValue placeholder="Select account" />
+							</SelectTrigger>
+							<SelectContent>
+								{accountOptions.map((option) => (
+									<SelectItem key={option.id} value={option.id}>
+										{option.label}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+					</div>
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						onClick={() => resetAccount(accountId)}
+						disabled={!accountId || isResetting}
+					>
+						{isResetting ? "Resetting…" : "Reset"}
+					</Button>
+				</div>
+			</div>
 
-			<Card className="border border-border/70 bg-card/80 shadow-sm">
-				<CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-					<div>
-						<CardTitle className="text-lg">Completed Trade Metrics</CardTitle>
-						<p className="text-sm text-muted-foreground">
-							{tradeSummary.totalTrades > 0
-								? `Aggregated from ${tradeSummary.totalTrades} closed ${tradeSummary.totalTrades === 1 ? "trade" : "trades"}.`
-								: "Closed trade analytics will appear once positions have been closed."}
-						</p>
-					</div>
-					{tradeSummary.totalTrades > 0 && (
-						<div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-							<span className="inline-flex items-baseline gap-1">
-								<span className="font-semibold text-foreground">
-									Realized PnL:
-								</span>
-								{renderCurrencyMetric(tradeSummary.totalRealized)}
-							</span>
-							<span className="inline-flex items-baseline gap-1">
-								<span className="font-semibold text-foreground">
-									Closed Trades:
-								</span>
-								<NumberFlow
-									value={tradeSummary.totalTrades}
-									format={{ maximumFractionDigits: 0 }}
-								/>
-							</span>
+			{/* Account Metrics */}
+			{accountMetrics.length > 0 && (
+				<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+					{accountMetrics.map((metric) => (
+						<Card
+							key={metric.label}
+							className="bg-gradient-to-br from-card to-card/60 border-border/60"
+						>
+							<CardContent className="p-4">
+								<p className="text-xs font-medium text-muted-foreground">
+									{metric.label}
+								</p>
+								<div className="mt-2 flex items-baseline gap-2">
+									<p className="text-xl font-bold">
+										{renderCurrencyMetric(metric.value)}
+									</p>
+								</div>
+							</CardContent>
+						</Card>
+					))}
+				</div>
+			)}
+
+			{/* Main Content Grid */}
+			<div className="grid gap-6 lg:grid-cols-3">
+				{/* Order Book */}
+				<Card className="lg:col-span-2 border-border/60 bg-card/50">
+					<CardHeader className="flex flex-row items-center justify-between pb-3">
+						<div>
+							<CardTitle className="text-lg">Order Book</CardTitle>
+							{book && (
+								<p className="text-sm text-muted-foreground">
+									Spread: {numberFormatter.format(book.spread)} · Mid:{" "}
+									{formatUsd(book.midPrice)}
+								</p>
+							)}
 						</div>
-					)}
-				</CardHeader>
-				<CardContent>
-					{tradeSummary.totalTrades === 0 ? (
-						<div className="rounded-xl border border-dashed border-border/60 bg-muted/20 p-6 text-sm text-muted-foreground">
-							Close a simulated position to unlock expectancy, leverage, and
-							confidence analytics.
+						<Badge variant="secondary" className="font-mono text-xs">
+							{symbol}
+						</Badge>
+					</CardHeader>
+					<CardContent>
+						{book ? (
+							<div className="grid gap-6 md:grid-cols-2">
+								<div>
+									<div className="mb-2 flex items-center justify-between">
+										<h3 className="text-sm font-semibold text-red-400">Asks</h3>
+										<span className="text-xs text-muted-foreground">
+											{topAsks.length} levels
+										</span>
+									</div>
+									<div className="space-y-1">
+										{topAsks.map((level) => (
+											<div
+												key={`ask-${level.price}`}
+												className="group grid grid-cols-[1fr_auto] gap-2 rounded px-2 py-1 hover:bg-muted/50"
+											>
+												<span className="text-sm font-medium text-red-400">
+													{numberFormatter.format(level.price)}
+												</span>
+												<span className="text-sm tabular-nums text-muted-foreground group-hover:text-foreground">
+													{level.quantity.toFixed(4)}
+												</span>
+											</div>
+										))}
+									</div>
+								</div>
+								<div>
+									<div className="mb-2 flex items-center justify-between">
+										<h3 className="text-sm font-semibold text-emerald-400">
+											Bids
+										</h3>
+										<span className="text-xs text-muted-foreground">
+											{topBids.length} levels
+										</span>
+									</div>
+									<div className="space-y-1">
+										{topBids.map((level) => (
+											<div
+												key={`bid-${level.price}`}
+												className="group grid grid-cols-[1fr_auto] gap-2 rounded px-2 py-1 hover:bg-muted/50"
+											>
+												<span className="text-sm font-medium text-emerald-400">
+													{numberFormatter.format(level.price)}
+												</span>
+												<span className="text-sm tabular-nums text-muted-foreground group-hover:text-foreground">
+													{level.quantity.toFixed(4)}
+												</span>
+											</div>
+										))}
+									</div>
+								</div>
+							</div>
+						) : (
+							<div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
+								Waiting for order book data…
+							</div>
+						)}
+					</CardContent>
+				</Card>
+
+				{/* Right Column: Positions & Trade Activity */}
+				<div className="flex flex-col gap-6">
+					{/* Open Positions */}
+					<Card className="border-border/60 bg-card/50">
+						<CardHeader className="pb-3">
+							<CardTitle className="text-lg">Open Positions</CardTitle>
+						</CardHeader>
+						<CardContent>
+							{account && account.positions.length > 0 ? (
+								<div className="space-y-2">
+									{account.positions.map((position) => (
+										<div
+											key={position.symbol}
+											className="rounded-lg border border-border/40 bg-muted/30 p-3"
+										>
+											<div className="mb-2 flex items-center justify-between">
+												<div className="flex items-center gap-2">
+													<span className="font-semibold">
+														{position.symbol}
+													</span>
+													<Badge
+														variant={
+															position.side === "LONG"
+																? "default"
+																: "destructive"
+														}
+														className="text-[10px]"
+													>
+														{position.side}
+													</Badge>
+												</div>
+												<span className="text-sm text-muted-foreground">
+													{position.quantity.toFixed(4)}
+												</span>
+											</div>
+											<div className="grid grid-cols-2 gap-2 text-xs">
+												<div>
+													<span className="text-muted-foreground">Entry:</span>
+													<span className="ml-2 font-medium">
+														{numberFormatter.format(position.avgEntryPrice)}
+													</span>
+												</div>
+												<div>
+													<span className="text-muted-foreground">Mark:</span>
+													<span className="ml-2 font-medium">
+														{numberFormatter.format(position.markPrice)}
+													</span>
+												</div>
+												<div>
+													<span className="text-muted-foreground">
+														Realized:
+													</span>
+													<span
+														className={`ml-2 font-medium ${
+															position.realizedPnl >= 0
+																? "text-emerald-500"
+																: "text-red-500"
+														}`}
+													>
+														{formatUsd(position.realizedPnl)}
+													</span>
+												</div>
+												<div>
+													<span className="text-muted-foreground">
+														Unrealized:
+													</span>
+													<span
+														className={`ml-2 font-medium ${
+															position.unrealizedPnl >= 0
+																? "text-emerald-500"
+																: "text-red-500"
+														}`}
+													>
+														{formatUsd(position.unrealizedPnl)}
+													</span>
+												</div>
+											</div>
+										</div>
+									))}
+								</div>
+							) : (
+								<p className="text-sm text-muted-foreground">
+									No open positions
+								</p>
+							)}
+						</CardContent>
+					</Card>
+
+					{/* Trade Summary */}
+					<Card className="border-border/60 bg-card/50">
+						<CardHeader className="pb-3">
+							<CardTitle className="text-lg">Trade Summary</CardTitle>
+						</CardHeader>
+						<CardContent>
+							{tradeSummary.totalTrades === 0 ? (
+								<p className="text-sm text-muted-foreground">
+									No completed trades
+								</p>
+							) : (
+								<div className="space-y-4">
+									<div className="flex items-center justify-between border-b border-border/40 pb-3">
+										<span className="text-sm text-muted-foreground">
+											Total Realized
+										</span>
+										<span
+											className={`text-lg font-bold ${
+												tradeSummary.totalRealized >= 0
+													? "text-emerald-500"
+													: "text-red-500"
+											}`}
+										>
+											{renderCurrencyMetric(tradeSummary.totalRealized)}
+										</span>
+									</div>
+									<div className="flex items-center justify-between">
+										<span className="text-sm text-muted-foreground">
+											Closed Trades
+										</span>
+										<span className="text-lg font-bold">
+											{tradeSummary.totalTrades}
+										</span>
+									</div>
+									{tradeSummary.winRate !== null && (
+										<div className="space-y-2">
+											<div className="flex items-center justify-between">
+												<span className="text-sm text-muted-foreground">
+													Win Rate
+												</span>
+												<span className="text-sm font-semibold">
+													{renderPercentMetric(tradeSummary.winRate)}
+												</span>
+											</div>
+											<Progress
+												value={tradeSummary.winRate * 100}
+												className="h-2"
+											/>
+										</div>
+									)}
+									{tradeSummary.expectancy !== null && (
+										<div className="flex items-center justify-between">
+											<span className="text-sm text-muted-foreground">
+												Expectancy
+											</span>
+											<span
+												className={`text-sm font-semibold ${
+													tradeSummary.expectancy >= 0
+														? "text-emerald-500"
+														: "text-red-500"
+												}`}
+											>
+												{renderCurrencyMetric(tradeSummary.expectancy)}
+											</span>
+										</div>
+									)}
+								</div>
+							)}
+						</CardContent>
+					</Card>
+				</div>
+			</div>
+
+			{/* Analytics Charts */}
+			{tradeSummary.totalTrades > 0 && (
+				<Card className="border-border/60 bg-card/50">
+					<CardHeader>
+						<CardTitle className="text-lg">Trade Analytics</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<div className="grid gap-6 md:grid-cols-2">
+							{/* PnL Chart */}
+							<div className="space-y-3">
+								<h3 className="text-sm font-semibold">PnL Over Time</h3>
+								<ChartContainer
+									config={{
+										pnl: {
+											label: "PnL",
+											color: "hsl(var(--primary))",
+										},
+									}}
+									className="h-[200px]"
+								>
+									<Recharts.AreaChart data={chartData}>
+										<Recharts.Area
+											type="monotone"
+											dataKey="pnl"
+											stroke="hsl(var(--primary))"
+											fill="hsl(var(--primary))"
+											fillOpacity={0.2}
+										/>
+										<Recharts.CartesianGrid strokeDasharray="3 3" />
+										<Recharts.Tooltip
+											content={
+												<ChartTooltipContent
+													formatter={(value) => formatUsd(value as number)}
+												/>
+											}
+										/>
+									</Recharts.AreaChart>
+								</ChartContainer>
+							</div>
+
+							{/* Leverage Distribution */}
+							<div className="space-y-3">
+								<h3 className="text-sm font-semibold">Leverage Distribution</h3>
+								<ChartContainer
+									config={{
+										count: {
+											label: "Trades",
+											color: "hsl(var(--primary))",
+										},
+									}}
+									className="h-[200px]"
+								>
+									<Recharts.BarChart data={leverageDistribution}>
+										<Recharts.Bar
+											dataKey="count"
+											fill="hsl(var(--primary))"
+											radius={[4, 4, 0, 0]}
+										/>
+										<Recharts.CartesianGrid strokeDasharray="3 3" />
+										<Recharts.Tooltip content={<ChartTooltipContent />} />
+									</Recharts.BarChart>
+								</ChartContainer>
+							</div>
 						</div>
-					) : (
-						<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+
+						{/* Metrics Grid */}
+						<div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 							{analyticsMetrics.map((metric) => (
 								<div
 									key={metric.label}
-									className="rounded-xl border border-border/60 bg-muted/15 p-4 shadow-sm"
+									className="rounded-xl border border-border/60 bg-muted/15 p-4"
 								>
 									<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
 										{metric.label}
@@ -775,170 +1103,11 @@ export default function SimulatorPanel() {
 								</div>
 							))}
 						</div>
-					)}
-				</CardContent>
-			</Card>
-
-			<div className="grid gap-6 lg:grid-cols-2">
-				<Card className="border-dashed border-border/60 bg-muted/10">
-					<CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-						<div>
-							<CardTitle className="text-lg">Order Book · {symbol}</CardTitle>
-							{book && (
-								<p className="text-muted-foreground text-sm">
-									Spread: {numberFormatter.format(book.spread)} · Mid:{" "}
-									{formatUsd(book.midPrice)}
-								</p>
-							)}
-						</div>
-						<Select
-							value={symbol}
-							onValueChange={(value) =>
-								setSymbol(value as (typeof SYMBOLS)[number])
-							}
-						>
-							<SelectTrigger className="w-32">
-								<SelectValue placeholder="Symbol" />
-							</SelectTrigger>
-							<SelectContent>
-								{SYMBOLS.map((item) => (
-									<SelectItem key={item} value={item}>
-										{item}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-					</CardHeader>
-					<CardContent>
-						{book ? (
-							<div className="grid gap-6 lg:grid-cols-2">
-								<div>
-									<h3 className="mb-2 text-sm font-semibold text-red-500">
-										Asks
-									</h3>
-									<div className="rounded-md border">
-										<table className="w-full text-sm">
-											<thead>
-												<tr className="border-b text-xs uppercase text-muted-foreground">
-													<th className="p-2 text-left">Price</th>
-													<th className="p-2 text-right">Size</th>
-												</tr>
-											</thead>
-											<tbody>
-												{topAsks.map((level) => (
-													<tr
-														key={`${level.price}-${level.quantity}`}
-														className="border-b last:border-b-0"
-													>
-														<td className="p-2 text-left text-red-500">
-															{numberFormatter.format(level.price)}
-														</td>
-														<td className="p-2 text-right">
-															{level.quantity.toFixed(4)}
-														</td>
-													</tr>
-												))}
-											</tbody>
-										</table>
-									</div>
-								</div>
-								<div>
-									<h3 className="mb-2 text-sm font-semibold text-emerald-500">
-										Bids
-									</h3>
-									<div className="rounded-md border">
-										<table className="w-full text-sm">
-											<thead>
-												<tr className="border-b text-xs uppercase text-muted-foreground">
-													<th className="p-2 text-left">Price</th>
-													<th className="p-2 text-right">Size</th>
-												</tr>
-											</thead>
-											<tbody>
-												{topBids.map((level) => (
-													<tr
-														key={`${level.price}-${level.quantity}`}
-														className="border-b last:border-b-0"
-													>
-														<td className="p-2 text-left text-emerald-500">
-															{numberFormatter.format(level.price)}
-														</td>
-														<td className="p-2 text-right">
-															{level.quantity.toFixed(4)}
-														</td>
-													</tr>
-												))}
-											</tbody>
-										</table>
-									</div>
-								</div>
-							</div>
-						) : (
-							<p className="text-muted-foreground text-sm">
-								Waiting for order book data…
-							</p>
-						)}
 					</CardContent>
 				</Card>
+			)}
 
-				<Card>
-					<CardHeader>
-						<CardTitle className="text-lg">Open Positions</CardTitle>
-					</CardHeader>
-					<CardContent>
-						{account && account.positions.length > 0 ? (
-							<div className="overflow-x-auto">
-								<table className="w-full text-sm">
-									<thead>
-										<tr className="border-b text-xs uppercase text-muted-foreground">
-											<th className="p-2 text-left">Symbol</th>
-											<th className="p-2 text-left">Side</th>
-											<th className="p-2 text-right">Qty</th>
-											<th className="p-2 text-right">Entry</th>
-											<th className="p-2 text-right">Mark</th>
-											<th className="p-2 text-right">Realized</th>
-											<th className="p-2 text-right">Unrealized</th>
-										</tr>
-									</thead>
-									<tbody>
-										{account.positions.map((position) => (
-											<tr
-												key={position.symbol}
-												className="border-b last:border-b-0"
-											>
-												<td className="p-2 text-left">{position.symbol}</td>
-												<td className="p-2 text-left">{position.side}</td>
-												<td className="p-2 text-right">
-													{position.quantity.toFixed(4)}
-												</td>
-												<td className="p-2 text-right">
-													{numberFormatter.format(position.avgEntryPrice)}
-												</td>
-												<td className="p-2 text-right">
-													{numberFormatter.format(position.markPrice)}
-												</td>
-												<td className="p-2 text-right">
-													{formatUsd(position.realizedPnl)}
-												</td>
-												<td
-													className={`p-2 text-right ${position.unrealizedPnl >= 0 ? "text-emerald-500" : "text-red-500"}`}
-												>
-													{formatUsd(position.unrealizedPnl)}
-												</td>
-											</tr>
-										))}
-									</tbody>
-								</table>
-							</div>
-						) : (
-							<p className="text-muted-foreground text-sm">
-								No open positions for this account.
-							</p>
-						)}
-					</CardContent>
-				</Card>
-			</div>
-
+			{/* Errors */}
 			{errors.length > 0 && (
 				<Card className="border-destructive/60 bg-destructive/5">
 					<CardHeader>

@@ -11,7 +11,7 @@ import {
 	ApiKeyAuthentication,
 	IsomorphicFetchHttpLibrary,
 	ServerConfiguration,
-} from "../../../../lighter-sdk-ts/generated";
+} from "@/lighter/generated/index";
 
 export interface ExitPlanSummary {
 	target: number | null;

@@ -1,46 +1,46 @@
 import { getInvocations, getModels } from "./models";
 import {
-  getAccount,
-  getCompletedTrades,
-  getCompletedTradesFromDB,
-  getOrderBook,
-  placeOrder,
-  resetAccount,
+	getAccount,
+	getCompletedTrades,
+	getCompletedTradesFromDB,
+	getOrderBook,
+	placeOrder,
+	resetAccount,
 } from "./simulator";
 import { addTodo, listTodos } from "./todos";
 import {
-  getCryptoPrices,
-  getPortfolioHistory,
-  getPositions,
-  getTrades,
+	getCryptoPrices,
+	getPortfolioHistory,
+	getPositions,
+	getTrades,
 } from "./trading";
 
 export default {
-  // Demo/Example procedures
-  listTodos,
-  addTodo,
+	// Demo/Example procedures
+	listTodos,
+	addTodo,
 
-  // Trading procedures
-  trading: {
-    getTrades,
-    getPositions,
-    getCryptoPrices,
-    getPortfolioHistory,
-  },
+	// Trading procedures
+	trading: {
+		getTrades,
+		getPositions,
+		getCryptoPrices,
+		getPortfolioHistory,
+	},
 
-  // Models & Invocations
-  models: {
-    getModels,
-    getInvocations,
-  },
+	// Models & Invocations
+	models: {
+		getModels,
+		getInvocations,
+	},
 
-  // Simulator
-  simulator: {
-    placeOrder,
-    getAccount,
-    resetAccount,
-    getOrderBook,
-    getCompletedTrades,
-    getCompletedTradesFromDB,
-  },
+	// Simulator
+	simulator: {
+		placeOrder,
+		getAccount,
+		resetAccount,
+		getOrderBook,
+		getCompletedTrades,
+		getCompletedTradesFromDB,
+	},
 };

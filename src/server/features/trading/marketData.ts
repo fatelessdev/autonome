@@ -8,7 +8,7 @@ import {
 	OrderApi,
 	type OrderBookDetail,
 	ServerConfiguration,
-} from "@/lighter/generated";
+} from "@/lighter/generated/index";
 import {
 	getAtr,
 	getCloses,

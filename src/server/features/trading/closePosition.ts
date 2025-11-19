@@ -16,7 +16,7 @@ import {
 	CandlestickApi,
 	IsomorphicFetchHttpLibrary,
 	ServerConfiguration,
-} from "../../../../lighter-sdk-ts/generated";
+} from "@/lighter/generated/index";
 import { NonceManagerType } from "../../../../lighter-sdk-ts/nonce_manager";
 
 export interface ClosedPositionSummary {

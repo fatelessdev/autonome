@@ -4,7 +4,7 @@ import type {
 	OrderBookSnapshot,
 	OrderBookSource,
 } from "@/server/features/simulator/types";
-import type { OrderApi } from "../../../../lighter-sdk-ts/generated";
+import type { OrderApi } from "@/lighter/generated/index";
 
 class OrderBook {
 	private snapshot: OrderBookSnapshot;

@@ -37,7 +37,7 @@ async function requestDashboardResource<TResponse, TResult>(
 	normalizer: Normalizer<TResponse, TResult>,
 ): Promise<TResult> {
 	let payload: TResponse;
-	
+
 	switch (endpoint) {
 		case DASHBOARD_ENDPOINTS.trades:
 			const tradesData = await orpc.trading.getTrades.call({});
@@ -50,21 +50,23 @@ async function requestDashboardResource<TResponse, TResult>(
 		case DASHBOARD_ENDPOINTS.conversations:
 			const conversationsData = await orpc.models.getInvocations.call({});
 			// Transform the data to match the expected schema
-			const transformedConversations = conversationsData.conversations.map(conv => ({
-				id: conv.id,
-				modelId: conv.modelId,
-				modelName: conv.modelName || "Unknown Model",
-				modelLogo: conv.modelLogo || "unknown-model",
-				response: conv.response || "",
-				timestamp: conv.timestamp,
-				toolCalls: conv.toolCalls || []
-			}));
+			const transformedConversations = conversationsData.conversations.map(
+				(conv) => ({
+					id: conv.id,
+					modelId: conv.modelId,
+					modelName: conv.modelName || "Unknown Model",
+					modelLogo: conv.modelLogo || "unknown-model",
+					response: conv.response || "",
+					timestamp: conv.timestamp,
+					toolCalls: conv.toolCalls || [],
+				}),
+			);
 			payload = { conversations: transformedConversations } as TResponse;
 			break;
 		default:
 			throw new Error(`Unknown endpoint: ${endpoint}`);
 	}
-	
+
 	return normalizer(payload);
 }
 
@@ -82,15 +84,20 @@ function normalizeTrades(payload: TradesResponse): Trade[] {
 		.map((entry) => {
 			if (!entry || typeof entry !== "object") return null;
 			const record = entry as Record<string, unknown>;
-			const id = typeof record.id === "string" ? record.id : typeof record.tradeId === "string" ? record.tradeId : null;
+			const id =
+				typeof record.id === "string"
+					? record.id
+					: typeof record.tradeId === "string"
+						? record.tradeId
+						: null;
 			const modelId =
 				typeof record.modelId === "string"
 					? record.modelId
 					: typeof record.modelKey === "string"
 						? record.modelKey
 						: typeof id === "string"
-						? id
-						: null;
+							? id
+							: null;
 
 			if (!id || !modelId) return null;
 
@@ -196,12 +203,18 @@ function normalizePositions(payload: PositionsResponse): ModelPositions[] {
 			if (!entry || typeof entry !== "object") return null;
 			const record = entry as Record<string, unknown>;
 			const modelId =
-				typeof record.modelId === "string" ? record.modelId :
-				typeof record.modelKey === "string" ? record.modelKey : null;
+				typeof record.modelId === "string"
+					? record.modelId
+					: typeof record.modelKey === "string"
+						? record.modelKey
+						: null;
 			const modelName =
-				typeof record.modelName === "string" ? record.modelName :
-				typeof record.name === "string" ? record.name : modelId;
-			
+				typeof record.modelName === "string"
+					? record.modelName
+					: typeof record.name === "string"
+						? record.name
+						: modelId;
+
 			if (!modelId || !modelName) return null;
 
 			const positionsRaw = Array.isArray(record.positions)
@@ -222,7 +235,9 @@ function normalizePositions(payload: PositionsResponse): ModelPositions[] {
 						? record.totalUnrealizedPnl
 						: undefined,
 				availableCash:
-					typeof record.availableCash === "number" ? record.availableCash : undefined,
+					typeof record.availableCash === "number"
+						? record.availableCash
+						: undefined,
 			} as ModelPositions;
 		})
 		.filter((group): group is ModelPositions => group !== null);

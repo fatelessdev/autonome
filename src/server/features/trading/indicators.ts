@@ -1,4 +1,4 @@
-import type { Candlestick } from "../../../../lighter-sdk-ts/generated";
+import type { Candlestick } from "@/lighter/generated/index";
 
 export function getEma(prices: number[], period: number): number[] {
 	if (prices.length < period) {

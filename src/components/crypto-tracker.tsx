@@ -174,11 +174,11 @@ function PriceWithChange({
 								: "text-rose-400"
 					}
 				>
-					{formattedChange == null
+					{/* {formattedChange == null
 						? "–"
-						: `${formattedChange >= 0 ? "+" : ""}${formattedChange.toFixed(2)}%`}
+						: `${formattedChange >= 0 ? "+" : ""}${formattedChange.toFixed(2)}%`} */}
 				</span>
-				<span className="text-muted-foreground">· {source}</span>
+				{/* <span className="text-muted-foreground">· {source}</span> */}
 			</div>
 		</div>
 	);

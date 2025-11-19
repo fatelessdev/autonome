@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SimulatorRouteImport } from './routes/simulator'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as ChatRouteImport } from './routes/chat'
+import { Route as AiRouteImport } from './routes/ai'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DemoTanstackQueryRouteImport } from './routes/demo/tanstack-query'
 import { Route as DemoTanchatRouteImport } from './routes/demo/tanchat'
@@ -23,6 +24,7 @@ import { Route as DemoDrizzleRouteImport } from './routes/demo/drizzle'
 import { Route as DemoDbChatApiRouteImport } from './routes/demo/db-chat-api'
 import { Route as DemoDbChatRouteImport } from './routes/demo/db-chat'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
+import { Route as ApiAiRouteImport } from './routes/api/ai'
 import { Route as ApiSplatRouteImport } from './routes/api/$'
 import { Route as ExampleGuitarsIndexRouteImport } from './routes/example/guitars/index'
 import { Route as ExampleGuitarsGuitarIdRouteImport } from './routes/example/guitars/$guitarId'
@@ -58,6 +60,11 @@ const McpRoute = McpRouteImport.update({
 const ChatRoute = ChatRouteImport.update({
   id: '/chat',
   path: '/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AiRoute = AiRouteImport.update({
+  id: '/ai',
+  path: '/ai',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -113,6 +120,11 @@ const DemoDbChatRoute = DemoDbChatRouteImport.update({
 const ApiChatRoute = ApiChatRouteImport.update({
   id: '/api/chat',
   path: '/api/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAiRoute = ApiAiRouteImport.update({
+  id: '/api/ai',
+  path: '/api/ai',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSplatRoute = ApiSplatRouteImport.update({
@@ -223,10 +235,12 @@ const DemoStartSsrDataOnlyRoute = DemoStartSsrDataOnlyRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/ai': typeof AiRoute
   '/chat': typeof ChatRoute
   '/mcp': typeof McpRoute
   '/simulator': typeof SimulatorRoute
   '/api/$': typeof ApiSplatRoute
+  '/api/ai': typeof ApiAiRoute
   '/api/chat': typeof ApiChatRoute
   '/demo/db-chat': typeof DemoDbChatRoute
   '/demo/db-chat-api': typeof DemoDbChatApiRoute
@@ -260,10 +274,12 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/ai': typeof AiRoute
   '/chat': typeof ChatRoute
   '/mcp': typeof McpRoute
   '/simulator': typeof SimulatorRoute
   '/api/$': typeof ApiSplatRoute
+  '/api/ai': typeof ApiAiRoute
   '/api/chat': typeof ApiChatRoute
   '/demo/db-chat': typeof DemoDbChatRoute
   '/demo/db-chat-api': typeof DemoDbChatApiRoute
@@ -298,10 +314,12 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/ai': typeof AiRoute
   '/chat': typeof ChatRoute
   '/mcp': typeof McpRoute
   '/simulator': typeof SimulatorRoute
   '/api/$': typeof ApiSplatRoute
+  '/api/ai': typeof ApiAiRoute
   '/api/chat': typeof ApiChatRoute
   '/demo/db-chat': typeof DemoDbChatRoute
   '/demo/db-chat-api': typeof DemoDbChatApiRoute
@@ -337,10 +355,12 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/ai'
     | '/chat'
     | '/mcp'
     | '/simulator'
     | '/api/$'
+    | '/api/ai'
     | '/api/chat'
     | '/demo/db-chat'
     | '/demo/db-chat-api'
@@ -374,10 +394,12 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/ai'
     | '/chat'
     | '/mcp'
     | '/simulator'
     | '/api/$'
+    | '/api/ai'
     | '/api/chat'
     | '/demo/db-chat'
     | '/demo/db-chat-api'
@@ -411,10 +433,12 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/ai'
     | '/chat'
     | '/mcp'
     | '/simulator'
     | '/api/$'
+    | '/api/ai'
     | '/api/chat'
     | '/demo/db-chat'
     | '/demo/db-chat-api'
@@ -449,10 +473,12 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AiRoute: typeof AiRoute
   ChatRoute: typeof ChatRoute
   McpRoute: typeof McpRoute
   SimulatorRoute: typeof SimulatorRoute
   ApiSplatRoute: typeof ApiSplatRoute
+  ApiAiRoute: typeof ApiAiRoute
   ApiChatRoute: typeof ApiChatRoute
   DemoDbChatRoute: typeof DemoDbChatRoute
   DemoDbChatApiRoute: typeof DemoDbChatApiRoute
@@ -506,6 +532,13 @@ declare module '@tanstack/react-router' {
       path: '/chat'
       fullPath: '/chat'
       preLoaderRoute: typeof ChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ai': {
+      id: '/ai'
+      path: '/ai'
+      fullPath: '/ai'
+      preLoaderRoute: typeof AiRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -583,6 +616,13 @@ declare module '@tanstack/react-router' {
       path: '/api/chat'
       fullPath: '/api/chat'
       preLoaderRoute: typeof ApiChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ai': {
+      id: '/api/ai'
+      path: '/api/ai'
+      fullPath: '/api/ai'
+      preLoaderRoute: typeof ApiAiRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/$': {
@@ -737,10 +777,12 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AiRoute: AiRoute,
   ChatRoute: ChatRoute,
   McpRoute: McpRoute,
   SimulatorRoute: SimulatorRoute,
   ApiSplatRoute: ApiSplatRoute,
+  ApiAiRoute: ApiAiRoute,
   ApiChatRoute: ApiChatRoute,
   DemoDbChatRoute: DemoDbChatRoute,
   DemoDbChatApiRoute: DemoDbChatApiRoute,

@@ -217,12 +217,12 @@ function normalizePortfolioHistory(
 async function requestPortfolioHistory() {
 	const data = await orpc.trading.getPortfolioHistory.call({});
 	// Transform the data to match the expected format
-	const transformedData = data.map(entry => ({
+	const transformedData = data.map((entry) => ({
 		...entry,
 		model: {
 			name: entry.model?.name || "Unknown Model",
-			openRouterModelName: entry.model?.openRouterModelName || "unknown-model"
-		}
+			openRouterModelName: entry.model?.openRouterModelName || "unknown-model",
+		},
 	}));
 	return normalizePortfolioHistory({ history: transformedData });
 }

@@ -6,7 +6,7 @@ import {
 	IsomorphicFetchHttpLibrary,
 	OrderApi,
 	ServerConfiguration,
-} from "@/lighter/generated";
+} from "@/lighter/generated/index";
 import { ToolCallType } from "@/server/db/tradingRepository";
 import {
 	createInvocationMutation,

@@ -1,4 +1,4 @@
-import type { SimpleOrder } from "@/lighter/generated";
+import type { SimpleOrder } from "@/lighter/generated/index";
 
 export type TradingMode = "live" | "simulated";
 
