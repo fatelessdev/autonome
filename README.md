@@ -2,8 +2,6 @@
 
 # Autonome
 
-github-link = "https://github.com/fatelessdev/autonome"
-
 Autonome is an AI-powered autonomous cryptocurrency trading platform that blends TanStack Start, multi-provider AI strategies, and a high-fidelity trading simulator for both live and sandbox execution. This README is tailored for the HUSHH TC.40779.2027.55355 / TC.40779.2026.55243 Round-2 submission process and documents everything evaluators need to reproduce, review, and extend the project.
 
 ## Table of Contents
