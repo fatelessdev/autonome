@@ -1,366 +1,147 @@
-Welcome to your new TanStack app! 
-
 # Getting Started
 
-To run this application:
+# Autonome
 
-```bash
-bun install
-bun --bun run start
-```
+github-link = "https://github.com/fatelessdev/autonome"
 
-# Building For Production
+Autonome is an AI-powered autonomous cryptocurrency trading platform that blends TanStack Start, multi-provider AI strategies, and a high-fidelity trading simulator for both live and sandbox execution. This README is tailored for the HUSHH TC.40779.2027.55355 / TC.40779.2026.55243 Round-2 submission process and documents everything evaluators need to reproduce, review, and extend the project.
 
-To build this application for production:
+## Table of Contents
+- [Tech Stack](#tech-stack)
+- [Architecture](#architecture)
+- [Core Features](#core-features)
+- [Setup & Run](#setup--run)
+- [Environment Variables](#environment-variables)
+- [Database & Data Models](#database--data-models)
+- [APIs & Integrations](#apis--integrations)
+- [Testing & Quality](#testing--quality)
+- [Deployment](#deployment)
+- [Impact & Metrics](#impact--metrics)
+- [Whats Next](#whats-next)
 
-```bash
-bun --bun run build
-```
-
-## Testing
-
-This project uses [Vitest](https://vitest.dev/) for testing. You can run the tests with:
-
-```bash
-bun --bun run test
-```
-
-## Styling
-
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
-
-
-## Linting & Formatting
-
-This project uses [Biome](https://biomejs.dev/) for linting and formatting. The following scripts are available:
-
-
-```bash
-bun --bun run lint
-bun --bun run format
-bun --bun run check
-```
-
-
-## Shadcn
-
-Add components using the latest version of [Shadcn](https://ui.shadcn.com/).
-
-```bash
-pnpx shadcn@latest add button
-```
-
-
-## T3Env
-
-- You can use T3Env to add type safety to your environment variables.
-- Add Environment variables to the `src/env.mjs` file.
-- Use the environment variables in your code.
-
-### Usage
-
-```ts
-import { env } from "@/env";
-
-console.log(env.VITE_APP_TITLE);
-```
-
-
-
-
-
-# TanStack Chat Application
-
-Am example chat application built with TanStack Start, TanStack Store, and Claude AI.
-
-## .env Updates
-
-```env
-ANTHROPIC_API_KEY=your_anthropic_api_key
-```
-
-## ✨ Features
-
-### AI Capabilities
-- 🤖 Powered by Claude 3.5 Sonnet 
-- 📝 Rich markdown formatting with syntax highlighting
-- 🎯 Customizable system prompts for tailored AI behavior
-- 🔄 Real-time message updates and streaming responses (coming soon)
-
-### User Experience
-- 🎨 Modern UI with Tailwind CSS and Lucide icons
-- 🔍 Conversation management and history
-- 🔐 Secure API key management
-- 📋 Markdown rendering with code highlighting
-
-### Technical Features
-- 📦 Centralized state management with TanStack Store
-- 🔌 Extensible architecture for multiple AI providers
-- 🛠️ TypeScript for type safety
+## Tech Stack
+| Layer | Technologies |
+| --- | --- |
+| Framework & Runtime | TanStack Start (React 19, SSR), Vite w/ TanStack Router plugin, Bun package/runtime |
+| Styling & UI | Tailwind CSS v4, shadcn/ui, Lucide icons, GSAP micro-interactions |
+| Data & State | TanStack Query + oRPC, EventSource (SSE), React Store, cva utilities |
+| Backend | Node/Bun server, oRPC procedures, Sentry tracing, Exchange Simulator, schedulers |
+| Database | PostgreSQL + Drizzle ORM (quoted identifiers, repository pattern) |
+| AI & Trading Integrations | AI SDK v6 (Anthropic Claude primary, Google, OpenAI, Mistral, NVIDIA NIM), Lighter REST API SDK |
+| Tooling | Biome (lint/format), Vitest, T3Env, tsx, dotenv, Sentry |
 
 ## Architecture
 
-### Tech Stack
-- **Frontend Framework**: TanStack Start
-- **Routing**: TanStack Router
-- **State Management**: TanStack Store
-- **Styling**: Tailwind CSS
-- **AI Integration**: Anthropic's Claude API
-
-
-## Routing
-This project uses [TanStack Router](https://tanstack.com/router). The initial setup is a file based router. Which means that the routes are managed as files in `src/routes`.
-
-### Adding A Route
-
-To add a new route to your application just add another a new file in the `./src/routes` directory.
-
-TanStack will automatically generate the content of the route file for you.
-
-Now that you have two routes you can use a `Link` component to navigate between them.
-
-### Adding Links
-
-To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
-
-```tsx
-import { Link } from "@tanstack/react-router";
-```
-
-Then anywhere in your JSX you can use it like so:
-
-```tsx
-<Link to="/about">About</Link>
-```
-
-This will create a link that will navigate to the `/about` route.
-
-More information on the `Link` component can be found in the [Link documentation](https://tanstack.com/router/v1/docs/framework/react/api/router/linkComponent).
-
-### Using A Layout
-
-In the File Based Routing setup the layout is located in `src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you use the `<Outlet />` component.
-
-Here is an example layout that includes a header:
-
-```tsx
-import { Outlet, createRootRoute } from '@tanstack/react-router'
-import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
-
-import { Link } from "@tanstack/react-router";
-
-export const Route = createRootRoute({
-  component: () => (
-    <>
-      <header>
-        <nav>
-          <Link to="/">Home</Link>
-          <Link to="/about">About</Link>
-        </nav>
-      </header>
-      <Outlet />
-      <TanStackRouterDevtools />
-    </>
-  ),
-})
-```
-
-The `<TanStackRouterDevtools />` component is not required so you can remove it if you don't want it in your layout.
-
-More information on layouts can be found in the [Layouts documentation](https://tanstack.com/router/latest/docs/framework/react/guide/routing-concepts#layouts).
-
-
-## Data Fetching
-
-There are multiple ways to fetch data in your application. You can use TanStack Query to fetch data from a server. But you can also use the `loader` functionality built into TanStack Router to load the data for a route before it's rendered.
-
-For example:
-
-```tsx
-const peopleRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/people",
-  loader: async () => {
-    const response = await fetch("https://swapi.dev/api/people");
-    return response.json() as Promise<{
-      results: {
-        name: string;
-      }[];
-    }>;
-  },
-  component: () => {
-    const data = peopleRoute.useLoaderData();
-    return (
-      <ul>
-        {data.results.map((person) => (
-          <li key={person.name}>{person.name}</li>
-        ))}
-      </ul>
-    );
-  },
-});
-```
-
-Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
-
-### React-Query
-
-React-Query is an excellent addition or alternative to route loading and integrating it into you application is a breeze.
-
-First add your dependencies:
-
-```bash
-bun install @tanstack/react-query @tanstack/react-query-devtools
-```
-
-Next we'll need to create a query client and provider. We recommend putting those in `main.tsx`.
-
-```tsx
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-
-// ...
-
-const queryClient = new QueryClient();
-
-// ...
-
-if (!rootElement.innerHTML) {
-  const root = ReactDOM.createRoot(rootElement);
-
-  root.render(
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
-  );
-}
-```
-
-You can also add TanStack Query Devtools to the root route (optional).
-
-```tsx
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-
-const rootRoute = createRootRoute({
-  component: () => (
-    <>
-      <Outlet />
-      <ReactQueryDevtools buttonPosition="top-right" />
-      <TanStackRouterDevtools />
-    </>
-  ),
-});
-```
-
-Now you can use `useQuery` to fetch your data.
-
-```tsx
-import { useQuery } from "@tanstack/react-query";
-
-import "./App.css";
-
-function App() {
-  const { data } = useQuery({
-    queryKey: ["people"],
-    queryFn: () =>
-      fetch("https://swapi.dev/api/people")
-        .then((res) => res.json())
-        .then((data) => data.results as { name: string }[]),
-    initialData: [],
-  });
-
-  return (
-    <div>
-      <ul>
-        {data.map((person) => (
-          <li key={person.name}>{person.name}</li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-export default App;
-```
-
-You can find out everything you need to know on how to use React-Query in the [React-Query documentation](https://tanstack.com/query/latest/docs/framework/react/overview).
-
-## State Management
-
-Another common requirement for React applications is state management. There are many options for state management in React. TanStack Store provides a great starting point for your project.
-
-First you need to add TanStack Store as a dependency:
-
-```bash
-bun install @tanstack/store
-```
-
-Now let's create a simple counter in the `src/App.tsx` file as a demonstration.
-
-```tsx
-import { useStore } from "@tanstack/react-store";
-import { Store } from "@tanstack/store";
-import "./App.css";
-
-const countStore = new Store(0);
-
-function App() {
-  const count = useStore(countStore);
-  return (
-    <div>
-      <button onClick={() => countStore.setState((n) => n + 1)}>
-        Increment - {count}
-      </button>
-    </div>
-  );
-}
-
-export default App;
-```
-
-One of the many nice features of TanStack Store is the ability to derive state from other state. That derived state will update when the base state updates.
-
-Let's check this out by doubling the count using derived state.
-
-```tsx
-import { useStore } from "@tanstack/react-store";
-import { Store, Derived } from "@tanstack/store";
-import "./App.css";
-
-const countStore = new Store(0);
-
-const doubledStore = new Derived({
-  fn: () => countStore.state * 2,
-  deps: [countStore],
-});
-doubledStore.mount();
-
-function App() {
-  const count = useStore(countStore);
-  const doubledCount = useStore(doubledStore);
-
-  return (
-    <div>
-      <button onClick={() => countStore.setState((n) => n + 1)}>
-        Increment - {count}
-      </button>
-      <div>Doubled - {doubledCount}</div>
-    </div>
-  );
-}
-
-export default App;
-```
-
-We use the `Derived` class to create a new store that is derived from another store. The `Derived` class has a `mount` method that will start the derived store updating.
-
-Once we've created the derived store we can use it in the `App` component just like we would any other store using the `useStore` hook.
-
-You can find out everything you need to know on how to use TanStack Store in the [TanStack Store documentation](https://tanstack.com/store/latest).
-
-# Demo files
-
-Files prefixed with `demo` can be safely deleted. They are there to provide a starting point for you to play around with the features you've installed.
-
-# Learn More
-
-You can learn more about all of the offerings from TanStack in the [TanStack documentation](https://tanstack.com).
+![alt text](https://github.com/fatelessdev/autonome/public/architecture.png)
+
+- **Client** renders TanStack Start routes, reusing `orpc.*.*.queryOptions` for data fetching and SSE streams (`/api/events/*`) for live updates.
+- **Server** exposes only oRPC endpoints (`src/routes/api/rpc.$.ts`) backed by domain modules under `src/server/features/**`. Schedulers bootstrap once per process via `instrument.server.mjs` + `ExchangeSimulator`.
+- **Data** persists in PostgreSQL using Drizzle with quoted identifiers (`"Models"`, `"netPortfolio"`) and repository helpers. Read-only SQL tooling is enforced through AI assistant guardrails.
+- **Integrations** include the generated Lighter SDK for real market access, AI SDK multi-provider orchestration, and EventEmitter-backed SSE broadcasters for UI reactivity.
+
+## Core Features
+- **Autonomous Trading Loop** – AI agents evaluate market data, craft trade/exit decisions, and route them via simulator or Lighter live endpoints with risk controls.
+- **AI Co-Pilot Chat** – Model chat tab shows reasoning, tool calls, exit updates, and their execution status with markdown and decision badges.
+- **Trading Simulator** – ExchangeSimulator mimics latency, slippage, maker/taker fees, and funding to validate strategies offline.
+- **Positions & Trades Dashboard** – Unified sidebar with filters, net PnL summaries, exit plan visualization, and streaming updates.
+- **Multi-Provider AI Stack** – Anthropic Claude primary with fallbacks to Google, OpenAI, Mistral, and NVIDIA NIM for SQL planning.
+- **Safety Rails** – Read-only SQL enforcement, Sentry spans, environment-guarded scheduler bootstrap, and typed env access via T3Env.
+
+## Setup & Run
+
+### Prerequisites
+- Bun >= 1.1 and Node 18+ (Bun drives package scripts)
+- PostgreSQL 15+ (local or hosted)
+- Lighter API credentials (or simulator mode)
+
+### Steps
+1. **Install deps**
+   ```bash
+   bun install
+   ```
+2. **Configure env**
+   ```bash
+   cp .env.example .env
+   # fill in API keys, database URL, etc.
+   ```
+3. **Prepare database**
+   ```bash
+   bun run db:generate   # after schema tweaks
+   bun run db:migrate    # apply migrations
+   ```
+4. **Run dev server**
+   ```bash
+   bun run dev           # Vite + scheduler bootstrap
+   ```
+5. **Production build & start**
+   ```bash
+   bun run build
+   bun run start
+   ```
+
+Common helper scripts:
+
+| Command | Purpose |
+| --- | --- |
+| `bun run lint` / `bun run format` / `bun run check` | Biome linting, formatting, lint+type combo |
+| `bun run test` | Vitest suite (unit + domain tests) |
+| `bun run db:studio` | Launch Drizzle Studio to inspect live schema |
+| `bun run scripts/validate-env.ts` | Verify mandatory environment configuration (new) |
+
+## Environment Variables
+All secrets are typed through `src/env.ts`. Copy `.env.example` and fill the following:
+
+| Variable | Description |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `SERVER_URL` | Public server origin (optional, used for callbacks) |
+| `TRADING_MODE` | `live` or `simulated`; toggles ExchangeSimulator |
+| `IS_SIMULATION_ENABLED` | Mirror flag for client deployments (string `true`/`false`) |
+| `LIGHTER_API_KEY_INDEX` | Selects credential slot in zkLighter account (default 2) |
+| `LIGHTER_BASE_URL` | Lighter REST endpoint base |
+| `SIM_*` vars | Configure simulator capital, fees, latency, funding cadence |
+| `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `OPENAI_API_KEY`, `MISTRAL_API_KEY`, `NIM_API_KEY` | Provider auth tokens |
+| `VITE_SENTRY_DSN` | Browser Sentry DSN (must be prefixed with `VITE_`) |
+| `VITE_APP_TITLE` | Optional UI title override |
+
+## Database & Data Models
+- **ORM**: Drizzle with quoted identifiers; see `db/schema.ts` for `"Models"`, `"Trades"`, `"PortfolioSnapshots"`, etc.
+- **Repository Pattern**: Query helpers under `src/server/db/**` expose typed data loaders consumed by oRPC procedures.
+- **Key Domain Rules**
+  - Monetary fields such as `"netPortfolio"` are stored as `TEXT`; cast to `NUMERIC` for analytics (`CAST("netPortfolio" AS NUMERIC)`).
+  - IDs are `TEXT` (not UUID). Avoid implicit type casts when joining.
+  - All AI-generated SQL is funneled through `queryPortfolioSql` and guarded by `enforceReadOnly`.
+- **Migrations**: Generated via `drizzle-kit` into `drizzle/` and executed with the `db:*` scripts listed above.
+
+## APIs & Integrations
+- **oRPC Router (`src/server/orpc/router`)**
+  - `trading.*`: trades, positions, crypto prices, portfolio history.
+  - `models.*`: AI model metadata, invocation history.
+  - `simulator.*`: place/reset orders, account snapshots, historical trades.
+  - `chat`: model reasoning stream with SQL tooling.
+- **SSE Streams**
+  - `/api/events/trading` – real-time position updates.
+  - `/api/events/trades` – execution feed.
+  - `/api/events/conversations` – AI chat events.
+- **External Services**
+  - `lighter-sdk-ts` generated client for zkLighter REST API.
+  - AI SDK v6 multi-provider stack (Anthropic, Google, OpenAI, Mistral, NVIDIA NIM).
+  - Sentry instrumentation covering both router and server spans.
+
+## Testing & Quality
+- **Vitest** for unit/integration tests (`bun run test`).
+- **Biome** enforces tabs, double quotes, and max line width 80.
+- **Type Safety** through strict TypeScript config and Zod validation on every oRPC input/output.
+- **Manual QA Playbook**
+  - Run `bun run dev` with `TRADING_MODE=simulated` to exercise ExchangeSimulator.
+  - Trigger `scripts/validate-env.ts` before deployments to catch missing secrets.
+
+## Deployment
+- Build with `bun run build` (Vite + SSR bundle) and start via `bun run start`, which reuses `instrument.server.mjs` to bootstrap schedulers in production.
+- Deployable on any Bun-compatible host (Render, Fly.io, custom VM). Provide `DATABASE_URL`, provider keys, and `SERVER_URL` per environment. Ensure SSE endpoints stay behind HTTPS for production.
+
+## Impact & Metrics
+- **Latency**: SSE updates every 3s for price refresh; simulator latency randomized between 40–250 ms to mimic exchange fills.
+- **Caching**: TanStack Query caches volatile data 15s–5min, balancing responsiveness with API quotas.
+- **Resilience**: Schedulers guard against duplicate bootstrap via global flag; errors are traced in Sentry for root-cause analysis.
+- **Scalability**: oRPC procedures are stateless and pool DB connections; trading simulators/spans can run horizontally per process.

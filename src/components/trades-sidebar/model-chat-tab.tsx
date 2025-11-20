@@ -4,7 +4,6 @@ import rehypeRaw from "rehype-raw";
 import remarkGfm from "remark-gfm";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { getModelInfo } from "@/shared/models/modelConfig";
 import { ModelChatSkeleton } from "./loading-skeletons";
 import type { Conversation } from "./types";
 import {
@@ -12,6 +11,7 @@ import {
 	extractTradingDecisions,
 	formatDecisionDetails,
 	formatTimestamp,
+	resolveModelIdentity,
 } from "./utils";
 
 type ModelChatTabProps = {
@@ -88,12 +88,12 @@ export function ModelChatTab({
 					) : (
 						<div>
 							{conversations.map((conv, idx) => {
-								const modelKey = conv.modelLogo || conv.modelName;
-								const modelInfo = getModelInfo(modelKey || conv.modelName);
+								const modelInfo = resolveModelIdentity({
+									modelLogo: conv.modelLogo,
+									modelName: conv.modelName,
+								});
 								const modelColor = modelInfo.color || "#888888";
-								const modelLabel = modelInfo.logo
-									? modelInfo.label
-									: conv.modelName || modelKey || "Unknown Model";
+								const modelLabel = modelInfo.label;
 								const isExpanded = expandedResponses.has(conv.id);
 								const previewText = extractMarkdownPreview(conv.response);
 								const tradingDecisions = extractTradingDecisions(

@@ -5,9 +5,9 @@ import {
 	formatSignedCurrencyValue,
 	normalizeNumber,
 } from "@/shared/formatting/numberFormat";
-import { getModelInfo } from "@/shared/models/modelConfig";
 import { PositionsListSkeleton } from "./loading-skeletons";
 import type { ExitPlanSelection, ModelPositions } from "./types";
+import { resolveModelIdentity } from "./utils";
 
 type PositionsTabProps = {
 	positions: ModelPositions[];
@@ -43,12 +43,12 @@ export function PositionsTab({
 						<div>
 							{positions.map((modelPos, modelIdx) => {
 								if (modelPos.positions.length === 0) return null;
-								const modelKey = modelPos.modelLogo || modelPos.modelName;
-								const modelInfo = getModelInfo(modelKey || modelPos.modelName);
+								const modelInfo = resolveModelIdentity({
+									modelLogo: modelPos.modelLogo,
+									modelName: modelPos.modelName,
+								});
 								const modelColor = modelInfo.color || "#888888";
-								const modelLabel = modelInfo.logo
-									? modelInfo.label
-									: modelPos.modelName;
+								const modelLabel = modelInfo.label;
 								const totalUnrealizedNumeric =
 									normalizeNumber(modelPos.totalUnrealizedPnl) ??
 									modelPos.positions.reduce(

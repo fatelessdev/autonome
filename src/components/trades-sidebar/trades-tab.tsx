@@ -2,10 +2,13 @@ import { ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCurrency } from "@/shared/formatting/numberFormat";
-import { getModelInfo } from "@/shared/models/modelConfig";
 import { TradesListSkeleton } from "./loading-skeletons";
 import type { Trade } from "./types";
-import { computeHoldingLabel, formatTimestamp } from "./utils";
+import {
+	computeHoldingLabel,
+	formatTimestamp,
+	resolveModelIdentity,
+} from "./utils";
 
 type TradesTabProps = {
 	trades: Trade[];
@@ -30,16 +33,13 @@ export function TradesTab({ trades, loading, filterMenu }: TradesTabProps) {
 					) : (
 						<div>
 							{trades.map((trade, idx) => {
-								const modelInfo = getModelInfo(
-									trade.modelKey || trade.modelName,
-								);
+								const modelInfo = resolveModelIdentity({
+									modelKey: trade.modelKey,
+									modelName: trade.modelName,
+									modelRouterName: trade.modelRouterName,
+								});
 								const modelColor = modelInfo.color || "#888888";
-								const modelLabel = modelInfo.logo
-									? modelInfo.label
-									: trade.modelName ||
-										trade.modelRouterName ||
-										trade.modelKey ||
-										"Unknown Model";
+								const modelLabel = modelInfo.label;
 								const isShort = trade.side === "SHORT";
 								const netPnlValue = trade.netPnl ?? 0;
 								const isProfitable = netPnlValue >= 0;

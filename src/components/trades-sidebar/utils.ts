@@ -5,6 +5,7 @@ import {
 	formatPriceLabel,
 	formatQuantityValue,
 } from "@/shared/formatting/numberFormat";
+import { getModelInfo } from "@/shared/models/modelConfig";
 import type { Conversation, TradingDecisionCard } from "./types";
 
 export const extractMarkdownPreview = (
@@ -163,4 +164,51 @@ export const computeHoldingLabel = (
 	if (hours > 0) parts.push(`${hours}H`);
 	parts.push(`${minutes}M`);
 	return parts.join(" ");
+};
+
+type ModelIdentitySource = {
+	modelKey?: string | null;
+	modelName?: string | null;
+	modelLogo?: string | null;
+	modelRouterName?: string | null;
+};
+
+export const resolveModelIdentity = (source: ModelIdentitySource) => {
+	const candidates = [
+		source.modelLogo,
+		source.modelKey,
+		source.modelRouterName,
+		source.modelName,
+	]
+		.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+		.map((value) => value.trim());
+
+	for (const candidate of candidates) {
+		const info = getModelInfo(candidate);
+		if (info.logo) {
+			return info;
+		}
+	}
+
+	const fallbackLabel =
+		source.modelName ||
+		source.modelRouterName ||
+		source.modelKey ||
+		source.modelLogo ||
+		"Unknown Model";
+
+	if (candidates.length > 0) {
+		const info = getModelInfo(candidates[0]);
+		return {
+			logo: info.logo,
+			color: info.color,
+			label: info.logo ? info.label : fallbackLabel,
+		};
+	}
+
+	return {
+		logo: "",
+		color: "#888888",
+		label: fallbackLabel,
+	};
 };

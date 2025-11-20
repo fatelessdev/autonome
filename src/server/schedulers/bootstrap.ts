@@ -6,7 +6,8 @@ import { ensureTradeScheduler } from "@/server/features/trading/tradeExecutor";
 let bootstrapped = false;
 
 export async function bootstrapSchedulers() {
-	if (typeof window !== "undefined" || bootstrapped) {
+	const isBrowser = typeof window !== "undefined" && typeof window.document !== "undefined";
+	if (isBrowser || bootstrapped) {
 		return;
 	}
 

@@ -1,4 +1,4 @@
-export const MODEL_INFO: Record<
+	export const MODEL_INFO: Record<
 	string,
 	{ logo: string; color: string; label: string }
 > = {
@@ -27,10 +27,10 @@ export const MODEL_INFO: Record<
 		color: "#FF6B35",
 		label: "Claude Sonnet 4.5",
 	},
-	"grok-4": {
-		logo: "https://nof1.ai/logos_white/Grok_logo.webp",
+	"grok-4.1-fast": {
+		logo: "/grok.webp",
 		color: "#000000",
-		label: "Grok 4",
+		label: "Grok 4.1",
 	},
 	"qwen3-max": {
 		logo: "https://nof1.ai/logos_white/qwen_logo.png",
