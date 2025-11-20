@@ -32,7 +32,7 @@ Autonome is an AI-powered autonomous cryptocurrency trading platform that blends
 
 ## Architecture
 
-![alt text](https://github.com/fatelessdev/autonome/public/architecture.png)
+![Architecture text](https://github.com/fatelessdev/autonome/blob/main/public/architecture.png)
 
 - **Client** renders TanStack Start routes, reusing `orpc.*.*.queryOptions` for data fetching and SSE streams (`/api/events/*`) for live updates.
 - **Server** exposes only oRPC endpoints (`src/routes/api/rpc.$.ts`) backed by domain modules under `src/server/features/**`. Schedulers bootstrap once per process via `instrument.server.mjs` + `ExchangeSimulator`.
