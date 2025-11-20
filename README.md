@@ -13,9 +13,7 @@ Autonome is an AI-powered autonomous cryptocurrency trading platform that blends
 - [Database & Data Models](#database--data-models)
 - [APIs & Integrations](#apis--integrations)
 - [Testing & Quality](#testing--quality)
-- [Deployment](#deployment)
 - [Impact & Metrics](#impact--metrics)
-- [Whats Next](#whats-next)
 
 ## Tech Stack
 | Layer | Technologies |
@@ -133,10 +131,6 @@ All secrets are typed through `src/env.ts`. Copy `.env.example` and fill the fol
 - **Manual QA Playbook**
   - Run `bun run dev` with `TRADING_MODE=simulated` to exercise ExchangeSimulator.
   - Trigger `scripts/validate-env.ts` before deployments to catch missing secrets.
-
-## Deployment
-- Build with `bun run build` (Vite + SSR bundle) and start via `bun run start`, which reuses `instrument.server.mjs` to bootstrap schedulers in production.
-- Deployable on any Bun-compatible host (Render, Fly.io, custom VM). Provide `DATABASE_URL`, provider keys, and `SERVER_URL` per environment. Ensure SSE endpoints stay behind HTTPS for production.
 
 ## Impact & Metrics
 - **Latency**: SSE updates every 3s for price refresh; simulator latency randomized between 40–250 ms to mimic exchange fills.
