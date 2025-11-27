@@ -128,6 +128,10 @@ export async function getOpenPositions(
 			"index",
 			accountIndex,
 		);
+		console.log(
+			`[Positions] API Response for ${accountIndex}:`,
+			JSON.stringify(currentOpenOrders.data, null, 2),
+		);
 		const positions = currentOpenOrders.data.accounts[0]?.positions ?? [];
 
 		if (options.fallbackToSimulator && (!positions || positions.length === 0)) {

@@ -38,7 +38,7 @@ Autonome is an AI-powered autonomous cryptocurrency trading platform that blends
 ## Core Features
 - **Autonomous Trading Loop** – AI agents evaluate market data, craft trade/exit decisions, and route them via simulator or Lighter live endpoints with risk controls.
 - **AI Co-Pilot Chat** – Model chat tab shows reasoning, tool calls, exit updates, and their execution status with markdown and decision badges.
-- **Trading Simulator** – ExchangeSimulator mimics latency, slippage, maker/taker fees, and funding to validate strategies offline.
+- **Trading Simulator** – ExchangeSimulator to validate strategies offline.
 - **Positions & Trades Dashboard** – Unified sidebar with filters, net PnL summaries, exit plan visualization, and streaming updates.
 - **Multi-Provider AI Stack** – Anthropic Claude primary with fallbacks to Google, OpenAI, Mistral, and NVIDIA NIM for SQL planning.
 - **Safety Rails** – Read-only SQL enforcement, Sentry spans, environment-guarded scheduler bootstrap, and typed env access via T3Env.
@@ -95,7 +95,7 @@ All secrets are typed through `src/env.ts`. Copy `.env.example` and fill the fol
 | `IS_SIMULATION_ENABLED` | Mirror flag for client deployments (string `true`/`false`) |
 | `LIGHTER_API_KEY_INDEX` | Selects credential slot in zkLighter account (default 2) |
 | `LIGHTER_BASE_URL` | Lighter REST endpoint base |
-| `SIM_*` vars | Configure simulator capital, fees, latency, funding cadence |
+| `SIM_*` vars | Configure simulator capital |
 | `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `OPENAI_API_KEY`, `MISTRAL_API_KEY`, `NIM_API_KEY` | Provider auth tokens |
 | `VITE_SENTRY_DSN` | Browser Sentry DSN (must be prefixed with `VITE_`) |
 | `VITE_APP_TITLE` | Optional UI title override |
@@ -133,7 +133,7 @@ All secrets are typed through `src/env.ts`. Copy `.env.example` and fill the fol
   - Trigger `scripts/validate-env.ts` before deployments to catch missing secrets.
 
 ## Impact & Metrics
-- **Latency**: SSE updates every 3s for price refresh; simulator latency randomized between 40–250 ms to mimic exchange fills.
+- **Latency**: SSE updates every 3s for price refresh
 - **Caching**: TanStack Query caches volatile data 15s–5min, balancing responsiveness with API quotas.
 - **Resilience**: Schedulers guard against duplicate bootstrap via global flag; errors are traced in Sentry for root-cause analysis.
 - **Scalability**: oRPC procedures are stateless and pool DB connections; trading simulators/spans can run horizontally per process.

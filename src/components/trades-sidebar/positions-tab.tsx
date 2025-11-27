@@ -227,9 +227,9 @@ export function PositionsTab({
 }
 
 const SYMBOL_ICON_MAP: Record<string, { src: string; alt: string }> = {
-	BTC: { src: "/btc.svg", alt: "BTC" },
-	ETH: { src: "/eth.svg", alt: "ETH" },
-	SOL: { src: "/sol.svg", alt: "SOL" },
+	BTC: { src: "/coins/btc.svg", alt: "BTC" },
+	ETH: { src: "/coins/eth.svg", alt: "ETH" },
+	SOL: { src: "/coins/sol.svg", alt: "SOL" },
 };
 
 function renderSymbolIcon(symbol: string) {

@@ -8,6 +8,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { SQL_ASSISTANT_PROMPT } from "@/server/chat/sqlPrompt";
 import { tools } from "@/server/chat/tools";
+import { env } from "process";
 
 // AI SDK-compatible chat endpoint
 async function handleChat({ request }: { request: Request }) {
@@ -29,7 +30,7 @@ async function handleChat({ request }: { request: Request }) {
 			name: "nim",
 			baseURL: "https://integrate.api.nvidia.com/v1",
 			headers: {
-				Authorization: `Bearer ${process.env.NIM_API_KEY}`,
+				Authorization: `Bearer ${env.NIM_API_KEY}`,
 			},
 		});
 		const model = nim.chatModel("moonshotai/kimi-k2-instruct-0905");

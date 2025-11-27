@@ -6,29 +6,10 @@ export type OrderSide = "buy" | "sell";
 
 export type OrderType = "market" | "limit";
 
-export interface SimulatorLatency {
-	minMs: number;
-	maxMs: number;
-}
-
-export interface SimulatorSlippage {
-	maxBasisPoints: number;
-}
-
-export interface SimulatorFeeConfig {
-	makerBps: number;
-	takerBps: number;
-}
 
 export interface ExchangeSimulatorOptions {
 	initialCapital: number;
 	quoteCurrency: string;
-	latency: SimulatorLatency;
-	slippage: SimulatorSlippage;
-	fees: SimulatorFeeConfig;
-	deterministicSeed?: number;
-	fundingPeriodHours: number;
-	fundingRefreshIntervalMs: number;
 	refreshIntervalMs: number;
 }
 
@@ -66,17 +47,12 @@ export interface OrderMatchingInput {
 export interface FillDetail {
 	quantity: number;
 	price: number;
-	maker: boolean;
-	fee: number;
-	slippageBps: number;
-	latencyMs: number;
 }
 
 export interface OrderExecution {
 	fills: FillDetail[];
 	averagePrice: number;
 	totalQuantity: number;
-	totalFees: number;
 	status: "filled" | "partial" | "rejected";
 	reason?: string;
 }
@@ -122,7 +98,6 @@ export interface AccountSnapshot {
 	positions: PositionSummary[];
 	totalRealizedPnl: number;
 	totalUnrealizedPnl: number;
-	totalFundingPnl: number;
 }
 
 export interface OrderBookSource {

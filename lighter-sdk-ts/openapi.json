@@ -4264,7 +4264,6 @@
               "canceled-reduce-only",
               "canceled-position-not-allowed",
               "canceled-margin-not-allowed",
-              "canceled-too-much-slippage",
               "canceled-not-enough-liquidity",
               "canceled-self-trade",
               "canceled-expired",

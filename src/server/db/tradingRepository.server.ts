@@ -14,8 +14,8 @@ export const listModelsQuery = () =>
 	queryOptions({
 		queryKey: ["models", "list"],
 		queryFn: () => repo.listModels(),
-		staleTime: 30_000, // 30 seconds
-		gcTime: 5 * 60_000, // Keep in cache for 5 minutes
+		staleTime: Infinity, // 30 seconds
+		gcTime: Infinity, // Keep in cache for 5 minutes
 	});
 
 /**
@@ -26,8 +26,8 @@ export const listModelsOrderedQuery = () =>
 	queryOptions({
 		queryKey: ["models", "list-ordered"],
 		queryFn: () => repo.listModelsOrderedAsc(),
-		staleTime: 30_000,
-		gcTime: 5 * 60_000,
+		staleTime: Infinity,
+		gcTime: Infinity,
 	});
 
 /**
@@ -90,8 +90,8 @@ export const searchModelsQuery = (params: {
 	queryOptions({
 		queryKey: ["models", "search", params.search, params.limit ?? 10],
 		queryFn: () => repo.searchModels(params),
-		staleTime: 10_000,
-		gcTime: 1 * 60_000,
+		staleTime: Infinity,
+		gcTime: Infinity,
 		enabled: !!params.search, // Only run if search term provided
 	});
 

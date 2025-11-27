@@ -25,7 +25,6 @@ export class AccountState {
 	private readonly positions = new Map<string, PositionInternal>();
 	private totalRealized = 0;
 	private totalFees = 0;
-	private totalFunding = 0;
 
 	constructor(private readonly options: ExchangeSimulatorOptions) {
 		this.cashBalance = options.initialCapital;
@@ -37,7 +36,6 @@ export class AccountState {
 		copy.cashBalance = this.cashBalance;
 		copy.totalRealized = this.totalRealized;
 		copy.totalFees = this.totalFees;
-		copy.totalFunding = this.totalFunding;
 		copy.positions.clear();
 		for (const [symbol, position] of this.positions.entries()) {
 			copy.positions.set(symbol, {
@@ -154,7 +152,6 @@ export class AccountState {
 			const startingQuantity = position.quantity;
 
 			this.cashBalance -= signedQty * fill.price;
-			this.cashBalance -= fill.fee;
 
 			if (
 				startingQuantity === 0 ||
@@ -208,7 +205,6 @@ export class AccountState {
 			}
 
 			position.markPrice = fill.price;
-			this.totalFees += fill.fee;
 
 			if (!Number.isFinite(position.margin) || position.margin < 0) {
 				position.margin = 0;
@@ -230,38 +226,6 @@ export class AccountState {
 		const position = this.positions.get(symbol);
 		if (!position) return;
 		position.markPrice = markPrice;
-	}
-
-	applyFunding(symbol: string, effectiveRate: number) {
-		if (!Number.isFinite(effectiveRate) || effectiveRate === 0) {
-			return;
-		}
-
-		const position = this.positions.get(symbol);
-		if (!position || position.quantity === 0) {
-			return;
-		}
-
-		const markPrice = position.markPrice;
-		if (!Number.isFinite(markPrice) || markPrice <= 0) {
-			return;
-		}
-
-		const notional = Math.abs(position.quantity) * markPrice;
-		if (notional === 0) {
-			return;
-		}
-
-		const direction = Math.sign(position.quantity) || 1;
-		const fundingPnl = -direction * notional * effectiveRate;
-		if (fundingPnl === 0) {
-			return;
-		}
-
-		this.cashBalance += fundingPnl;
-		position.realizedPnl += fundingPnl;
-		this.totalRealized += fundingPnl;
-		this.totalFunding += fundingPnl;
 	}
 
 	getSnapshot(): AccountSnapshot {
@@ -328,7 +292,6 @@ export class AccountState {
 			positions,
 			totalRealizedPnl: this.totalRealized,
 			totalUnrealizedPnl: unrealizedTotal,
-			totalFundingPnl: this.totalFunding,
 		};
 	}
 

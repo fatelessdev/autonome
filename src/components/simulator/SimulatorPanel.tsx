@@ -216,19 +216,11 @@ export default function SimulatorPanel() {
 		void fetchAccount(accountId);
 	}, [accountId, fetchAccount]);
 
-	// Auto-refresh orderbook every 10 seconds
-	useEffect(() => {
-		const interval = setInterval(() => {
-			void fetchBook(symbol);
-		}, 10_000);
-		return () => clearInterval(interval);
-	}, [symbol, fetchBook]);
-
-	// Auto-refresh account every 10 seconds
+	// Auto-refresh account every 30 seconds
 	useEffect(() => {
 		const interval = setInterval(() => {
 			void fetchAccount(accountId);
-		}, 10_000);
+		}, 30_000);
 		return () => clearInterval(interval);
 	}, [accountId, fetchAccount]);
 
@@ -251,64 +243,64 @@ export default function SimulatorPanel() {
 
 				const trades = Array.isArray(data.trades)
 					? (data.trades as Array<Record<string, unknown>>)
-							.map((entry) => {
-								const symbol =
-									typeof entry.symbol === "string" ? entry.symbol : null;
-								if (!symbol) {
-									return null;
-								}
+						.map((entry) => {
+							const symbol =
+								typeof entry.symbol === "string" ? entry.symbol : null;
+							if (!symbol) {
+								return null;
+							}
 
-								const direction =
-									typeof entry.direction === "string" &&
+							const direction =
+								typeof entry.direction === "string" &&
 									entry.direction.toUpperCase() === "SHORT"
-										? "SHORT"
-										: "LONG";
+									? "SHORT"
+									: "LONG";
 
-								const notional =
-									typeof entry.notional === "number" &&
+							const notional =
+								typeof entry.notional === "number" &&
 									Number.isFinite(entry.notional)
-										? Math.abs(entry.notional)
-										: null;
-								const realizedPnl =
-									typeof entry.realizedPnl === "number" &&
+									? Math.abs(entry.notional)
+									: null;
+							const realizedPnl =
+								typeof entry.realizedPnl === "number" &&
 									Number.isFinite(entry.realizedPnl)
-										? entry.realizedPnl
-										: 0;
-								const leverage =
-									typeof entry.leverage === "number" &&
+									? entry.realizedPnl
+									: 0;
+							const leverage =
+								typeof entry.leverage === "number" &&
 									Number.isFinite(entry.leverage)
-										? entry.leverage
-										: null;
-								const confidence =
-									typeof entry.confidence === "number" &&
+									? entry.leverage
+									: null;
+							const confidence =
+								typeof entry.confidence === "number" &&
 									Number.isFinite(entry.confidence)
-										? entry.confidence
-										: null;
-								const parsedClosedAt =
-									typeof entry.closedAt === "string"
-										? Date.parse(entry.closedAt)
-										: NaN;
-								const timestamp = Number.isFinite(parsedClosedAt)
-									? parsedClosedAt
-									: Date.now();
+									? entry.confidence
+									: null;
+							const parsedClosedAt =
+								typeof entry.closedAt === "string"
+									? Date.parse(entry.closedAt)
+									: NaN;
+							const timestamp = Number.isFinite(parsedClosedAt)
+								? parsedClosedAt
+								: Date.now();
 
-								const id =
-									typeof entry.id === "string"
-										? entry.id
-										: `${symbol}-${timestamp}`;
+							const id =
+								typeof entry.id === "string"
+									? entry.id
+									: `${symbol}-${timestamp}`;
 
-								return {
-									id,
-									symbol,
-									direction,
-									notional: notional ?? 0,
-									realizedPnl,
-									leverage,
-									confidence,
-									timestamp,
-								} satisfies CompletedTrade;
-							})
-							.filter((value): value is CompletedTrade => value !== null)
+							return {
+								id,
+								symbol,
+								direction,
+								notional: notional ?? 0,
+								realizedPnl,
+								leverage,
+								confidence,
+								timestamp,
+							} satisfies CompletedTrade;
+						})
+						.filter((value): value is CompletedTrade => value !== null)
 					: [];
 
 				setCompletedTrades(trades);
@@ -337,14 +329,14 @@ export default function SimulatorPanel() {
 
 				const fetched = Array.isArray(data.models)
 					? (data.models as Array<{ id: string; name?: string | null }>).map(
-							(model) => ({
-								id: model.id,
-								label:
-									model.name && model.name.trim().length > 0
-										? model.name
-										: model.id,
-							}),
-						)
+						(model) => ({
+							id: model.id,
+							label:
+								model.name && model.name.trim().length > 0
+									? model.name
+									: model.id,
+						}),
+					)
 					: [];
 
 				const fallback = { id: DEFAULT_ACCOUNT_ID, label: "Demo account" };
@@ -407,22 +399,22 @@ export default function SimulatorPanel() {
 
 				const notional =
 					typeof payload.notional === "number" &&
-					Number.isFinite(payload.notional)
+						Number.isFinite(payload.notional)
 						? Math.abs(payload.notional)
 						: null;
 				const realized =
 					typeof payload.realizedPnl === "number" &&
-					Number.isFinite(payload.realizedPnl)
+						Number.isFinite(payload.realizedPnl)
 						? payload.realizedPnl
 						: 0;
 				const leverage =
 					typeof payload.leverage === "number" &&
-					Number.isFinite(payload.leverage)
+						Number.isFinite(payload.leverage)
 						? payload.leverage
 						: null;
 				const confidence =
 					typeof payload.confidence === "number" &&
-					Number.isFinite(payload.confidence)
+						Number.isFinite(payload.confidence)
 						? payload.confidence
 						: null;
 				const direction = payload.direction === "SHORT" ? "SHORT" : "LONG";
@@ -781,82 +773,6 @@ export default function SimulatorPanel() {
 
 			{/* Main Content Grid */}
 			<div className="grid gap-6 lg:grid-cols-3">
-				{/* Order Book */}
-				<Card className="lg:col-span-2 border-border/60 bg-card/50">
-					<CardHeader className="flex flex-row items-center justify-between pb-3">
-						<div>
-							<CardTitle className="text-lg">Order Book</CardTitle>
-							{book && (
-								<p className="text-sm text-muted-foreground">
-									Spread: {numberFormatter.format(book.spread)} · Mid:{" "}
-									{formatUsd(book.midPrice)}
-								</p>
-							)}
-						</div>
-						<Badge variant="secondary" className="font-mono text-xs">
-							{symbol}
-						</Badge>
-					</CardHeader>
-					<CardContent>
-						{book ? (
-							<div className="grid gap-6 md:grid-cols-2">
-								<div>
-									<div className="mb-2 flex items-center justify-between">
-										<h3 className="text-sm font-semibold text-red-400">Asks</h3>
-										<span className="text-xs text-muted-foreground">
-											{topAsks.length} levels
-										</span>
-									</div>
-									<div className="space-y-1">
-										{topAsks.map((level) => (
-											<div
-												key={`ask-${level.price}`}
-												className="group grid grid-cols-[1fr_auto] gap-2 rounded px-2 py-1 hover:bg-muted/50"
-											>
-												<span className="text-sm font-medium text-red-400">
-													{numberFormatter.format(level.price)}
-												</span>
-												<span className="text-sm tabular-nums text-muted-foreground group-hover:text-foreground">
-													{level.quantity.toFixed(4)}
-												</span>
-											</div>
-										))}
-									</div>
-								</div>
-								<div>
-									<div className="mb-2 flex items-center justify-between">
-										<h3 className="text-sm font-semibold text-emerald-400">
-											Bids
-										</h3>
-										<span className="text-xs text-muted-foreground">
-											{topBids.length} levels
-										</span>
-									</div>
-									<div className="space-y-1">
-										{topBids.map((level) => (
-											<div
-												key={`bid-${level.price}`}
-												className="group grid grid-cols-[1fr_auto] gap-2 rounded px-2 py-1 hover:bg-muted/50"
-											>
-												<span className="text-sm font-medium text-emerald-400">
-													{numberFormatter.format(level.price)}
-												</span>
-												<span className="text-sm tabular-nums text-muted-foreground group-hover:text-foreground">
-													{level.quantity.toFixed(4)}
-												</span>
-											</div>
-										))}
-									</div>
-								</div>
-							</div>
-						) : (
-							<div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
-								Waiting for order book data…
-							</div>
-						)}
-					</CardContent>
-				</Card>
-
 				{/* Right Column: Positions & Trade Activity */}
 				<div className="flex flex-col gap-6">
 					{/* Open Positions */}
@@ -910,11 +826,10 @@ export default function SimulatorPanel() {
 														Realized:
 													</span>
 													<span
-														className={`ml-2 font-medium ${
-															position.realizedPnl >= 0
-																? "text-emerald-500"
-																: "text-red-500"
-														}`}
+														className={`ml-2 font-medium ${position.realizedPnl >= 0
+															? "text-emerald-500"
+															: "text-red-500"
+															}`}
 													>
 														{formatUsd(position.realizedPnl)}
 													</span>
@@ -924,11 +839,10 @@ export default function SimulatorPanel() {
 														Unrealized:
 													</span>
 													<span
-														className={`ml-2 font-medium ${
-															position.unrealizedPnl >= 0
-																? "text-emerald-500"
-																: "text-red-500"
-														}`}
+														className={`ml-2 font-medium ${position.unrealizedPnl >= 0
+															? "text-emerald-500"
+															: "text-red-500"
+															}`}
 													>
 														{formatUsd(position.unrealizedPnl)}
 													</span>
@@ -962,11 +876,10 @@ export default function SimulatorPanel() {
 											Total Realized
 										</span>
 										<span
-											className={`text-lg font-bold ${
-												tradeSummary.totalRealized >= 0
-													? "text-emerald-500"
-													: "text-red-500"
-											}`}
+											className={`text-lg font-bold ${tradeSummary.totalRealized >= 0
+												? "text-emerald-500"
+												: "text-red-500"
+												}`}
 										>
 											{renderCurrencyMetric(tradeSummary.totalRealized)}
 										</span>
@@ -1001,11 +914,10 @@ export default function SimulatorPanel() {
 												Expectancy
 											</span>
 											<span
-												className={`text-sm font-semibold ${
-													tradeSummary.expectancy >= 0
-														? "text-emerald-500"
-														: "text-red-500"
-												}`}
+												className={`text-sm font-semibold ${tradeSummary.expectancy >= 0
+													? "text-emerald-500"
+													: "text-red-500"
+													}`}
 											>
 												{renderCurrencyMetric(tradeSummary.expectancy)}
 											</span>
@@ -1103,24 +1015,6 @@ export default function SimulatorPanel() {
 								</div>
 							))}
 						</div>
-					</CardContent>
-				</Card>
-			)}
-
-			{/* Errors */}
-			{errors.length > 0 && (
-				<Card className="border-destructive/60 bg-destructive/5">
-					<CardHeader>
-						<CardTitle className="text-lg text-destructive">Alerts</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<ul className="space-y-2 text-sm">
-							{errors.map((error) => (
-								<li key={error} className="font-mono">
-									{error}
-								</li>
-							))}
-						</ul>
 					</CardContent>
 				</Card>
 			)}

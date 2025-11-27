@@ -1,6 +1,6 @@
 {
-  "id": "6d8619d0-4007-48f6-95f1-70a975e218f5",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "c49b7c8e-cf23-47c8-b1e4-891899009078",
+  "prevId": "6d8619d0-4007-48f6-95f1-70a975e218f5",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -248,173 +248,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.Positions": {
-      "name": "Positions",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "modelId": {
-          "name": "modelId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "symbol": {
-          "name": "symbol",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "side": {
-          "name": "side",
-          "type": "PositionSide",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "quantity": {
-          "name": "quantity",
-          "type": "numeric(20, 8)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "entryPrice": {
-          "name": "entryPrice",
-          "type": "numeric(20, 8)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "leverage": {
-          "name": "leverage",
-          "type": "numeric(10, 2)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "confidence": {
-          "name": "confidence",
-          "type": "numeric(5, 4)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "exitPlan": {
-          "name": "exitPlan",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "toolCallId": {
-          "name": "toolCallId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "openedAt": {
-          "name": "openedAt",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updatedAt": {
-          "name": "updatedAt",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "Positions_modelId_idx": {
-          "name": "Positions_modelId_idx",
-          "columns": [
-            {
-              "expression": "modelId",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "Positions_symbol_idx": {
-          "name": "Positions_symbol_idx",
-          "columns": [
-            {
-              "expression": "symbol",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "Positions_modelId_symbol_key": {
-          "name": "Positions_modelId_symbol_key",
-          "columns": [
-            {
-              "expression": "modelId",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "symbol",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "Positions_modelId_Models_id_fk": {
-          "name": "Positions_modelId_Models_id_fk",
-          "tableFrom": "Positions",
-          "tableTo": "Models",
-          "columnsFrom": [
-            "modelId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "cascade"
-        },
-        "Positions_toolCallId_ToolCalls_id_fk": {
-          "name": "Positions_toolCallId_ToolCalls_id_fk",
-          "tableFrom": "Positions",
-          "tableTo": "ToolCalls",
-          "columnsFrom": [
-            "toolCallId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "cascade"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.ToolCalls": {
       "name": "ToolCalls",
       "schema": "",
@@ -499,14 +332,6 @@
     }
   },
   "enums": {
-    "public.PositionSide": {
-      "name": "PositionSide",
-      "schema": "public",
-      "values": [
-        "LONG",
-        "SHORT"
-      ]
-    },
     "public.ToolCallType": {
       "name": "ToolCallType",
       "schema": "public",

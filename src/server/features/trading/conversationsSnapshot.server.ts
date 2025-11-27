@@ -1,5 +1,4 @@
 import { db } from "@/db";
-import { emitConversationEvent } from "@/server/features/trading/events/conversationEvents";
 import { parseTradingToolCallMetadata } from "@/server/features/trading/tradingDecisions";
 import { safeJsonParse } from "@/utils/json";
 
@@ -79,12 +78,5 @@ export async function fetchConversationSnapshots(
 
 export async function refreshConversationEvents() {
 	const conversations = await fetchConversationSnapshots();
-
-	emitConversationEvent({
-		type: "conversations:updated",
-		timestamp: new Date().toISOString(),
-		data: conversations,
-	});
-
 	return conversations;
 }

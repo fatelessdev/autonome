@@ -51,6 +51,21 @@ type TradesSidebarProps = {
 
 type FilterValue = "all" | string;
 
+const matchesFilter = (
+	filter: FilterValue,
+	...candidates: Array<string | null | undefined>
+) => {
+	if (filter === "all") {
+		return true;
+	}
+	return candidates.some((candidate) => {
+		if (typeof candidate !== "string" || candidate.trim().length === 0) {
+			return false;
+		}
+		return candidate === filter;
+	});
+};
+
 export default function TradesSidebar({
 	isExpanded,
 	isMobile,
@@ -113,22 +128,38 @@ export default function TradesSidebar({
 
 	const filteredTrades = useMemo(() => {
 		if (filter === "all") return trades;
-		return trades.filter((trade) => trade.modelKey === filter);
+		return trades.filter((trade) =>
+			matchesFilter(
+				filter,
+				trade.modelId,
+				trade.modelKey,
+				trade.modelRouterName,
+				trade.modelName,
+			),
+		);
 	}, [filter, trades]);
 
 	const filteredConversations = useMemo(() => {
 		if (filter === "all") return conversations;
-		return conversations.filter(
-			(conversation) =>
-				(conversation.modelLogo || conversation.modelName) === filter,
+		return conversations.filter((conversation) =>
+			matchesFilter(
+				filter,
+				conversation.modelId,
+				conversation.modelLogo,
+				conversation.modelName,
+			),
 		);
 	}, [conversations, filter]);
 
 	const filteredPositions = useMemo(() => {
 		if (filter === "all") return positions;
-		return positions.filter(
-			(positionGroup) =>
-				(positionGroup.modelLogo || positionGroup.modelName) === filter,
+		return positions.filter((positionGroup) =>
+			matchesFilter(
+				filter,
+				positionGroup.modelId,
+				positionGroup.modelLogo,
+				positionGroup.modelName,
+			),
 		);
 	}, [filter, positions]);
 

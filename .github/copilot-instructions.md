@@ -1,6 +1,6 @@
 ## Project Overview
 
-Autonome3 is an AI-powered autonomous cryptocurrency trading platform built with TanStack Start, featuring real-time portfolio analytics, multi-model AI integration, and a sophisticated trading simulator. The platform supports both live trading (via Lighter API) and simulated trading modes, with comprehensive position management, risk controls, and real-time data visualization.
+Autonome is an AI-powered autonomous cryptocurrency trading platform built with TanStack Start, featuring real-time portfolio analytics, multi-model AI integration, and a sophisticated trading simulator. The platform supports both live trading (via Lighter API) and simulated trading modes, with comprehensive position management, risk controls, and real-time data visualization.
 
 ## Core Technology Stack
 
@@ -249,7 +249,7 @@ mutate({ symbol: 'BTC', quantity: 1, side: 'buy' });
 ## Trading Automation & Simulator
 
 ### Trading Modes
-- **`env.TRADING_MODE`**: 'live' or 'simulated' (default 'live')
+- **`TRADING_MODE`**: 'live' or 'simulated' (default 'live')
 - **Simulator**: `src/server/features/simulator/exchangeSimulator.ts` bootstrapped in `src/server/schedulers/bootstrap.ts`
 - **Bootstrap guard**: Ensures schedulers run once per server process
 
@@ -283,9 +283,55 @@ mutate({ symbol: 'BTC', quantity: 1, side: 'buy' });
 - `getCompletedTrades({ accountId })`: Fetch simulator trade history
 - `getCompletedTradesFromDB({ modelId, limit })`: Fetch DB trade history with stats
 
-**SSE Endpoints** (still REST for streaming):
-- `/api/events/trading`: Real-time position updates
-- `/api/events/trades`: Real-time trade execution events
+**SSE Endpoints**:
+- `/api/events/workflow`: Unified endpoint for all workflow notifications (preferred)
+- `/api/events/trading`: Real-time position updates (legacy)
+- `/api/events/trades`: Real-time trade execution events (legacy)
+
+## Position Persistence Architecture
+
+Positions are persisted to the database for durability across server restarts:
+
+### Database Layer
+- **Schema**: `positions` table in `src/db/schema.ts` with:
+  - `modelId`, `symbol`, `side` (LONG/SHORT enum), `quantity`, `entryPrice`
+  - `exitPlan` (JSONB with target, stop, invalidation)
+  - `leverage`, `confidence`, `toolCallId`
+- **Repository**: `src/server/db/positionsRepository.ts`
+  - `upsertPosition()`: Create or update position
+  - `closePositionRecords()`: Remove positions when closed
+  - `getPositionsByModel()`: Fetch open positions
+
+### Data Flow
+1. **Create**: `createPosition.ts` → execute order → `upsertPosition()` to DB
+2. **Close**: `closePosition.ts` → execute order → `closePositionRecords()` from DB
+3. **Fetch**: `queries.server.ts` → `fetchPositions()` reads from DB with live prices
+
+## Workflow Events (SSE)
+
+Unified event system for real-time updates (`src/server/events/workflowEvents.ts`):
+
+### Event Types
+- `workflow:complete`: Single model's workflow finished
+- `batch:complete`: All models finished scheduled run
+- `positions:changed`: Positions data changed
+- `trades:changed`: Trades data changed (position closed)
+- `conversations:changed`: New invocation completed
+
+### Usage Pattern
+```typescript
+// After workflow completes:
+import { emitAllDataChanged } from "@/server/events/workflowEvents";
+emitAllDataChanged(modelId); // Emits all data change events
+
+// Clients subscribe and refetch:
+// SSE event received → invalidate TanStack Query → refetch via oRPC
+```
+
+### SSE Endpoint
+- Endpoint: `/api/events/workflow`
+- Subscribe: `subscribeToWorkflowEvents(listener)`
+- Emitter functions: `emitAllDataChanged()`, `emitBatchComplete()`, `emitPositionsChanged()`
 
 ## External Integrations
 
@@ -302,14 +348,6 @@ mutate({ symbol: 'BTC', quantity: 1, side: 'buy' });
 - **Router instrumentation**: `src/router.tsx` (required)
 - **Server spans**: Wrap all `createServerFn` handlers with `Sentry.startSpan`
 - **No duplication**: Reference `.cursorrules` for Sentry patterns
-
-## Real-time Updates
-
-### Event System (`src/server/features/trading/events`)
-- **EventEmitter**: `subscribeToTradingEvents`, `subscribeToTradeEvents`
-- **SSE Streaming**: Use existing `emitTradingEvent` helpers
-- **WebSocket**: Simulator streaming for order book updates
-- **Polling**: Fallback with `usePollingFetch` pattern
 
 ## Code Quality & Testing
 

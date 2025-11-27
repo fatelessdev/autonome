@@ -39,12 +39,6 @@ export type PortfolioHistoryResponse =
 	| null
 	| undefined;
 
-const MARKET_ENDPOINTS = {
-	prices: "/api/crypto-prices",
-} as const;
-
-const PORTFOLIO_ENDPOINT = "/api/portfolio-history";
-
 const MARKET_QUERY_KEYS = {
 	prices: (symbols: readonly MarketSymbol[]) =>
 		["markets", "prices", [...symbols].sort().join(",")] as const,

@@ -20,7 +20,7 @@ type ModelChatTabProps = {
 	filterMenu: React.ReactNode;
 };
 
-type Panel = "response" | "decisions";
+type Panel = "response" | "decisions" | "prompt";
 
 export function ModelChatTab({
 	conversations,
@@ -170,7 +170,7 @@ export function ModelChatTab({
 														className="flex items-center gap-2 rounded-lg border bg-background/70 p-1"
 														style={{ borderColor: `${modelColor}22` }}
 													>
-														{(["response", "decisions"] as Panel[]).map(
+														{(["response", "decisions", "prompt"] as Panel[]).map(
 															(panel) => {
 																const isActive = activePanel === panel;
 																return (
@@ -188,7 +188,9 @@ export function ModelChatTab({
 																	>
 																		{panel === "response"
 																			? "Response"
-																			: "Trading Decisions"}
+																			: panel === "decisions"
+																				? "Trading Decisions"
+																				: "Prompt"}
 																	</button>
 																);
 															},
@@ -211,7 +213,7 @@ export function ModelChatTab({
 																</div>
 															</div>
 														</section>
-													) : (
+													) : activePanel === "decisions" ? (
 														<section>
 															{tradingDecisions.length === 0 ? (
 																<div className="rounded-lg border border-dashed bg-background/40 p-3 text-xs text-muted-foreground">
@@ -367,6 +369,24 @@ export function ModelChatTab({
 																	})}
 																</div>
 															)}
+														</section>
+													) : (
+														<section>
+															<div
+																className="rounded-lg border bg-background/60 p-3"
+																style={{ borderColor: `${modelColor}33` }}
+															>
+																{conv.prompt && conv.prompt.trim().length > 0 ? (
+																	<pre className="whitespace-pre-wrap wrap-break-word text-xs leading-relaxed font-sans text-muted-foreground">
+																		{conv.prompt}
+																	</pre>
+																) : (
+																	<p className="text-xs text-muted-foreground">
+																		Prompt payload was not captured for this
+																		invocation.
+																	</p>
+																)}
+															</div>
 														</section>
 													)}
 												</div>

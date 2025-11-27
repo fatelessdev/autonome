@@ -11,7 +11,7 @@ import { DEFAULT_SIMULATOR_OPTIONS, IS_SIMULATION_ENABLED } from "@/env";
 import { ExchangeSimulator } from "@/server/features/simulator/exchangeSimulator";
 import type { OrderSide } from "@/server/features/simulator/types";
 import { normalizeNumber } from "@/shared/formatting/numberFormat";
-import { getArray, safeJsonParse } from "@/utils/json";
+import { getArray, safeJsonParse } from "@/core/utils/json";
 
 // ==================== Schema Definitions ====================
 
@@ -57,7 +57,6 @@ const AccountSnapshotSchema = z.object({
 	positions: z.array(AccountPositionSchema),
 	totalRealizedPnl: z.number(),
 	totalUnrealizedPnl: z.number(),
-	totalFundingPnl: z.number(),
 });
 
 const PlaceOrderInputSchema = z.object({
@@ -406,18 +405,18 @@ export const getCompletedTradesFromDB = os
 
 			const createCalls = invocationIds.length
 				? await db
-						.select({
-							invocationId: toolCalls.invocationId,
-							metadata: toolCalls.metadata,
-							createdAt: toolCalls.createdAt,
-						})
-						.from(toolCalls)
-						.where(
-							and(
-								eq(toolCalls.toolCallType, ToolCallType.CREATE_POSITION),
-								inArray(toolCalls.invocationId, invocationIds),
-							),
-						)
+					.select({
+						invocationId: toolCalls.invocationId,
+						metadata: toolCalls.metadata,
+						createdAt: toolCalls.createdAt,
+					})
+					.from(toolCalls)
+					.where(
+						and(
+							eq(toolCalls.toolCallType, ToolCallType.CREATE_POSITION),
+							inArray(toolCalls.invocationId, invocationIds),
+						),
+					)
 				: [];
 
 			const createLookup = new Map<

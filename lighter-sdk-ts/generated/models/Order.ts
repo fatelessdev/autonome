@@ -275,7 +275,6 @@ export enum OrderStatusEnum {
     CanceledReduceOnly = 'canceled-reduce-only',
     CanceledPositionNotAllowed = 'canceled-position-not-allowed',
     CanceledMarginNotAllowed = 'canceled-margin-not-allowed',
-    CanceledTooMuchSlippage = 'canceled-too-much-slippage',
     CanceledNotEnoughLiquidity = 'canceled-not-enough-liquidity',
     CanceledSelfTrade = 'canceled-self-trade',
     CanceledExpired = 'canceled-expired',

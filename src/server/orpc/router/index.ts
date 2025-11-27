@@ -7,7 +7,6 @@ import {
 	placeOrder,
 	resetAccount,
 } from "./simulator";
-import { addTodo, listTodos } from "./todos";
 import {
 	getCryptoPrices,
 	getPortfolioHistory,
@@ -16,10 +15,6 @@ import {
 } from "./trading";
 
 export default {
-	// Demo/Example procedures
-	listTodos,
-	addTodo,
-
 	// Trading procedures
 	trading: {
 		getTrades,

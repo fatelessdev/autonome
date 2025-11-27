@@ -63,6 +63,7 @@ export type Conversation = {
 	modelName: string;
 	modelLogo: string;
 	response: string;
+	prompt?: string | null;
 	timestamp: string;
 	toolCalls: {
 		id: string;

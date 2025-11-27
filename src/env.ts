@@ -10,8 +10,7 @@ import type {
 } from "@/server/features/simulator/types";
 
 const cwd = process.cwd();
-const mode = process.env.NODE_ENV ?? "development";
-const envFiles = [".env", ".env.local", `.env.${mode}`, `.env.${mode}.local`];
+const envFiles = [".env", ".env.local"];
 
 for (const file of envFiles) {
 	const fullPath = resolve(cwd, file);
@@ -34,6 +33,10 @@ export const env = createEnv({
 	server: {
 		// General server configuration
 		SERVER_URL: z.string().url().optional(),
+		DATABASE_URL: z.string().url(),
+		NIM_API_KEY: z.string(),
+		OPENROUTER_API_KEY: z.string(),
+		MISTRAL_API_KEY: z.string(),
 
 		// Lighter API configuration
 		LIGHTER_API_KEY_INDEX: z.coerce.number().default(2),
@@ -43,20 +46,12 @@ export const env = createEnv({
 			.default("https://mainnet.zklighter.elliot.ai"),
 
 		// Trading mode
-		TRADING_MODE: z.enum(["live", "simulated"]).default("live"),
+		TRADING_MODE: z.enum(["live", "simulated"]).default("simulated"),
 
 		// Simulator options
 		SIM_INITIAL_CAPITAL: z.coerce.number().default(10_000),
 		SIM_QUOTE_CURRENCY: z.string().default("USDT"),
-		SIM_MIN_LATENCY_MS: z.coerce.number().default(40),
-		SIM_MAX_LATENCY_MS: z.coerce.number().default(250),
-		SIM_MAX_SLIPPAGE_BPS: z.coerce.number().default(10),
-		SIM_MAKER_FEE_BPS: z.coerce.number().default(2),
-		SIM_TAKER_FEE_BPS: z.coerce.number().default(5),
-		SIM_DETERMINISTIC_SEED: z.coerce.number().optional(),
-		SIM_FUNDING_PERIOD_HOURS: z.coerce.number().default(8),
-		SIM_FUNDING_REFRESH_MS: z.coerce.number().default(60_000),
-		SIM_REFRESH_INTERVAL_MS: z.coerce.number().default(3_000),
+		SIM_REFRESH_INTERVAL_MS: z.coerce.number().default(10_000),
 	},
 
 	/**
@@ -100,19 +95,5 @@ export const IS_SIMULATION_ENABLED = env.TRADING_MODE === "simulated";
 export const DEFAULT_SIMULATOR_OPTIONS: ExchangeSimulatorOptions = {
 	initialCapital: env.SIM_INITIAL_CAPITAL,
 	quoteCurrency: env.SIM_QUOTE_CURRENCY,
-	latency: {
-		minMs: env.SIM_MIN_LATENCY_MS,
-		maxMs: env.SIM_MAX_LATENCY_MS,
-	},
-	slippage: {
-		maxBasisPoints: env.SIM_MAX_SLIPPAGE_BPS,
-	},
-	fees: {
-		makerBps: env.SIM_MAKER_FEE_BPS,
-		takerBps: env.SIM_TAKER_FEE_BPS,
-	},
-	deterministicSeed: env.SIM_DETERMINISTIC_SEED,
-	fundingPeriodHours: env.SIM_FUNDING_PERIOD_HOURS,
-	fundingRefreshIntervalMs: env.SIM_FUNDING_REFRESH_MS,
 	refreshIntervalMs: env.SIM_REFRESH_INTERVAL_MS,
 };

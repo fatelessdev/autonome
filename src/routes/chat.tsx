@@ -39,7 +39,7 @@ function AIPage() {
 	return (
 		<div className="relative min-h-screen w-full overflow-hidden text-white">
 			<div className="pointer-events-none absolute inset-0">
-				<ShaderGradientCanvas
+				{/* <ShaderGradientCanvas
 					style={{ width: "100%", height: "100%" }}
 					lazyLoad={false}
 					fov={undefined}
@@ -81,7 +81,7 @@ function AIPage() {
 						hoverState=""
 						enableTransition={true}
 					/>
-				</ShaderGradientCanvas>
+				</ShaderGradientCanvas> */}
 				<div className="absolute inset-0 bg-gradient-to-b to-slate-950/60" />
 			</div>
 			<div className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-12 pt-16 sm:px-6 lg:px-8">

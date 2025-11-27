@@ -30,12 +30,13 @@ export const getTrades = os
 					modelName: trade.modelName || "",
 					modelRouterName: trade.modelRouterName || undefined,
 					modelKey: trade.modelKey || trade.modelId || "",
-					side:
+					side: (
 						trade.side &&
 						typeof trade.side === "string" &&
 						trade.side.toLowerCase() === "short"
 							? "short"
-							: "long",
+							: "long"
+					) as "short" | "long",
 					symbol: trade.symbol || "",
 					entryPrice:
 						typeof trade.entryPrice === "number" ? trade.entryPrice : 0,
@@ -94,9 +95,9 @@ export const getPositions = os
 						? modelPos.positions.map((pos: any) => ({
 								symbol: typeof pos.symbol === "string" ? pos.symbol : "",
 								side:
-									pos.side &&
-									typeof pos.side === "string" &&
-									pos.side.toLowerCase() === "short"
+								pos.sign &&
+								typeof pos.sign === "string" &&
+								pos.sign.toUpperCase() === "SHORT"
 										? "short"
 										: "long",
 								quantity: typeof pos.quantity === "number" ? pos.quantity : 0,
@@ -105,10 +106,14 @@ export const getPositions = os
 								currentPrice:
 									typeof pos.currentPrice === "number"
 										? pos.currentPrice
+									: typeof pos.markPrice === "number"
+										? pos.markPrice
 										: undefined,
-								unrealizedPnl:
-									typeof pos.unrealizedPnl === "number"
-										? pos.unrealizedPnl
+							unrealizedPnl:
+								typeof pos.unrealizedPnl === "number"
+									? pos.unrealizedPnl
+									: typeof pos.unrealizedPnl === "string"
+										? parseFloat(pos.unrealizedPnl)
 										: undefined,
 								exitPlan:
 									pos.exitPlan && typeof pos.exitPlan === "object"

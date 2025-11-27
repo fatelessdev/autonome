@@ -139,6 +139,7 @@ export async function closePosition(
 			const summary = buildSummary(symbol, position, exitPrice, closedAtIso);
 			if (summary) summaries.push(summary);
 		}
+
 		return summaries;
 	}
 
@@ -215,7 +216,9 @@ export async function closePosition(
 			});
 
 			const summary = buildSummary(symbol, position, latestPrice, closedAtIso);
-			if (summary) summaries.push(summary);
+			if (summary) {
+				summaries.push(summary);
+			}
 		} catch (err) {
 			console.error(`Failed to close position for ${symbol}:`, err);
 		}

@@ -1,3 +1,0 @@
-import { DEFAULT_SIMULATOR_OPTIONS, TRADING_MODE } from "../src/env";
-
-console.log({ TRADING_MODE, DEFAULT_SIMULATOR_OPTIONS });

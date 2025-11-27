@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Autonome3 is an AI-powered autonomous cryptocurrency trading platform built with TanStack Start, featuring real-time portfolio analytics, multi-model AI integration, and a sophisticated trading simulator with both live and simulated trading modes.
+Autonome is an AI-powered autonomous cryptocurrency trading platform built with TanStack Start, featuring real-time portfolio analytics, multi-model AI integration, and a sophisticated trading simulator with both live and simulated trading modes.
 
 ## Essential Development Commands
 
@@ -110,9 +110,26 @@ Required variables in `src/env.ts`:
 ## Trading System Architecture
 
 ### Trading Modes
-- `env.TRADING_MODE`: 'live' or 'simulated'
-- `env.IS_SIMULATION_ENABLED`: Toggle trading mode
+- `TRADING_MODE`: 'live' or 'simulated'
+- `IS_SIMULATION_ENABLED`: Toggle trading mode
 - Simulator: `src/server/features/simulator/exchangeSimulator.ts`
+
+### Position Persistence Architecture
+Positions are persisted to the database for durability across server restarts:
+
+- **Schema**: `positions` table in `src/db/schema.ts` with modelId, symbol, side, quantity, entryPrice, exitPlan (JSONB)
+- **Repository**: `src/server/db/positionsRepository.ts` - CRUD operations for positions
+- **Create Flow**: `createPosition.ts` → execute order → `upsertPosition()` to DB
+- **Close Flow**: `closePosition.ts` → execute order → `closePositionRecords()` from DB
+- **Fetch Flow**: `queries.server.ts` → `fetchPositions()` reads from DB with live prices
+
+### Workflow Events (SSE)
+Unified event system for real-time updates:
+
+- **Event System**: `src/server/events/workflowEvents.ts` - Single emitter for all data changes
+- **SSE Endpoint**: `/api/events/workflow` - One connection for all notifications
+- **Event Flow**: Workflow completes → `emitAllDataChanged(modelId)` → clients refetch via oRPC
+- **Event Types**: `workflow:complete`, `batch:complete`, `positions:changed`, `trades:changed`, `conversations:changed`
 
 ### Key oRPC Procedures
 - **Trading**: `orpc.trading.*` (getTrades, getPositions, getCryptoPrices, getPortfolioHistory)
@@ -121,9 +138,10 @@ Required variables in `src/env.ts`:
 - **AI Chat**: `orpc.chat` (streaming AI with SQL tools)
 
 ### Real-time Updates
-- SSE endpoints: `/api/events/trading`, `/api/events/trades`
-- EventEmitter pattern for position/trade updates
-- WebSocket fallback for order book streaming
+- SSE endpoint: `/api/events/workflow` (unified for all data types)
+- Legacy SSE: `/api/events/trading`, `/api/events/trades`, `/api/events/positions` (deprecated)
+- EventEmitter pattern with `subscribeToWorkflowEvents()`
+- Clients receive events → invalidate TanStack Query caches → refetch via oRPC
 
 ## Testing Strategy
 

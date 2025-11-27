@@ -2,7 +2,6 @@
 
 import { BASE_URL } from "@/env";
 import {
-	FundingApi,
 	IsomorphicFetchHttpLibrary,
 	OrderApi,
 	ServerConfiguration,
@@ -29,18 +28,13 @@ import type {
 	SimulatedOrderRequest,
 	SimulatedOrderResult,
 } from "@/server/features/simulator/types";
-import { emitTradingEvent } from "@/server/features/trading/events/tradingEvents";
+import { emitAllDataChanged } from "@/server/events/workflowEvents";
 import { MARKETS } from "@/shared/markets/marketMetadata";
 
 const DEFAULT_OPTIONS: ExchangeSimulatorOptions = {
-	initialCapital: 100_000,
+	initialCapital: 10_000,
 	quoteCurrency: "USDT",
-	latency: { minMs: 100, maxMs: 450 },
-	slippage: { maxBasisPoints: 12 },
-	fees: { makerBps: 2, takerBps: 5 },
-	fundingPeriodHours: 8,
-	fundingRefreshIntervalMs: 60_000,
-	refreshIntervalMs: 3_000,
+	refreshIntervalMs: 30_000,
 };
 
 type SimulatorEventType = MarketEvent["type"];
@@ -76,13 +70,6 @@ class SimpleEmitter {
 
 class LinearCongruential implements RandomSource {
 	private state: number;
-
-	constructor(seed: number) {
-		this.state = seed % 2147483647;
-		if (this.state <= 0) {
-			this.state += 2147483646;
-		}
-	}
 
 	next(): number {
 		this.state = (this.state * 48271) % 2147483647;
@@ -145,29 +132,16 @@ export class ExchangeSimulator {
 	private readonly emitter = new SimpleEmitter();
 	private readonly rng: RandomSource;
 	private readonly orderApi: OrderApi;
-	private readonly fundingApi: FundingApi;
-	private readonly fundingRates = new Map<string, number>();
-	private readonly lastFundingApplied = new Map<string, number>();
 	private readonly pendingAutoCloses = new Set<string>();
-	private lastFundingFetch = 0;
 	private refreshHandle?: NodeJS.Timeout;
 
 	private constructor(options: ExchangeSimulatorOptions) {
 		this.options = options;
-		this.rng =
-			typeof options.deterministicSeed === "number"
-				? new LinearCongruential(options.deterministicSeed)
-				: new MathRandomSource();
+		this.rng = new MathRandomSource();
 
 		const server = new ServerConfiguration(BASE_URL, {});
 		const http = new IsomorphicFetchHttpLibrary();
 		this.orderApi = new OrderApi({
-			baseServer: server,
-			httpApi: http,
-			middleware: [],
-			authMethods: {},
-		});
-		this.fundingApi = new FundingApi({
 			baseServer: server,
 			httpApi: http,
 			middleware: [],
@@ -219,7 +193,6 @@ export class ExchangeSimulator {
 	}
 
 	private async initialise() {
-		await this.refreshFundingRates(Date.now(), true);
 		for (const metadata of buildMarketMetadata()) {
 			const market = new MarketState(metadata, this.orderApi);
 			await market.refresh();
@@ -241,24 +214,11 @@ export class ExchangeSimulator {
 	}
 
 	private async refreshAll() {
-		const now = Date.now();
-		await this.refreshFundingRates(now, false);
-
 		for (const [symbol, market] of this.markets) {
 			try {
 				const snapshot = await market.refresh();
-				const effectiveFundingRate = this.calculateFundingIncrement(
-					symbol,
-					now,
-				);
 				for (const account of this.accounts.values()) {
 					account.updateMarkPrice(symbol, snapshot.midPrice);
-					if (
-						effectiveFundingRate !== undefined &&
-						effectiveFundingRate !== 0
-					) {
-						account.applyFunding(symbol, effectiveFundingRate);
-					}
 				}
 				this.emitter.emit("book", {
 					type: "book",
@@ -355,11 +315,7 @@ export class ExchangeSimulator {
 						);
 					}
 
-					emitTradingEvent({
-						type: "workflow:complete",
-						modelId: request.accountId,
-						timestamp: new Date().toISOString(),
-					});
+					emitAllDataChanged(request.accountId);
 				}
 			} finally {
 				this.pendingAutoCloses.delete(`${request.accountId}:${request.symbol}`);
@@ -393,8 +349,7 @@ export class ExchangeSimulator {
 	}
 
 	async placeOrder(
-		request: SimulatedOrderRequest,
-		accountId: string,
+		request: SimulatedOrderRequest, accountId: string, p0: { skipValidation: boolean; },
 	): Promise<SimulatedOrderResult> {
 		const symbol = normalizeSymbol(request.symbol);
 		const market = this.markets.get(symbol);
@@ -464,7 +419,7 @@ export class ExchangeSimulator {
 		const notional = Math.abs(execution.totalQuantity * execution.averagePrice);
 		const confidence =
 			typeof request.confidence === "number" &&
-			Number.isFinite(request.confidence)
+				Number.isFinite(request.confidence)
 				? request.confidence
 				: null;
 
@@ -550,72 +505,6 @@ export class ExchangeSimulator {
 			side: "buy",
 			type: "market",
 		};
-	}
-
-	private async refreshFundingRates(now: number, force: boolean) {
-		const elapsed = now - this.lastFundingFetch;
-		if (!force && elapsed < this.options.fundingRefreshIntervalMs) {
-			return;
-		}
-
-		try {
-			const response = await this.fundingApi.fundingRates();
-			if (typeof response.code === "number" && response.code !== 0) {
-				console.warn(
-					`[Simulator] Funding rate response returned code ${response.code}`,
-				);
-			}
-
-			if (!response.fundingRates) {
-				return;
-			}
-
-			for (const entry of response.fundingRates) {
-				const normalizedSymbol = normalizeSymbol(entry.symbol);
-				if (!Number.isFinite(entry.rate)) {
-					continue;
-				}
-				this.fundingRates.set(normalizedSymbol, entry.rate);
-			}
-
-			this.lastFundingFetch = now;
-		} catch (error) {
-			console.error("[Simulator] Failed to refresh funding rates", error);
-		}
-	}
-
-	private calculateFundingIncrement(
-		symbol: string,
-		now: number,
-	): number | undefined {
-		const rate = this.fundingRates.get(symbol);
-		if (rate === undefined) {
-			return undefined;
-		}
-
-		const periodMs = this.options.fundingPeriodHours * 60 * 60 * 1000;
-		if (!Number.isFinite(periodMs) || periodMs <= 0) {
-			return undefined;
-		}
-
-		const last = this.lastFundingApplied.get(symbol);
-		this.lastFundingApplied.set(symbol, now);
-
-		if (!last) {
-			return 0;
-		}
-
-		const elapsed = now - last;
-		if (elapsed <= 0) {
-			return 0;
-		}
-
-		const fraction = elapsed / periodMs;
-		if (!Number.isFinite(fraction) || fraction <= 0) {
-			return 0;
-		}
-
-		return rate * fraction;
 	}
 
 	setExitPlan(

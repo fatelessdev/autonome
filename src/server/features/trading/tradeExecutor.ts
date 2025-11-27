@@ -11,14 +11,13 @@ import {
 	incrementModelUsageMutation,
 	updateInvocationMutation,
 } from "@/server/db/tradingRepository.server";
-import { DEFAULT_SIMULATOR_OPTIONS, IS_SIMULATION_ENABLED } from "@/env";
+import { DEFAULT_SIMULATOR_OPTIONS, env, IS_SIMULATION_ENABLED } from "@/env";
 import { ExchangeSimulator } from "@/server/features/simulator/exchangeSimulator";
 import type { Account } from "@/server/features/trading/accounts";
 import { closePosition } from "@/server/features/trading/closePosition";
-import { refreshConversationEvents } from "@/server/features/trading/conversationsSnapshot.server";
 import { createPosition } from "@/server/features/trading/createPosition";
+import { fetchPositions } from "@/server/features/trading/queries.server";
 import { fetchLatestDecisionIndex } from "@/server/features/trading/decisionIndex";
-import { emitTradingEvent } from "@/server/features/trading/events/tradingEvents";
 import { portfolioQuery } from "@/server/features/trading/getPortfolio.server";
 import {
 	buildInvocationResponsePayload,
@@ -47,6 +46,10 @@ import type {
 	TradingSignal,
 } from "@/server/features/trading/tradingDecisions";
 import { MARKETS } from "@/shared/markets/marketMetadata";
+import {
+	emitAllDataChanged,
+	emitBatchComplete,
+} from "@/server/events/workflowEvents";
 
 declare global {
 	// eslint-disable-next-line no-var
@@ -150,14 +153,14 @@ export async function runTradeWorkflow(account: Account) {
 		name: "nim",
 		baseURL: "https://integrate.api.nvidia.com/v1",
 		headers: {
-			Authorization: `Bearer ${process.env.NIM_API_KEY}`,
+			Authorization: `Bearer ${env.NIM_API_KEY}`,
 		},
 	});
 	const openrouter = createOpenRouter({
-		apiKey: process.env.OPENROUTER_API_KEY,
+		apiKey: env.OPENROUTER_API_KEY,
 	});
 
-	const _model = nim.chatModel(account.modelName);
+	const model = nim.chatModel(account.modelName);
 
 	const toolChoiceMode: "auto" | "required" = "auto";
 	// const toolChoiceMode: 'auto' | 'required' = 'required'; // Enable during focused QA to force tool invocations.
@@ -659,18 +662,24 @@ export async function runTradeWorkflow(account: Account) {
 		closedPositions: capturedClosedPositions,
 	});
 
+	console.log(
+		`[TradeExecutor] Saving invocation ${modelInvocation.id}. Prompt length: ${enrichedPrompt.length}`,
+	);
+	// console.log("[TradeExecutor] Payload:", JSON.stringify(responsePayload, null, 2));
+
 	await updateInvocationMutation({
 		id: modelInvocation.id,
 		response: responseText,
 		responsePayload,
 	});
-	await refreshConversationEvents();
+
+	// Refresh positions to emit SSE update after any position changes
+	await fetchPositions();
 	console.log(responseText);
-	emitTradingEvent({
-		type: "workflow:complete",
-		modelId: account.id,
-		timestamp: new Date().toISOString(),
-	});
+
+	// Emit unified workflow event - clients will refetch via oRPC
+	emitAllDataChanged(account.id);
+
 	return responseText;
 }
 
@@ -706,11 +715,7 @@ export async function executeScheduledTrades() {
 		}
 
 		if (processedModels.length > 0) {
-			emitTradingEvent({
-				type: "batch:complete",
-				modelIds: processedModels,
-				timestamp: new Date().toISOString(),
-			});
+			emitBatchComplete(processedModels);
 		}
 	} catch (error) {
 		console.error("Scheduled trade execution failed", error);

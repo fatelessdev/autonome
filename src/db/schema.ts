@@ -5,20 +5,10 @@ import {
 	jsonb,
 	pgEnum,
 	pgTable,
-	serial,
 	text,
 	timestamp,
 	uniqueIndex,
 } from "drizzle-orm/pg-core";
-
-// Demo todos table remains for sample routes
-export const todos = pgTable("todos", {
-	id: serial("id").primaryKey(),
-	title: text("title").notNull(),
-	createdAt: timestamp("created_at").defaultNow(),
-});
-
-// --- Trading domain tables migrated from Prisma schema ---
 
 export const toolCallTypeEnum = pgEnum("ToolCallType", [
 	"CREATE_POSITION",
@@ -114,7 +104,7 @@ export const invocationRelations = relations(invocations, ({ one, many }) => ({
 	toolCalls: many(toolCalls),
 }));
 
-export const toolCallRelations = relations(toolCalls, ({ one }) => ({
+export const toolCallRelations = relations(toolCalls, ({ one, many }) => ({
 	invocation: one(invocations, {
 		fields: [toolCalls.invocationId],
 		references: [invocations.id],

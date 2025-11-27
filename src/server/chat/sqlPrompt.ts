@@ -6,12 +6,7 @@ ENUM TYPES:
 
 TABLES (quoted identifiers preserve casing):
 
-1. "todos" (demo/sample table)
-   id              SERIAL PRIMARY KEY
-   title           TEXT NOT NULL
-   created_at      TIMESTAMP DEFAULT now()
-
-2. "Models" (AI trading model configurations)
+1. "Models" (AI trading model configurations)
    id                      TEXT PRIMARY KEY
    name                    TEXT UNIQUE NOT NULL (indexed: Models_name_idx, Models_name_key)
    "openRoutermodelName"   TEXT NOT NULL
@@ -20,7 +15,7 @@ TABLES (quoted identifiers preserve casing):
    "totalMinutes"          INTEGER NOT NULL DEFAULT 0
    "accountIndex"          TEXT NOT NULL
 
-3. "Invocations" (model execution records)
+2. "Invocations" (model execution records)
    id                 TEXT PRIMARY KEY
    "modelId"          TEXT NOT NULL (indexed: Invocations_modelId_idx)
    response           TEXT NOT NULL
@@ -30,7 +25,7 @@ TABLES (quoted identifiers preserve casing):
    
    FOREIGN KEY: "modelId" REFERENCES "Models"(id) ON DELETE RESTRICT ON UPDATE CASCADE
 
-4. "ToolCalls" (trading actions/operations)
+3. "ToolCalls" (trading actions/operations)
    id              TEXT PRIMARY KEY
    "invocationId"  TEXT NOT NULL (indexed: ToolCalls_invocationId_idx)
    "toolCallType"  "ToolCallType" NOT NULL (enum: 'CREATE_POSITION' | 'CLOSE_POSITION')
@@ -40,7 +35,7 @@ TABLES (quoted identifiers preserve casing):
    
    FOREIGN KEY: "invocationId" REFERENCES "Invocations"(id) ON DELETE RESTRICT ON UPDATE CASCADE
 
-5. "PortfolioSize" (portfolio value snapshots over time)
+4. "PortfolioSize" (portfolio value snapshots over time)
    id              TEXT PRIMARY KEY
    "modelId"       TEXT NOT NULL (indexed: PortfolioSize_modelId_idx)
    "netPortfolio"  TEXT NOT NULL (stored as string, represents decimal USD value)

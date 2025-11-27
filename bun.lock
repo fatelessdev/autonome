@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "autonome3",
+      "name": "autonome",
       "dependencies": {
         "@ai-sdk/anthropic": "^2.0.1",
         "@ai-sdk/google": "^3.0.0-beta.43",

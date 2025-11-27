@@ -24,9 +24,9 @@ const COIN_STYLES: Record<
 	CoinSymbol,
 	{ badge: string; logo: string; decimals: number }
 > = {
-	BTC: { badge: "BTC", logo: "/btc.svg", decimals: 2 },
-	ETH: { badge: "ETH", logo: "/eth.svg", decimals: 2 },
-	SOL: { badge: "SOL", logo: "/sol.svg", decimals: 3 },
+	BTC: { badge: "BTC", logo: "/coins/btc.svg", decimals: 2 },
+	ETH: { badge: "ETH", logo: "/coins/eth.svg", decimals: 2 },
+	SOL: { badge: "SOL", logo: "/coins/sol.svg", decimals: 3 },
 };
 
 export default function CryptoTracker() {

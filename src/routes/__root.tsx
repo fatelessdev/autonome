@@ -8,7 +8,6 @@ import {
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import Providers from "@/components/providers";
 
-import StoreDevtools from "@/core/lib/demo-store-devtools";
 import TanStackQueryDevtools from "@/server/integrations/tanstack-query/devtools";
 import appCss from "@/styles.css?url";
 
@@ -60,7 +59,6 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 								render: <TanStackRouterDevtoolsPanel />,
 							},
 							TanStackQueryDevtools,
-							StoreDevtools,
 						]}
 					/>
 					<Scripts />

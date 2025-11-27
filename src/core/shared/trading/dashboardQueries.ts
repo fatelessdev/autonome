@@ -161,7 +161,7 @@ function normalizePosition(entry: unknown): Position | null {
 	if (!symbol) return null;
 
 	const rawSign =
-		typeof record.sign === "string" ? record.sign.toUpperCase() : "LONG";
+		typeof record.side === "string" ? record.side.toUpperCase() : "LONG";
 	const sign = rawSign === "SHORT" ? "SHORT" : "LONG";
 
 	return {
@@ -261,6 +261,14 @@ function normalizeConversations(
 			const modelId =
 				typeof record.modelId === "string" ? record.modelId : null;
 			if (!id || !modelId) return null;
+			const responsePayload =
+				record.responsePayload && typeof record.responsePayload === "object"
+					? (record.responsePayload as Record<string, unknown>)
+					: null;
+			const prompt =
+				typeof responsePayload?.prompt === "string"
+					? responsePayload.prompt
+					: null;
 
 			const toolCallsRaw = Array.isArray(record.toolCalls)
 				? record.toolCalls
@@ -308,6 +316,7 @@ function normalizeConversations(
 						? record.modelLogo
 						: "unknown-model",
 				response: typeof record.response === "string" ? record.response : "",
+				prompt,
 				timestamp:
 					typeof record.timestamp === "string"
 						? record.timestamp

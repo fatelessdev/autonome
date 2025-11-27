@@ -25,6 +25,8 @@ export interface PositionRequest {
 	stopLoss: number | null;
 	invalidationCondition: string | null;
 	confidence: number | null;
+	/** Optional: link to the tool call that created this position */
+	toolCallId?: string;
 }
 
 export interface PositionResult {
@@ -32,6 +34,7 @@ export interface PositionResult {
 	side: "LONG" | "SHORT" | "HOLD";
 	quantity: number;
 	leverage: number | null;
+	entryPrice?: number;
 	success: boolean;
 	error?: string;
 }
@@ -84,6 +87,7 @@ export async function createPosition(
 						},
 					},
 					accountId,
+					{ skipValidation: false },
 				);
 
 				if (execution.status === "rejected" || execution.totalQuantity === 0) {
@@ -96,7 +100,15 @@ export async function createPosition(
 						error: execution.reason ?? "Order rejected",
 					});
 				} else {
-					results.push({ symbol, side, quantity, leverage, success: true });
+					const entryPrice = execution.averagePrice ?? 0;
+					results.push({
+						symbol,
+						side,
+						quantity,
+						leverage,
+						entryPrice,
+						success: true,
+					});
 				}
 			} catch (error) {
 				const message =
@@ -132,7 +144,12 @@ export async function createPosition(
 
 	const results: PositionResult[] = [];
 
-	for (const { symbol, side, quantity, leverage } of positions) {
+	for (const {
+		symbol,
+		side,
+		quantity,
+		leverage,
+	} of positions) {
 		try {
 			const market = MARKETS[symbol as keyof typeof MARKETS];
 			if (!market) {
@@ -196,7 +213,15 @@ export async function createPosition(
 				orderExpiry: SignerClient.DEFAULT_IOC_EXPIRY,
 			});
 			console.log(`Position created for ${symbol}:`, response);
-			results.push({ symbol, side, quantity, leverage, success: true });
+
+			results.push({
+				symbol,
+				side,
+				quantity,
+				leverage,
+				entryPrice: latestPrice,
+				success: true,
+			});
 		} catch (err) {
 			const errorMsg = err instanceof Error ? err.message : String(err);
 			console.error(`Failed to create position for ${symbol}:`, err);
