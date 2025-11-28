@@ -1,9 +1,7 @@
 import { getInvocations, getModels } from "./models";
 import {
 	getAccount,
-	getCompletedTrades,
 	getCompletedTradesFromDB,
-	getOrderBook,
 	placeOrder,
 	resetAccount,
 } from "./simulator";
@@ -34,8 +32,6 @@ export default {
 		placeOrder,
 		getAccount,
 		resetAccount,
-		getOrderBook,
-		getCompletedTrades,
 		getCompletedTradesFromDB,
 	},
 };

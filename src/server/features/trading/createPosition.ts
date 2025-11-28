@@ -9,12 +9,9 @@ import type { OrderSide } from "@/server/features/simulator/types";
 import type { Account } from "@/server/features/trading/accounts";
 import { SignerClient } from "@/server/features/trading/signerClient";
 import { MARKETS } from "@/shared/markets/marketMetadata";
-import {
-	CandlestickApi,
-	IsomorphicFetchHttpLibrary,
-	ServerConfiguration,
-} from "@/lighter/generated/index";
+import { candlestickApi } from "@/server/integrations/lighter";
 import { NonceManagerType } from "../../../../lighter-sdk-ts/nonce_manager";
+import { createOrder } from "@/server/db/ordersRepository.server";
 
 export interface PositionRequest {
 	symbol: string;
@@ -37,6 +34,8 @@ export interface PositionResult {
 	entryPrice?: number;
 	success: boolean;
 	error?: string;
+	/** The database order ID for this position */
+	orderId?: string;
 }
 
 export async function createPosition(
@@ -101,14 +100,48 @@ export async function createPosition(
 					});
 				} else {
 					const entryPrice = execution.averagePrice ?? 0;
-					results.push({
-						symbol,
-						side,
-						quantity,
-						leverage,
-						entryPrice,
-						success: true,
-					});
+
+					// Persist to database
+					try {
+						const dbOrder = await createOrder({
+							modelId: accountId,
+							symbol: symbol.toUpperCase(),
+							side,
+							quantity: orderQuantity.toString(),
+							entryPrice: entryPrice.toString(),
+							leverage: leverage?.toString() ?? null,
+							exitPlan: {
+								stop: stopLoss ?? null,
+								target: profitTarget ?? null,
+								invalidation: invalidationCondition ?? null,
+								confidence: confidence ?? null,
+							},
+						});
+
+						results.push({
+							symbol,
+							side,
+							quantity,
+							leverage,
+							entryPrice,
+							success: true,
+							orderId: dbOrder.id,
+						});
+					} catch (dbError) {
+						console.error(
+							`[createPosition] DB persist failed for ${symbol}:`,
+							dbError,
+						);
+						// Still return success since the order was executed
+						results.push({
+							symbol,
+							side,
+							quantity,
+							leverage,
+							entryPrice,
+							success: true,
+						});
+					}
 				}
 			} catch (error) {
 				const message =
@@ -135,13 +168,6 @@ export async function createPosition(
 		nonceManagementType: NonceManagerType.API,
 	});
 
-	const candleStickApi = new CandlestickApi({
-		baseServer: new ServerConfiguration(BASE_URL, {}),
-		httpApi: new IsomorphicFetchHttpLibrary(),
-		middleware: [],
-		authMethods: {},
-	});
-
 	const results: PositionResult[] = [];
 
 	for (const {
@@ -149,6 +175,10 @@ export async function createPosition(
 		side,
 		quantity,
 		leverage,
+		profitTarget,
+		stopLoss,
+		invalidationCondition,
+		confidence,
 	} of positions) {
 		try {
 			const market = MARKETS[symbol as keyof typeof MARKETS];
@@ -171,7 +201,7 @@ export async function createPosition(
 				continue;
 			}
 
-			const candleStickData = await candleStickApi.candlesticks(
+			const candleStickData = await candlestickApi.candlesticks(
 				market.marketId,
 				"1m",
 				Date.now() - 1000 * 60 * 5,
@@ -214,14 +244,46 @@ export async function createPosition(
 			});
 			console.log(`Position created for ${symbol}:`, response);
 
-			results.push({
-				symbol,
-				side,
-				quantity,
-				leverage,
-				entryPrice: latestPrice,
-				success: true,
-			});
+			// Persist to database
+			try {
+				const dbOrder = await createOrder({
+					modelId: account.id,
+					symbol: symbol.toUpperCase(),
+					side,
+					quantity: orderQuantity.toString(),
+					entryPrice: latestPrice.toString(),
+					leverage: leverage?.toString() ?? null,
+					exitPlan: {
+						stop: stopLoss ?? null,
+						target: profitTarget ?? null,
+						invalidation: invalidationCondition ?? null,
+						confidence: confidence ?? null,
+					},
+				});
+
+				results.push({
+					symbol,
+					side,
+					quantity,
+					leverage,
+					entryPrice: latestPrice,
+					success: true,
+					orderId: dbOrder.id,
+				});
+			} catch (dbError) {
+				console.error(
+					`[createPosition] DB persist failed for ${symbol}:`,
+					dbError,
+				);
+				results.push({
+					symbol,
+					side,
+					quantity,
+					leverage,
+					entryPrice: latestPrice,
+					success: true,
+				});
+			}
 		} catch (err) {
 			const errorMsg = err instanceof Error ? err.message : String(err);
 			console.error(`Failed to create position for ${symbol}:`, err);

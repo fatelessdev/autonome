@@ -16,8 +16,6 @@ export type Trade = {
 	quantity: number | null;
 	entryPrice: number | null;
 	exitPrice: number | null;
-	entryNotional: number | null;
-	exitNotional: number | null;
 	netPnl: number | null;
 	openedAt: string | null;
 	closedAt: string;
@@ -29,6 +27,7 @@ export type PositionExitPlan = {
 	target: number | null;
 	stop: number | null;
 	invalidation: string | null;
+	confidence?: number | null;
 };
 
 export type Position = {

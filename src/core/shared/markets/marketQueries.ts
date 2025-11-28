@@ -123,9 +123,9 @@ export function marketPricesQueryOptions(
 	return queryOptions({
 		queryKey: MARKET_QUERY_KEYS.prices(symbols),
 		queryFn: () => requestMarketPrices(symbols),
-		staleTime: 30_000,
+		staleTime: 10_000,
 		gcTime: 5 * 60_000,
-		refetchInterval: 30_000,
+		refetchInterval: 10_000,
 	});
 }
 

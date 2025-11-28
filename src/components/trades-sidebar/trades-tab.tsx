@@ -58,13 +58,20 @@ export function TradesTab({ trades, loading, filterMenu }: TradesTabProps) {
 									trade.exitPrice != null
 										? formatCurrency(trade.exitPrice)
 										: "--";
+								// Derive notional from quantity * price
+								const entryNotional = trade.quantity != null && trade.entryPrice != null
+									? trade.quantity * trade.entryPrice
+									: null;
+								const exitNotional = trade.quantity != null && trade.exitPrice != null
+									? trade.quantity * trade.exitPrice
+									: null;
 								const entryNotionalLabel =
-									trade.entryNotional != null
-										? formatCurrency(trade.entryNotional)
+									entryNotional != null
+										? formatCurrency(entryNotional)
 										: "--";
 								const exitNotionalLabel =
-									trade.exitNotional != null
-										? formatCurrency(trade.exitNotional)
+									exitNotional != null
+										? formatCurrency(exitNotional)
 										: "--";
 								const pnlLabel =
 									trade.netPnl != null ? formatCurrency(trade.netPnl) : "--";
@@ -160,7 +167,7 @@ export function TradesTab({ trades, loading, filterMenu }: TradesTabProps) {
 													</span>
 													<span className="font-light flex items-center gap-1">
 														{entryNotionalLabel}
-														{trade.exitNotional != null ? (
+														{exitNotional != null ? (
 															<>
 																<ArrowRight className="h-3 w-3" />
 																{exitNotionalLabel}

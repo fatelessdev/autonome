@@ -14,12 +14,6 @@ import type {
 
 const BASE_REFRESH_MS = 5 * 60 * 1000;
 
-export const DASHBOARD_ENDPOINTS = {
-	trades: "/api/trades",
-	positions: "/api/positions",
-	conversations: "/api/invocations",
-} as const;
-
 export const DASHBOARD_QUERY_KEYS = {
 	trades: () => ["dashboard", "trades"] as const,
 	positions: () => ["dashboard", "positions"] as const,
@@ -29,46 +23,6 @@ export const DASHBOARD_QUERY_KEYS = {
 type TradesResponse = { trades?: unknown };
 type PositionsResponse = { positions?: unknown };
 type ConversationsResponse = { conversations?: unknown };
-
-type Normalizer<TInput, TOutput> = (payload: TInput) => TOutput;
-
-async function requestDashboardResource<TResponse, TResult>(
-	endpoint: string,
-	normalizer: Normalizer<TResponse, TResult>,
-): Promise<TResult> {
-	let payload: TResponse;
-
-	switch (endpoint) {
-		case DASHBOARD_ENDPOINTS.trades:
-			const tradesData = await orpc.trading.getTrades.call({});
-			payload = { trades: tradesData.trades } as TResponse;
-			break;
-		case DASHBOARD_ENDPOINTS.positions:
-			const positionsData = await orpc.trading.getPositions.call({});
-			payload = { positions: positionsData.positions } as TResponse;
-			break;
-		case DASHBOARD_ENDPOINTS.conversations:
-			const conversationsData = await orpc.models.getInvocations.call({});
-			// Transform the data to match the expected schema
-			const transformedConversations = conversationsData.conversations.map(
-				(conv) => ({
-					id: conv.id,
-					modelId: conv.modelId,
-					modelName: conv.modelName || "Unknown Model",
-					modelLogo: conv.modelLogo || "unknown-model",
-					response: conv.response || "",
-					timestamp: conv.timestamp,
-					toolCalls: conv.toolCalls || [],
-				}),
-			);
-			payload = { conversations: transformedConversations } as TResponse;
-			break;
-		default:
-			throw new Error(`Unknown endpoint: ${endpoint}`);
-	}
-
-	return normalizer(payload);
-}
 
 function normalizeTradeSide(side: unknown): TradeSide {
 	if (typeof side !== "string") return "UNKNOWN";
@@ -116,8 +70,6 @@ function normalizeTrades(payload: TradesResponse): Trade[] {
 				quantity: normalizeNumber(record.quantity),
 				entryPrice: normalizeNumber(record.entryPrice),
 				exitPrice: normalizeNumber(record.exitPrice),
-				entryNotional: normalizeNumber(record.entryNotional),
-				exitNotional: normalizeNumber(record.exitNotional),
 				netPnl: normalizeNumber(record.netPnl),
 				openedAt: typeof record.openedAt === "string" ? record.openedAt : null,
 				closedAt:
@@ -140,12 +92,13 @@ function normalizeExitPlan(plan: unknown): PositionExitPlan | null {
 	const stop = normalizeNumber(record.stop);
 	const invalidation =
 		typeof record.invalidation === "string" ? record.invalidation : null;
+	const confidence = normalizeNumber(record.confidence);
 
-	if (target == null && stop == null && invalidation == null) {
+	if (target == null && stop == null && invalidation == null && confidence == null) {
 		return null;
 	}
 
-	return { target, stop, invalidation };
+	return { target, stop, invalidation, confidence };
 }
 
 function normalizePosition(entry: unknown): Position | null {
@@ -363,14 +316,34 @@ export const DASHBOARD_NORMALIZERS = {
 		normalizeConversations(coerceConversationsResponse(payload)),
 } as const;
 
+async function fetchTrades(): Promise<Trade[]> {
+	const data = await orpc.trading.getTrades.call({});
+	return normalizeTrades({ trades: data.trades });
+}
+
+async function fetchPositions(): Promise<ModelPositions[]> {
+	const data = await orpc.trading.getPositions.call({});
+	return normalizePositions({ positions: data.positions });
+}
+
+async function fetchConversations(): Promise<Conversation[]> {
+	const data = await orpc.models.getInvocations.call({});
+	const transformed = data.conversations.map((conv) => ({
+		id: conv.id,
+		modelId: conv.modelId,
+		modelName: conv.modelName || "Unknown Model",
+		modelLogo: conv.modelLogo || "unknown-model",
+		response: conv.response || "",
+		timestamp: conv.timestamp,
+		toolCalls: conv.toolCalls || [],
+	}));
+	return normalizeConversations({ conversations: transformed });
+}
+
 export const tradesQueryOptions = () =>
 	queryOptions({
 		queryKey: DASHBOARD_QUERY_KEYS.trades(),
-		queryFn: () =>
-			requestDashboardResource<TradesResponse, Trade[]>(
-				DASHBOARD_ENDPOINTS.trades,
-				normalizeTrades,
-			),
+		queryFn: fetchTrades,
 		staleTime: BASE_REFRESH_MS / 2,
 		gcTime: BASE_REFRESH_MS * 2,
 		refetchInterval: BASE_REFRESH_MS,
@@ -379,11 +352,7 @@ export const tradesQueryOptions = () =>
 export const positionsQueryOptions = () =>
 	queryOptions({
 		queryKey: DASHBOARD_QUERY_KEYS.positions(),
-		queryFn: () =>
-			requestDashboardResource<PositionsResponse, ModelPositions[]>(
-				DASHBOARD_ENDPOINTS.positions,
-				normalizePositions,
-			),
+		queryFn: fetchPositions,
 		staleTime: BASE_REFRESH_MS / 2,
 		gcTime: BASE_REFRESH_MS * 2,
 		refetchInterval: BASE_REFRESH_MS,
@@ -392,11 +361,7 @@ export const positionsQueryOptions = () =>
 export const conversationsQueryOptions = () =>
 	queryOptions({
 		queryKey: DASHBOARD_QUERY_KEYS.conversations(),
-		queryFn: () =>
-			requestDashboardResource<ConversationsResponse, Conversation[]>(
-				DASHBOARD_ENDPOINTS.conversations,
-				normalizeConversations,
-			),
+		queryFn: fetchConversations,
 		staleTime: BASE_REFRESH_MS / 2,
 		gcTime: BASE_REFRESH_MS * 2,
 		refetchInterval: BASE_REFRESH_MS,

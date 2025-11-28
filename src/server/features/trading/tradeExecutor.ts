@@ -11,6 +11,10 @@ import {
 	incrementModelUsageMutation,
 	updateInvocationMutation,
 } from "@/server/db/tradingRepository.server";
+import {
+	getOpenOrderBySymbol,
+	updateOrderExitPlan,
+} from "@/server/db/ordersRepository.server";
 import { DEFAULT_SIMULATOR_OPTIONS, env, IS_SIMULATION_ENABLED } from "@/env";
 import { ExchangeSimulator } from "@/server/features/simulator/exchangeSimulator";
 import type { Account } from "@/server/features/trading/accounts";
@@ -160,13 +164,12 @@ export async function runTradeWorkflow(account: Account) {
 		apiKey: env.OPENROUTER_API_KEY,
 	});
 
-	const model = nim.chatModel(account.modelName);
-
 	const toolChoiceMode: "auto" | "required" = "auto";
 	// const toolChoiceMode: 'auto' | 'required' = 'required'; // Enable during focused QA to force tool invocations.
 
 	const tradeAgent = new ToolLoopAgent({
-		model: openrouter(account.modelName),
+		// model: openrouter(account.modelName),
+		model: nim.chatModel(account.modelName),
 		// All tools behave identically for live accounts and simulation mode.
 		providerOptions: {
 			createOpenAICompatible: {
@@ -525,6 +528,25 @@ export async function runTradeWorkflow(account: Account) {
 								target: updatedExitPlan.target,
 								invalidation: updatedExitPlan.invalidation,
 							});
+						}
+
+						// Update exitPlan in Orders table (single source of truth)
+						try {
+							const accountId = account.id || "default";
+							const dbOrder = await getOpenOrderBySymbol(accountId, normalizedSymbol);
+							if (dbOrder) {
+								await updateOrderExitPlan({
+									orderId: dbOrder.id,
+									exitPlan: {
+										stop: updatedExitPlan.stop,
+										target: updatedExitPlan.target,
+										invalidation: updatedExitPlan.invalidation,
+										confidence: position.confidence ?? null,
+									},
+								});
+							}
+						} catch (dbError) {
+							console.error(`[updateExitPlan] DB update failed for ${normalizedSymbol}:`, dbError);
 						}
 
 						capturedDecisions.push({

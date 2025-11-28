@@ -1,16 +1,15 @@
 //@ts-nocheck
 
-import { BASE_URL } from "@/env";
-import {
-	IsomorphicFetchHttpLibrary,
-	OrderApi,
-	ServerConfiguration,
-} from "@/lighter/generated/index";
+import { orderApi } from "@/server/integrations/lighter";
 import { ToolCallType } from "@/server/db/tradingRepository";
 import {
 	createInvocationMutation,
 	createToolCallMutation,
 } from "@/server/db/tradingRepository.server";
+import {
+	closeOrder,
+	getOpenOrderBySymbol,
+} from "@/server/db/ordersRepository.server";
 import { AccountState } from "@/server/features/simulator/accountState";
 import { MarketState } from "@/server/features/simulator/market";
 import {
@@ -30,12 +29,6 @@ import type {
 } from "@/server/features/simulator/types";
 import { emitAllDataChanged } from "@/server/events/workflowEvents";
 import { MARKETS } from "@/shared/markets/marketMetadata";
-
-const DEFAULT_OPTIONS: ExchangeSimulatorOptions = {
-	initialCapital: 10_000,
-	quoteCurrency: "USDT",
-	refreshIntervalMs: 30_000,
-};
 
 type SimulatorEventType = MarketEvent["type"];
 
@@ -65,15 +58,6 @@ class SimpleEmitter {
 		for (const listener of listeners) {
 			listener(payload);
 		}
-	}
-}
-
-class LinearCongruential implements RandomSource {
-	private state: number;
-
-	next(): number {
-		this.state = (this.state * 48271) % 2147483647;
-		return this.state / 2147483647;
 	}
 }
 
@@ -118,10 +102,9 @@ export class ExchangeSimulator {
 	}
 
 	private static async create(
-		options?: Partial<ExchangeSimulatorOptions>,
+		options: ExchangeSimulatorOptions,
 	): Promise<ExchangeSimulator> {
-		const merged: ExchangeSimulatorOptions = { ...DEFAULT_OPTIONS, ...options };
-		const simulator = new ExchangeSimulator(merged);
+		const simulator = new ExchangeSimulator(options);
 		await simulator.initialise();
 		return simulator;
 	}
@@ -131,22 +114,12 @@ export class ExchangeSimulator {
 	private readonly markets = new Map<string, MarketState>();
 	private readonly emitter = new SimpleEmitter();
 	private readonly rng: RandomSource;
-	private readonly orderApi: OrderApi;
 	private readonly pendingAutoCloses = new Set<string>();
 	private refreshHandle?: NodeJS.Timeout;
 
 	private constructor(options: ExchangeSimulatorOptions) {
 		this.options = options;
 		this.rng = new MathRandomSource();
-
-		const server = new ServerConfiguration(BASE_URL, {});
-		const http = new IsomorphicFetchHttpLibrary();
-		this.orderApi = new OrderApi({
-			baseServer: server,
-			httpApi: http,
-			middleware: [],
-			authMethods: {},
-		});
 	}
 
 	private getOrCreateAccount(accountId: string): AccountState {
@@ -194,16 +167,79 @@ export class ExchangeSimulator {
 
 	private async initialise() {
 		for (const metadata of buildMarketMetadata()) {
-			const market = new MarketState(metadata, this.orderApi);
+			const market = new MarketState(metadata, orderApi);
 			await market.refresh();
 			this.markets.set(metadata.symbol, market);
-			this.emitter.emit("book", {
-				type: "book",
-				payload: market.getSnapshot(),
-			} as MarketEvent);
 		}
 
+		// Restore open positions from database
+		await this.restorePositionsFromDb();
+
 		this.startPolling();
+	}
+
+	/**
+	 * Restore open positions from the Orders table into simulator state.
+	 * This ensures auto-close triggers work even after server restarts.
+	 */
+	private async restorePositionsFromDb() {
+		try {
+			const { getAllOpenOrders } = await import(
+				"@/server/db/ordersRepository.server"
+			);
+			const openOrders = await getAllOpenOrders();
+
+			if (openOrders.length === 0) {
+				console.log("[Simulator] No open positions to restore from database");
+				return;
+			}
+
+			console.log(
+				`[Simulator] Restoring ${openOrders.length} open positions from database...`,
+			);
+
+			for (const order of openOrders) {
+				const account = this.getOrCreateAccount(order.modelId);
+				const symbol = normalizeSymbol(order.symbol);
+				const market = this.markets.get(symbol);
+				const markPrice = market?.getMidPrice() ?? parseFloat(order.entryPrice);
+
+				// Restore the position via a synthetic execution
+				const quantity = parseFloat(order.quantity);
+				const entryPrice = parseFloat(order.entryPrice);
+				const leverage = order.leverage ? parseFloat(order.leverage) : 1;
+				const side = order.side === "LONG" ? "buy" : "sell";
+
+				// Apply execution to create the position in memory
+				account.applyExecution(
+					symbol,
+					side,
+					{
+						fills: [{ quantity, price: entryPrice }],
+						averagePrice: entryPrice,
+						totalQuantity: quantity,
+						status: "filled",
+					},
+					leverage,
+				);
+
+				// Set exit plan if present
+				if (order.exitPlan) {
+					account.setExitPlan(symbol, order.exitPlan);
+				}
+
+				// Update mark price
+				account.updateMarkPrice(symbol, markPrice);
+
+				console.log(
+					`[Simulator] Restored ${order.side} ${symbol} x${quantity} @ $${entryPrice} for ${order.modelId}`,
+				);
+			}
+
+			console.log("[Simulator] Position restoration complete");
+		} catch (error) {
+			console.error("[Simulator] Failed to restore positions from DB:", error);
+		}
 	}
 
 	private startPolling() {
@@ -220,10 +256,6 @@ export class ExchangeSimulator {
 				for (const account of this.accounts.values()) {
 					account.updateMarkPrice(symbol, snapshot.midPrice);
 				}
-				this.emitter.emit("book", {
-					type: "book",
-					payload: snapshot,
-				} as MarketEvent);
 			} catch (error) {
 				console.error(`[Simulator] Failed to refresh market ${symbol}`, error);
 			}
@@ -279,7 +311,40 @@ export class ExchangeSimulator {
 					const account = this.accounts.get(request.accountId);
 					account?.clearPendingExit(normalizeSymbol(request.symbol));
 				} else if (outcome && positionBefore) {
-					// Record the auto-closed position in the database
+					// Calculate P&L
+					const isLong = positionBefore.side === "LONG";
+					const pnl = isLong
+						? (outcome.averagePrice - positionBefore.avgEntryPrice) *
+							positionBefore.quantity
+						: (positionBefore.avgEntryPrice - outcome.averagePrice) *
+							positionBefore.quantity;
+
+					// Update order in Orders table (primary source of truth)
+					try {
+						const normalizedSymbol = normalizeSymbol(request.symbol);
+						const dbOrder = await getOpenOrderBySymbol(
+							request.accountId,
+							normalizedSymbol,
+						);
+						if (dbOrder) {
+							await closeOrder({
+								orderId: dbOrder.id,
+								exitPrice: outcome.averagePrice.toString(),
+								realizedPnl: pnl.toString(),
+								closeTrigger: request.trigger,
+							});
+							console.info(
+								`[Simulator] Updated Orders table for auto-close: ${request.symbol} via ${request.trigger}`,
+							);
+						}
+					} catch (orderDbError) {
+						console.error(
+							`[Simulator] Failed to update Orders table:`,
+							orderDbError,
+						);
+					}
+
+					// Record the auto-closed position in the ToolCalls table (for audit/history)
 					try {
 						const invocation = await createInvocationMutation(
 							request.accountId,
@@ -291,11 +356,9 @@ export class ExchangeSimulator {
 							entryPrice: positionBefore.avgEntryPrice,
 							exitPrice: outcome.averagePrice,
 							markPrice: outcome.averagePrice,
-							realizedPnl: positionBefore.realizedPnl,
-							unrealizedPnl: positionBefore.unrealizedPnl,
-							netPnl:
-								(positionBefore.realizedPnl ?? 0) +
-								(positionBefore.unrealizedPnl ?? 0),
+							realizedPnl: pnl,
+							unrealizedPnl: 0,
+							netPnl: pnl,
 							closedAt: new Date().toISOString(),
 						};
 
@@ -310,7 +373,7 @@ export class ExchangeSimulator {
 						});
 					} catch (dbError) {
 						console.error(
-							`[Simulator] Failed to record auto-close in database:`,
+							`[Simulator] Failed to record auto-close in ToolCalls:`,
 							dbError,
 						);
 					}

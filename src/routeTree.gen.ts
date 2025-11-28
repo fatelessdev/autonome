@@ -9,13 +9,10 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SimulatorRouteImport } from './routes/simulator'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiSplatRouteImport } from './routes/api/$'
-import { Route as ApiSimStreamRouteImport } from './routes/api/sim/stream'
-import { Route as ApiSimOrderRouteImport } from './routes/api/sim/order'
 import { Route as ApiRpcSplatRouteImport } from './routes/api/rpc.$'
 import { Route as ApiEventsWorkflowRouteImport } from './routes/api/events/workflow'
 import { Route as ApiEventsTradingRouteImport } from './routes/api/events/trading'
@@ -23,11 +20,6 @@ import { Route as ApiEventsTradesRouteImport } from './routes/api/events/trades'
 import { Route as ApiEventsPositionsRouteImport } from './routes/api/events/positions'
 import { Route as ApiEventsConversationsRouteImport } from './routes/api/events/conversations'
 
-const SimulatorRoute = SimulatorRouteImport.update({
-  id: '/simulator',
-  path: '/simulator',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ChatRoute = ChatRouteImport.update({
   id: '/chat',
   path: '/chat',
@@ -46,16 +38,6 @@ const ApiChatRoute = ApiChatRouteImport.update({
 const ApiSplatRoute = ApiSplatRouteImport.update({
   id: '/api/$',
   path: '/api/$',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiSimStreamRoute = ApiSimStreamRouteImport.update({
-  id: '/api/sim/stream',
-  path: '/api/sim/stream',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiSimOrderRoute = ApiSimOrderRouteImport.update({
-  id: '/api/sim/order',
-  path: '/api/sim/order',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiRpcSplatRoute = ApiRpcSplatRouteImport.update({
@@ -92,7 +74,6 @@ const ApiEventsConversationsRoute = ApiEventsConversationsRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/chat': typeof ChatRoute
-  '/simulator': typeof SimulatorRoute
   '/api/$': typeof ApiSplatRoute
   '/api/chat': typeof ApiChatRoute
   '/api/events/conversations': typeof ApiEventsConversationsRoute
@@ -101,13 +82,10 @@ export interface FileRoutesByFullPath {
   '/api/events/trading': typeof ApiEventsTradingRoute
   '/api/events/workflow': typeof ApiEventsWorkflowRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
-  '/api/sim/order': typeof ApiSimOrderRoute
-  '/api/sim/stream': typeof ApiSimStreamRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/chat': typeof ChatRoute
-  '/simulator': typeof SimulatorRoute
   '/api/$': typeof ApiSplatRoute
   '/api/chat': typeof ApiChatRoute
   '/api/events/conversations': typeof ApiEventsConversationsRoute
@@ -116,14 +94,11 @@ export interface FileRoutesByTo {
   '/api/events/trading': typeof ApiEventsTradingRoute
   '/api/events/workflow': typeof ApiEventsWorkflowRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
-  '/api/sim/order': typeof ApiSimOrderRoute
-  '/api/sim/stream': typeof ApiSimStreamRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/chat': typeof ChatRoute
-  '/simulator': typeof SimulatorRoute
   '/api/$': typeof ApiSplatRoute
   '/api/chat': typeof ApiChatRoute
   '/api/events/conversations': typeof ApiEventsConversationsRoute
@@ -132,15 +107,12 @@ export interface FileRoutesById {
   '/api/events/trading': typeof ApiEventsTradingRoute
   '/api/events/workflow': typeof ApiEventsWorkflowRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
-  '/api/sim/order': typeof ApiSimOrderRoute
-  '/api/sim/stream': typeof ApiSimStreamRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/chat'
-    | '/simulator'
     | '/api/$'
     | '/api/chat'
     | '/api/events/conversations'
@@ -149,13 +121,10 @@ export interface FileRouteTypes {
     | '/api/events/trading'
     | '/api/events/workflow'
     | '/api/rpc/$'
-    | '/api/sim/order'
-    | '/api/sim/stream'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/chat'
-    | '/simulator'
     | '/api/$'
     | '/api/chat'
     | '/api/events/conversations'
@@ -164,13 +133,10 @@ export interface FileRouteTypes {
     | '/api/events/trading'
     | '/api/events/workflow'
     | '/api/rpc/$'
-    | '/api/sim/order'
-    | '/api/sim/stream'
   id:
     | '__root__'
     | '/'
     | '/chat'
-    | '/simulator'
     | '/api/$'
     | '/api/chat'
     | '/api/events/conversations'
@@ -179,14 +145,11 @@ export interface FileRouteTypes {
     | '/api/events/trading'
     | '/api/events/workflow'
     | '/api/rpc/$'
-    | '/api/sim/order'
-    | '/api/sim/stream'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ChatRoute: typeof ChatRoute
-  SimulatorRoute: typeof SimulatorRoute
   ApiSplatRoute: typeof ApiSplatRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiEventsConversationsRoute: typeof ApiEventsConversationsRoute
@@ -195,19 +158,10 @@ export interface RootRouteChildren {
   ApiEventsTradingRoute: typeof ApiEventsTradingRoute
   ApiEventsWorkflowRoute: typeof ApiEventsWorkflowRoute
   ApiRpcSplatRoute: typeof ApiRpcSplatRoute
-  ApiSimOrderRoute: typeof ApiSimOrderRoute
-  ApiSimStreamRoute: typeof ApiSimStreamRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/simulator': {
-      id: '/simulator'
-      path: '/simulator'
-      fullPath: '/simulator'
-      preLoaderRoute: typeof SimulatorRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/chat': {
       id: '/chat'
       path: '/chat'
@@ -234,20 +188,6 @@ declare module '@tanstack/react-router' {
       path: '/api/$'
       fullPath: '/api/$'
       preLoaderRoute: typeof ApiSplatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/sim/stream': {
-      id: '/api/sim/stream'
-      path: '/api/sim/stream'
-      fullPath: '/api/sim/stream'
-      preLoaderRoute: typeof ApiSimStreamRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/sim/order': {
-      id: '/api/sim/order'
-      path: '/api/sim/order'
-      fullPath: '/api/sim/order'
-      preLoaderRoute: typeof ApiSimOrderRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/rpc/$': {
@@ -298,7 +238,6 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ChatRoute: ChatRoute,
-  SimulatorRoute: SimulatorRoute,
   ApiSplatRoute: ApiSplatRoute,
   ApiChatRoute: ApiChatRoute,
   ApiEventsConversationsRoute: ApiEventsConversationsRoute,
@@ -307,8 +246,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiEventsTradingRoute: ApiEventsTradingRoute,
   ApiEventsWorkflowRoute: ApiEventsWorkflowRoute,
   ApiRpcSplatRoute: ApiRpcSplatRoute,
-  ApiSimOrderRoute: ApiSimOrderRoute,
-  ApiSimStreamRoute: ApiSimStreamRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

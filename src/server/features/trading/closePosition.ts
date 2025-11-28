@@ -12,12 +12,12 @@ import {
 } from "@/server/features/trading/openPositions";
 import { SignerClient } from "@/server/features/trading/signerClient";
 import { MARKETS } from "@/shared/markets/marketMetadata";
-import {
-	CandlestickApi,
-	IsomorphicFetchHttpLibrary,
-	ServerConfiguration,
-} from "@/lighter/generated/index";
+import { candlestickApi } from "@/server/integrations/lighter";
 import { NonceManagerType } from "../../../../lighter-sdk-ts/nonce_manager";
+import {
+	closeOrder,
+	getOpenOrderBySymbol,
+} from "@/server/db/ordersRepository.server";
 
 export interface ClosedPositionSummary {
 	symbol: string;
@@ -137,7 +137,26 @@ export async function closePosition(
 					? outcome.averagePrice
 					: null;
 			const summary = buildSummary(symbol, position, exitPrice, closedAtIso);
-			if (summary) summaries.push(summary);
+			if (summary) {
+				summaries.push(summary);
+
+				// Update order in database
+				try {
+					const dbOrder = await getOpenOrderBySymbol(accountId, key);
+					if (dbOrder) {
+						await closeOrder({
+							orderId: dbOrder.id,
+							exitPrice: (exitPrice ?? 0).toString(),
+							realizedPnl: (summary.netPnl ?? 0).toString(),
+						});
+					}
+				} catch (dbError) {
+					console.error(
+						`[closePosition] DB update failed for ${symbol}:`,
+						dbError,
+					);
+				}
+			}
 		}
 
 		return summaries;
@@ -149,13 +168,6 @@ export async function closePosition(
 		apiKeyIndex: API_KEY_INDEX,
 		accountIndex: Number(account.accountIndex),
 		nonceManagementType: NonceManagerType.API,
-	});
-
-	const candleStickApi = new CandlestickApi({
-		baseServer: new ServerConfiguration(BASE_URL, {}),
-		httpApi: new IsomorphicFetchHttpLibrary(),
-		middleware: [],
-		authMethods: {},
 	});
 
 	const summaries: ClosedPositionSummary[] = [];
@@ -177,7 +189,7 @@ export async function closePosition(
 		}
 
 		try {
-			const candleStickData = await candleStickApi.candlesticks(
+			const candleStickData = await candlestickApi.candlesticks(
 				market.marketId,
 				"1m",
 				Date.now() - 1000 * 60 * 5,
@@ -218,6 +230,23 @@ export async function closePosition(
 			const summary = buildSummary(symbol, position, latestPrice, closedAtIso);
 			if (summary) {
 				summaries.push(summary);
+
+				// Update order in database
+				try {
+					const dbOrder = await getOpenOrderBySymbol(account.id, key);
+					if (dbOrder) {
+						await closeOrder({
+							orderId: dbOrder.id,
+							exitPrice: latestPrice.toString(),
+							realizedPnl: (summary.netPnl ?? 0).toString(),
+						});
+					}
+				} catch (dbError) {
+					console.error(
+						`[closePosition] DB update failed for ${symbol}:`,
+						dbError,
+					);
+				}
 			}
 		} catch (err) {
 			console.error(`Failed to close position for ${symbol}:`, err);

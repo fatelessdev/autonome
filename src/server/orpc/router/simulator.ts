@@ -15,18 +15,6 @@ import { getArray, safeJsonParse } from "@/core/utils/json";
 
 // ==================== Schema Definitions ====================
 
-const OrderBookLevelSchema = z.object({
-	price: z.number(),
-	quantity: z.number(),
-});
-
-const OrderBookSnapshotSchema = z.object({
-	symbol: z.string(),
-	bids: z.array(OrderBookLevelSchema),
-	asks: z.array(OrderBookLevelSchema),
-	timestamp: z.string(),
-});
-
 const AccountPositionSchema = z.object({
 	symbol: z.string(),
 	side: z.enum(["LONG", "SHORT"]),
@@ -89,34 +77,6 @@ const ResetAccountInputSchema = z.object({
 
 const ResetAccountResponseSchema = z.object({
 	account: AccountSnapshotSchema,
-});
-
-const GetOrderBookInputSchema = z.object({
-	symbol: z.string(),
-});
-
-const GetOrderBookResponseSchema = z.object({
-	orderBook: OrderBookSnapshotSchema,
-});
-
-const CompletedTradeSchema = z.object({
-	id: z.string(),
-	symbol: z.string(),
-	side: z.string(),
-	direction: z.string(),
-	notional: z.number(),
-	realizedPnl: z.number(),
-	leverage: z.number().optional(),
-	confidence: z.number().optional(),
-	timestamp: z.string(),
-});
-
-const GetCompletedTradesInputSchema = z.object({
-	accountId: z.string().optional(),
-});
-
-const GetCompletedTradesResponseSchema = z.object({
-	trades: z.array(CompletedTradeSchema),
 });
 
 const TradeStatsSchema = z.object({
@@ -405,18 +365,18 @@ export const getCompletedTradesFromDB = os
 
 			const createCalls = invocationIds.length
 				? await db
-					.select({
-						invocationId: toolCalls.invocationId,
-						metadata: toolCalls.metadata,
-						createdAt: toolCalls.createdAt,
-					})
-					.from(toolCalls)
-					.where(
-						and(
-							eq(toolCalls.toolCallType, ToolCallType.CREATE_POSITION),
-							inArray(toolCalls.invocationId, invocationIds),
-						),
-					)
+						.select({
+							invocationId: toolCalls.invocationId,
+							metadata: toolCalls.metadata,
+							createdAt: toolCalls.createdAt,
+						})
+						.from(toolCalls)
+						.where(
+							and(
+								eq(toolCalls.toolCallType, ToolCallType.CREATE_POSITION),
+								inArray(toolCalls.invocationId, invocationIds),
+							),
+						)
 				: [];
 
 			const createLookup = new Map<
@@ -539,53 +499,5 @@ export const resetAccount = os
 					error instanceof Error ? error.message : "Failed to reset account",
 				);
 			}
-		});
-	});
-
-export const getOrderBook = os
-	.input(GetOrderBookInputSchema)
-	.output(GetOrderBookResponseSchema)
-	.handler(async ({ input }) => {
-		return Sentry.startSpan({ name: "getOrderBook" }, async () => {
-			if (!IS_SIMULATION_ENABLED) {
-				throw new Error("Simulation mode is disabled");
-			}
-
-			const { symbol } = input;
-			if (!symbol) {
-				throw new Error("symbol parameter is required");
-			}
-
-			const simulator = await ensureSimulator();
-			const orderBook = simulator.getOrderBook(symbol);
-
-			if (!orderBook) {
-				throw new Error(`Order book not found for symbol: ${symbol}`);
-			}
-
-			return {
-				orderBook: {
-					...orderBook,
-					timestamp: new Date(orderBook.timestamp).toISOString(),
-				},
-			};
-		});
-	});
-
-export const getCompletedTrades = os
-	.input(GetCompletedTradesInputSchema)
-	.output(GetCompletedTradesResponseSchema)
-	.handler(async ({ input }) => {
-		return Sentry.startSpan({ name: "getCompletedTrades" }, async () => {
-			if (!IS_SIMULATION_ENABLED) {
-				throw new Error("Simulation mode is disabled");
-			}
-
-			const accountId = normalizeAccountId(input.accountId, "default");
-			const simulator = await ensureSimulator();
-
-			// For now, return empty trades as the simulator doesn't track this
-			// Use getCompletedTradesFromDB for actual trade history
-			return { trades: [] };
 		});
 	});

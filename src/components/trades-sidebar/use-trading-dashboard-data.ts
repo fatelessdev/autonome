@@ -110,31 +110,45 @@ function buildModelOptions(
 ): ModelOption[] {
 	const map = new Map<string, ModelOption>();
 
-	const register = (id?: string, fallbackName?: string) => {
-		if (!id) return;
-		const info = getModelInfo(id);
-		const existing = map.get(id);
-		const logo = info.logo || existing?.logo || "";
+	const register = (modelId: string, modelName?: string, modelLogo?: string) => {
+		if (!modelId) return;
+		
+		// Normalize the modelId to use as key
+		const normalizedId = modelId.trim().toLowerCase();
+		if (!normalizedId) return;
+		
+		// Try to get model info from the config
+		const info = getModelInfo(modelId);
+		const existing = map.get(normalizedId);
+		
+		// Prefer logo from config, then from existing, then from parameter
+		const logo = info.logo || existing?.logo || modelLogo || "";
+		// Color comes from config if logo exists, otherwise use existing or default
 		const color = info.logo ? info.color : (existing?.color ?? info.color);
+		// Label: prefer config label if logo exists, then existing label, then modelName, then modelId
 		const label = info.logo
 			? info.label
-			: existing?.label && existing.label !== existing.id
+			: existing?.label && existing.label !== normalizedId
 				? existing.label
-				: (fallbackName ?? info.label ?? id);
+				: (modelName || info.label || modelId);
 
-		map.set(id, { id, label, logo, color });
+		map.set(normalizedId, { id: modelId, label, logo, color });
 	};
 
-	trades.forEach((trade) => register(trade.modelKey, trade.modelName));
-	conversations.forEach((conversation) =>
-		register(
-			conversation.modelLogo || conversation.modelName,
-			conversation.modelName,
-		),
-	);
-	positions.forEach((group) =>
-		register(group.modelLogo || group.modelName, group.modelName),
-	);
+	// Register all unique models from trades (use modelId as primary key)
+	trades.forEach((trade) => {
+		register(trade.modelId, trade.modelName, trade.modelKey);
+	});
+	
+	// Register from conversations
+	conversations.forEach((conversation) => {
+		register(conversation.modelId, conversation.modelName, conversation.modelLogo);
+	});
+	
+	// Register from positions
+	positions.forEach((group) => {
+		register(group.modelId, group.modelName, group.modelLogo);
+	});
 
 	return Array.from(map.values());
 }

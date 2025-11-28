@@ -42,10 +42,6 @@ export const getTrades = os
 						typeof trade.entryPrice === "number" ? trade.entryPrice : 0,
 					exitPrice: typeof trade.exitPrice === "number" ? trade.exitPrice : 0,
 					quantity: typeof trade.quantity === "number" ? trade.quantity : 0,
-					entryNotional:
-						typeof trade.entryNotional === "number" ? trade.entryNotional : 0,
-					exitNotional:
-						typeof trade.exitNotional === "number" ? trade.exitNotional : 0,
 					netPnl: typeof trade.netPnl === "number" ? trade.netPnl : 0,
 					openedAt:
 						typeof trade.openedAt === "string"

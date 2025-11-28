@@ -20,8 +20,6 @@ export const TradeSchema = z.object({
 	entryPrice: z.number(),
 	exitPrice: z.number(),
 	quantity: z.number(),
-	entryNotional: z.number(),
-	exitNotional: z.number(),
 	netPnl: z.number(),
 	openedAt: z.string(),
 	closedAt: z.string(),

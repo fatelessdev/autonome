@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun --import ./instrument.server.mjs node_modules/.bin/vite dev --port 3000",
+    "dev": "vite dev",
     "build": "vite build && cp instrument.server.mjs .output/server",
     "serve": "vite preview",
     "test": "vitest run",

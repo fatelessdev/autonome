@@ -280,7 +280,12 @@ export class AccountState {
 
 		const equity = this.cashBalance + netPositionValue;
 		const borrowedBalance = Math.max(-this.cashBalance, 0);
-		const availableCash = Math.max(equity - totalMargin, 0);
+		// Available cash = initial capital - margin used + realized PnL
+		// Note: Unrealized P&L does NOT affect available cash - only realized P&L does
+		const availableCash = Math.max(
+			this.options.initialCapital - totalMargin + this.totalRealized,
+			0,
+		);
 
 		return {
 			cashBalance: this.cashBalance,

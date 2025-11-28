@@ -3,6 +3,7 @@ import {
 	index,
 	integer,
 	jsonb,
+	numeric,
 	pgEnum,
 	pgTable,
 	text,
@@ -15,10 +16,14 @@ export const toolCallTypeEnum = pgEnum("ToolCallType", [
 	"CLOSE_POSITION",
 ]);
 
+export const orderStatusEnum = pgEnum("OrderStatus", ["OPEN", "CLOSED"]);
+
+export const orderSideEnum = pgEnum("OrderSide", ["LONG", "SHORT"]);
+
 export const models = pgTable(
 	"Models",
 	{
-		id: text("id").primaryKey(),
+		id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
 		name: text("name").notNull(),
 		openRouterModelName: text("openRoutermodelName").notNull(),
 		lighterApiKey: text("lighterApiKey").notNull(),
@@ -91,9 +96,69 @@ export const portfolioSize = pgTable(
 	}),
 );
 
+/**
+ * Orders table - single source of truth for positions
+ *
+ * OPEN orders = active positions (shown in Positions tab)
+ * CLOSED orders = completed trades (shown in Trades tab)
+ *
+ * Unrealized P&L is calculated live from current prices, not stored.
+ * When an order is closed, exitPrice and realizedPnl are populated.
+ * 
+ * Note: entryNotional and exitNotional are derived (qty * price) - not stored.
+ * Note: confidence is stored inside exitPlan JSONB (confidence in the plan).
+ */
+export const orders = pgTable(
+	"Orders",
+	{
+		id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+		modelId: text("modelId")
+			.notNull()
+			.references(() => models.id, {
+				onDelete: "restrict",
+				onUpdate: "cascade",
+			}),
+		// Position details
+		symbol: text("symbol").notNull(),
+		side: orderSideEnum("side").notNull(),
+		quantity: numeric("quantity", { precision: 18, scale: 8 }).notNull(),
+		leverage: numeric("leverage", { precision: 10, scale: 2 }),
+		// Entry details
+		entryPrice: numeric("entryPrice", { precision: 18, scale: 8 }).notNull(),
+		// Exit plan (stop-loss, take-profit, confidence in the plan)
+		exitPlan: jsonb("exitPlan").$type<{
+			stop: number | null;
+			target: number | null;
+			invalidation: string | null;
+			confidence: number | null;
+		}>(),
+		// Status: OPEN = active position, CLOSED = completed trade
+		status: orderStatusEnum("status").notNull().default("OPEN"),
+		// Exit details (populated when closed)
+		exitPrice: numeric("exitPrice", { precision: 18, scale: 8 }),
+		realizedPnl: numeric("realizedPnl", { precision: 18, scale: 2 }),
+		// Auto-close trigger (null = manual close, "STOP" or "TARGET" = auto)
+		closeTrigger: text("closeTrigger"),
+		// Timestamps
+		openedAt: timestamp("openedAt").defaultNow().notNull(),
+		closedAt: timestamp("closedAt"),
+		updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+	},
+	(table) => ({
+		modelIdx: index("Orders_modelId_idx").on(table.modelId),
+		statusIdx: index("Orders_status_idx").on(table.status),
+		modelStatusIdx: index("Orders_modelId_status_idx").on(
+			table.modelId,
+			table.status,
+		),
+		symbolIdx: index("Orders_symbol_idx").on(table.symbol),
+	}),
+);
+
 export const modelRelations = relations(models, ({ many }) => ({
 	invocations: many(invocations),
 	portfolioSnapshots: many(portfolioSize),
+	orders: many(orders),
 }));
 
 export const invocationRelations = relations(invocations, ({ one, many }) => ({
@@ -104,7 +169,7 @@ export const invocationRelations = relations(invocations, ({ one, many }) => ({
 	toolCalls: many(toolCalls),
 }));
 
-export const toolCallRelations = relations(toolCalls, ({ one, many }) => ({
+export const toolCallRelations = relations(toolCalls, ({ one }) => ({
 	invocation: one(invocations, {
 		fields: [toolCalls.invocationId],
 		references: [invocations.id],
@@ -118,10 +183,19 @@ export const portfolioRelations = relations(portfolioSize, ({ one }) => ({
 	}),
 }));
 
+export const orderRelations = relations(orders, ({ one }) => ({
+	model: one(models, {
+		fields: [orders.modelId],
+		references: [models.id],
+	}),
+}));
+
 export type Model = typeof models.$inferSelect;
 export type Invocation = typeof invocations.$inferSelect;
 export type ToolCall = typeof toolCalls.$inferSelect;
 export type PortfolioSnapshot = typeof portfolioSize.$inferSelect;
+export type Order = typeof orders.$inferSelect;
+export type NewOrder = typeof orders.$inferInsert;
 
 export const ToolCallType = {
 	CREATE_POSITION: toolCallTypeEnum.enumValues[0],
@@ -129,3 +203,17 @@ export const ToolCallType = {
 } as const;
 
 export type ToolCallType = (typeof toolCallTypeEnum.enumValues)[number];
+
+export const OrderStatus = {
+	OPEN: orderStatusEnum.enumValues[0],
+	CLOSED: orderStatusEnum.enumValues[1],
+} as const;
+
+export type OrderStatus = (typeof orderStatusEnum.enumValues)[number];
+
+export const OrderSide = {
+	LONG: orderSideEnum.enumValues[0],
+	SHORT: orderSideEnum.enumValues[1],
+} as const;
+
+export type OrderSide = (typeof orderSideEnum.enumValues)[number];

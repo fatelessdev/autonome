@@ -1,14 +1,10 @@
-import { BASE_URL } from "@/env";
+import type { Candlestick, OrderBookDetail } from "@/lighter/generated/index";
 import {
-	type Candlestick,
-	CandlestickApi,
-	FundingApi,
-	FundingRateExchangeEnum,
-	IsomorphicFetchHttpLibrary,
-	OrderApi,
-	type OrderBookDetail,
-	ServerConfiguration,
-} from "@/lighter/generated/index";
+	candlestickApi,
+	fundingApi,
+	orderApi,
+} from "@/server/integrations/lighter";
+import { FundingRateExchangeEnum } from "@/lighter/generated/index";
 import {
 	getAtr,
 	getCloses,
@@ -24,30 +20,6 @@ import {
 const SERIES_WINDOW = 10;
 const INTRADAY_LIMIT = 180;
 const HIGHER_TIMEFRAME_LIMIT = 90;
-
-const serverConfiguration = new ServerConfiguration(BASE_URL, {});
-const httpLibrary = new IsomorphicFetchHttpLibrary();
-
-const candlestickApi = new CandlestickApi({
-	baseServer: serverConfiguration,
-	httpApi: httpLibrary,
-	middleware: [],
-	authMethods: {},
-});
-
-const fundingApi = new FundingApi({
-	baseServer: serverConfiguration,
-	httpApi: httpLibrary,
-	middleware: [],
-	authMethods: {},
-});
-
-const orderApi = new OrderApi({
-	baseServer: serverConfiguration,
-	httpApi: httpLibrary,
-	middleware: [],
-	authMethods: {},
-});
 
 export type Timeframe = "5m" | "4h";
 

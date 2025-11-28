@@ -22,6 +22,33 @@ export type ConversationSnapshot = {
 	}>;
 };
 
+/**
+ * Check if a tool call is an auto-triggered close (stop-loss or take-profit).
+ * These should not appear in the model chat as they're system-initiated.
+ */
+function isAutoTriggeredClose(metadata: Record<string, unknown>): boolean {
+	return (
+		typeof metadata.autoTrigger === "string" &&
+		(metadata.autoTrigger === "STOP" || metadata.autoTrigger === "TARGET")
+	);
+}
+
+/**
+ * Check if an invocation only contains auto-triggered actions.
+ * If so, it should be filtered out from the conversation view entirely.
+ */
+function isAutoTriggeredInvocation(
+	toolCalls: Array<{ metadata: string }>,
+): boolean {
+	if (toolCalls.length === 0) return false;
+
+	// If ALL tool calls are auto-triggered closes, hide the entire invocation
+	return toolCalls.every((call) => {
+		const metadata = safeJsonParse<Record<string, unknown>>(call.metadata, {});
+		return isAutoTriggeredClose(metadata);
+	});
+}
+
 export async function fetchConversationSnapshots(
 	limit = 100,
 ): Promise<ConversationSnapshot[]> {
@@ -51,7 +78,12 @@ export async function fetchConversationSnapshots(
 		limit,
 	});
 
-	return invocationsWithRelations.map((invocation) => ({
+	// Filter out invocations that only contain auto-triggered closes
+	const filtered = invocationsWithRelations.filter(
+		(invocation) => !isAutoTriggeredInvocation(invocation.toolCalls),
+	);
+
+	return filtered.map((invocation) => ({
 		id: invocation.id,
 		modelId: invocation.modelId,
 		modelName: invocation.model?.name ?? "Unknown Model",
