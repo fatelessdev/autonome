@@ -1,15 +1,9 @@
-# Autonome - Docker Compose Configuration
-# For local development and EC2 deployment
-# Uses NeonDB (external PostgreSQL) - no local database container needed
+# Autonome - Docker Compose (EC2 Production)
+# Uses prebuilt Docker Hub image to avoid building on low-RAM servers
 
 services:
-  # Autonome Application
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        VITE_APP_TITLE: ${VITE_APP_TITLE:-Autonome}
+    image: smoggyowo/autonome3-app:latest   # <--- IMPORTANT
     container_name: autonome-app
     restart: unless-stopped
     ports:
@@ -28,7 +22,7 @@ services:
       SIM_REFRESH_INTERVAL_MS: ${SIM_REFRESH_INTERVAL_MS:-30000}
       VITE_APP_TITLE: ${VITE_APP_TITLE:-Autonome}
     volumes:
-      - ~/autonome-logs:/app/logs
+      - /home/ubuntu/autonome-logs:/app/logs    # <--- FIXED
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
       interval: 30s
