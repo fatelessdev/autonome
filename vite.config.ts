@@ -6,6 +6,9 @@ import react from '@vitejs/plugin-react'
 import viteTsConfigPaths from 'vite-tsconfig-paths'
 import tailwindcss from '@tailwindcss/vite'
 
+// Disable prerendering in Docker builds (no network/DB access during build)
+const isPrerenderDisabled = process.env.VITE_PRERENDER_DISABLED === 'true'
+
 const config = defineConfig({
   plugins: [
     devtools(),
@@ -14,7 +17,7 @@ const config = defineConfig({
     }),
     tailwindcss(),
     tanstackStart({
-      prerender: {
+      prerender: isPrerenderDisabled ? { enabled: false } : {
         enabled: true,
         autoSubfolderIndex: true,
         concurrency: 14,

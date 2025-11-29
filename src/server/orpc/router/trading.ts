@@ -29,7 +29,7 @@ export const getTrades = os
 					modelId: trade.modelId || "",
 					modelName: trade.modelName || "",
 					modelRouterName: trade.modelRouterName || undefined,
-					modelKey: trade.modelKey || trade.modelId || "",
+					modelKey: trade.modelRouterName || trade.modelId || "",
 					side: (
 						trade.side &&
 						typeof trade.side === "string" &&

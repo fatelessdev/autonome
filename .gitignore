@@ -3,13 +3,16 @@ node_modules
 dist
 dist-ssr
 count.txt
-.env
 .tanstack
 .wrangler
 .output
 .vinxi
 todos.json
 mcp-todos.json
+drizzle/*.json
+.env
+.env.development
+.env.production
+.env.docker
+.env.local
 drizzle
-.env.*
-# nextjs-autonome

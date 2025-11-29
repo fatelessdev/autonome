@@ -5,7 +5,6 @@ import {
 	createDashboardSseUpdaters,
 	DASHBOARD_QUERIES,
 } from "@/core/shared/trading/dashboardQueries";
-import { getModelInfo } from "@/shared/models/modelConfig";
 import type {
 	Conversation,
 	ModelOption,
@@ -13,6 +12,7 @@ import type {
 	Trade,
 	TradingDashboardData,
 } from "./types";
+import { resolveModelIdentity } from "./utils";
 
 type UseTradingDashboardDataOptions = {
 	enabled?: boolean;
@@ -110,43 +110,51 @@ function buildModelOptions(
 ): ModelOption[] {
 	const map = new Map<string, ModelOption>();
 
-	const register = (modelId: string, modelName?: string) => {
+	const register = (
+		modelId: string,
+		identity: {
+			modelKey?: string | null;
+			modelName?: string | null;
+			modelLogo?: string | null;
+			modelRouterName?: string | null;
+		},
+	) => {
 		if (!modelId) return;
-
-		// Normalize the modelId to use as key
 		const normalizedId = modelId.trim().toLowerCase();
 		if (!normalizedId) return;
 
-		// Always get model info from config - this is the source of truth for logos
-		const info = getModelInfo(modelId);
+		const info = resolveModelIdentity(identity);
 		const existing = map.get(normalizedId);
 
-		// Config logo takes priority, as it's the canonical source
-		const logo = info.logo || existing?.logo || "";
-		const color = info.logo ? info.color : (existing?.color ?? info.color);
-		// Label: prefer config label (when logo exists), then existing label, then modelName, then modelId
-		const label = info.logo
-			? info.label
-			: existing?.label && existing.label !== normalizedId
-				? existing.label
-				: (modelName || info.label || modelId);
-
-		map.set(normalizedId, { id: modelId, label, logo, color });
+		map.set(normalizedId, {
+			id: modelId,
+			label:
+				info.label || existing?.label || identity.modelName || modelId,
+			logo: info.logo || existing?.logo || "",
+			color: info.color || existing?.color || "#888888",
+		});
 	};
 
-	// Register all unique models from trades (use modelId as primary key)
 	for (const trade of trades) {
-		register(trade.modelId, trade.modelName);
+		register(trade.modelId, {
+			modelKey: trade.modelKey,
+			modelName: trade.modelName,
+			modelRouterName: trade.modelRouterName,
+		});
 	}
 
-	// Register from conversations
 	for (const conversation of conversations) {
-		register(conversation.modelId, conversation.modelName);
+		register(conversation.modelId, {
+			modelLogo: conversation.modelLogo,
+			modelName: conversation.modelName,
+		});
 	}
 
-	// Register from positions
 	for (const group of positions) {
-		register(group.modelId, group.modelName);
+		register(group.modelId, {
+			modelLogo: group.modelLogo,
+			modelName: group.modelName,
+		});
 	}
 
 	return Array.from(map.values());

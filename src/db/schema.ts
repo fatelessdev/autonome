@@ -26,10 +26,10 @@ export const models = pgTable(
 		id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
 		name: text("name").notNull(),
 		openRouterModelName: text("openRoutermodelName").notNull(),
-		lighterApiKey: text("lighterApiKey").notNull(),
+		lighterApiKey: text("lighterApiKey").notNull().default("0"),
 		invocationCount: integer("invocationCount").notNull().default(0),
 		totalMinutes: integer("totalMinutes").notNull().default(0),
-		accountIndex: text("accountIndex").notNull(),
+		accountIndex: text("accountIndex").notNull().default("0"),
 	},
 	(table) => ({
 		nameIdx: index("Models_name_idx").on(table.name),

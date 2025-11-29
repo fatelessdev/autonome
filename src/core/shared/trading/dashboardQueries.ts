@@ -64,7 +64,11 @@ function normalizeTrades(payload: TradesResponse): Trade[] {
 						? record.modelRouterName
 						: "",
 				modelKey:
-					typeof record.modelKey === "string" ? record.modelKey : modelId,
+					typeof record.modelKey === "string" && record.modelKey.length > 0
+						? record.modelKey
+						: typeof record.modelRouterName === "string" && record.modelRouterName.length > 0
+							? record.modelRouterName
+							: modelId,
 				symbol: typeof record.symbol === "string" ? record.symbol : "",
 				side: normalizeTradeSide(record.side),
 				quantity: normalizeNumber(record.quantity),

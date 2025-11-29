@@ -1,6 +1,6 @@
 ## Autonome - AI Cryptocurrency Trading Platform
-
-TanStack Start + React 19 + oRPC + PostgreSQL/Drizzle + AI SDK v6
+Autonome is an AI-powered autonomous cryptocurrency trading platform built with TanStack Start, featuring real-time portfolio analytics, multi AI integration, and a sophisticated trading simulator. The platform supports both live trading (via Lighter API) and simulated trading modes, with comprehensive position management, risk controls, and real-time data visualization.
+TanStack Start + React 19 + oRPC + PostgreSQL/Drizzle + AI SDK v6 + Tailwind v4 + Bun + shadcn/ui.
 
 ## Critical Rules
 
@@ -9,6 +9,9 @@ TanStack Start + React 19 + oRPC + PostgreSQL/Drizzle + AI SDK v6
 3. **Environment**: Use `src/env.ts` (T3Env), never `process.env` directly
 4. **Database**: Always quote capitalized identifiers (`"Models"`, `"Orders"`)
 5. **Polyfills**: Add `import '@/polyfill'` at top of oRPC router files
+6. **No bandaid fixes**: NEVER use workarounds or overrides to fix bugs. Always fix issues at their source/core.
+7. **Adaptive refactoring**: When modifying code, if you stumble upon sloppy code refactor that code to improve clarity and maintainability.
+
 
 ## Commands
 

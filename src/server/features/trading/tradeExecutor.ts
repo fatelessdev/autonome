@@ -50,6 +50,7 @@ import type {
 	TradingSignal,
 } from "@/server/features/trading/tradingDecisions";
 import { MARKETS } from "@/shared/markets/marketMetadata";
+import { getModelProvider } from "@/shared/models/modelConfig";
 import {
 	emitAllDataChanged,
 	emitBatchComplete,
@@ -164,12 +165,18 @@ export async function runTradeWorkflow(account: Account) {
 		apiKey: env.OPENROUTER_API_KEY,
 	});
 
+	const modelProvider = getModelProvider(account.name);
+	const useOpenRouter = modelProvider === "openrouter";
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const selectedModel = (useOpenRouter
+		? openrouter(account.modelName)
+		: nim.chatModel(account.modelName)) as any;
+
 	const toolChoiceMode: "auto" | "required" = "auto";
 	// const toolChoiceMode: 'auto' | 'required' = 'required'; // Enable during focused QA to force tool invocations.
 
 	const tradeAgent = new ToolLoopAgent({
-		// model: openrouter(account.modelName),
-		model: nim.chatModel(account.modelName),
+		model: selectedModel,
 		// All tools behave identically for live accounts and simulation mode.
 		providerOptions: {
 			createOpenAICompatible: {
