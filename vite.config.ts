@@ -5,12 +5,10 @@ import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import react from '@vitejs/plugin-react'
 import viteTsConfigPaths from 'vite-tsconfig-paths'
 import tailwindcss from '@tailwindcss/vite'
-import { nitroV2Plugin } from '@tanstack/nitro-v2-vite-plugin'
 
 const config = defineConfig({
   plugins: [
     devtools(),
-    nitroV2Plugin(),
     viteTsConfigPaths({
       projects: ['./tsconfig.json'],
     }),
@@ -37,10 +35,6 @@ const config = defineConfig({
       },
     }),
   ],
-  // Force bundling of srvx to fix "Cannot find package 'srvx'" error
-  ssr: {
-    noExternal: ['srvx'],
-  },
   // Fixes "Some chunks are larger than 500 kB" warning
   build: {
     rollupOptions: {

@@ -2,10 +2,8 @@ node_modules
 .DS_Store
 dist
 dist-ssr
-*.local
 count.txt
 .env
-.nitro
 .tanstack
 .wrangler
 .output
@@ -13,4 +11,5 @@ count.txt
 todos.json
 mcp-todos.json
 drizzle
+.env.*
 # nextjs-autonome

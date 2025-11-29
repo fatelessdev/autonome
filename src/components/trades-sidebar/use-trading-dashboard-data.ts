@@ -110,22 +110,21 @@ function buildModelOptions(
 ): ModelOption[] {
 	const map = new Map<string, ModelOption>();
 
-	const register = (modelId: string, modelName?: string, modelLogo?: string) => {
+	const register = (modelId: string, modelName?: string) => {
 		if (!modelId) return;
-		
+
 		// Normalize the modelId to use as key
 		const normalizedId = modelId.trim().toLowerCase();
 		if (!normalizedId) return;
-		
-		// Try to get model info from the config
+
+		// Always get model info from config - this is the source of truth for logos
 		const info = getModelInfo(modelId);
 		const existing = map.get(normalizedId);
-		
-		// Prefer logo from config, then from existing, then from parameter
-		const logo = info.logo || existing?.logo || modelLogo || "";
-		// Color comes from config if logo exists, otherwise use existing or default
+
+		// Config logo takes priority, as it's the canonical source
+		const logo = info.logo || existing?.logo || "";
 		const color = info.logo ? info.color : (existing?.color ?? info.color);
-		// Label: prefer config label if logo exists, then existing label, then modelName, then modelId
+		// Label: prefer config label (when logo exists), then existing label, then modelName, then modelId
 		const label = info.logo
 			? info.label
 			: existing?.label && existing.label !== normalizedId
@@ -136,19 +135,19 @@ function buildModelOptions(
 	};
 
 	// Register all unique models from trades (use modelId as primary key)
-	trades.forEach((trade) => {
-		register(trade.modelId, trade.modelName, trade.modelKey);
-	});
-	
+	for (const trade of trades) {
+		register(trade.modelId, trade.modelName);
+	}
+
 	// Register from conversations
-	conversations.forEach((conversation) => {
-		register(conversation.modelId, conversation.modelName, conversation.modelLogo);
-	});
-	
+	for (const conversation of conversations) {
+		register(conversation.modelId, conversation.modelName);
+	}
+
 	// Register from positions
-	positions.forEach((group) => {
-		register(group.modelId, group.modelName, group.modelLogo);
-	});
+	for (const group of positions) {
+		register(group.modelId, group.modelName);
+	}
 
 	return Array.from(map.values());
 }

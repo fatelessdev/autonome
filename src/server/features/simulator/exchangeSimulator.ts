@@ -168,7 +168,15 @@ export class ExchangeSimulator {
 	private async initialise() {
 		for (const metadata of buildMarketMetadata()) {
 			const market = new MarketState(metadata, orderApi);
-			await market.refresh();
+			try {
+				await market.refresh();
+			} catch (error) {
+				console.error(
+					`[Simulator] Failed to initialize market ${metadata.symbol}:`,
+					error instanceof Error ? error.message : error,
+				);
+				// Continue with other markets - we'll use stale/zero prices for this one
+			}
 			this.markets.set(metadata.symbol, market);
 		}
 
@@ -257,7 +265,9 @@ export class ExchangeSimulator {
 					account.updateMarkPrice(symbol, snapshot.midPrice);
 				}
 			} catch (error) {
-				console.error(`[Simulator] Failed to refresh market ${symbol}`, error);
+				// Log concise message for network errors (they're common/expected during connectivity issues)
+				const message = error instanceof Error ? error.message : String(error);
+				console.warn(`[Simulator] Market refresh failed for ${symbol}: ${message}`);
 			}
 		}
 

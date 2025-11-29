@@ -154,8 +154,16 @@ export function createSseDataStream<T = EventData>(
 			async start(controller) {
 				let closed = false;
 
-				// Hydrate cache if stale
-				await hydrateCache(request);
+				// Hydrate cache if stale (wrapped in try-catch to prevent stream crash)
+				try {
+					await hydrateCache(request);
+				} catch (error) {
+					console.error(
+						`[SSE][${name}] Hydration failed:`,
+						error instanceof Error ? error.message : error,
+					);
+					// Continue with stale/empty data rather than crashing the stream
+				}
 
 				// Send initial data
 				const initialData = getCurrentData();
