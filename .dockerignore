@@ -1,0 +1,62 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Build outputs
+.output
+.vinxi
+.tanstack
+dist
+dist-ssr
+
+# Testing
+coverage
+
+# Environment files (secrets)
+.env
+.env.local
+.env.development
+.env.development.local
+.env.production
+.env.production.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+!README.md
+
+# Development files
+drizzle/*.json
+todos.json
+mcp-todos.json
+count.txt
+
+# Lighter SDK examples (not needed in production)
+lighter-sdk-ts/examples
+
+# Test files
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+__tests__
