@@ -25,8 +25,8 @@ export function ExitPlanDialog({ selection, onClose }: ExitPlanDialogProps) {
 		>
 			{selection ? (
 				<DialogContent
-					className="max-w-md"
-					style={{ backgroundColor: `${selection.modelColor}15` }}
+					className="max-w-md backdrop-blur-lg"
+					style={{ backgroundColor: `${selection.modelColor}20` }}
 				>
 					<DialogHeader>
 						<DialogTitle className="flex items-center justify-between gap-3 ">

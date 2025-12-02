@@ -84,7 +84,7 @@ export default function CryptoTracker() {
 	const shouldShowError = isError && !isPending && displayTickers.length === 0;
 
 	return (
-		<div className="flex items-center border-b py-[5px] px-6">
+		<div className="flex items-center border-b py-[5px] px-4 sm:px-6 overflow-hidden">
 			{shouldShowSkeleton ? (
 				<TickerSkeleton />
 			) : shouldShowError ? (
@@ -96,19 +96,20 @@ export default function CryptoTracker() {
 					Fetching market prices...
 				</p>
 			) : (
-				<div className="flex w-full flex-wrap items-center justify-center sm:justify-start sm:gap-4">
+				<div className="flex w-full items-center justify-between sm:justify-start sm:gap-4 overflow-hidden">
 					{displayTickers.map((ticker, index) => {
 						const style = COIN_STYLES[ticker.symbol];
 						return (
 							<React.Fragment key={ticker.symbol}>
-								<div className="flex min-w-[92px] flex-1 flex-col items-center sm:min-w-[140px] sm:gap-1">
-									<div className="flex items-center gap-1.5 sm:gap-2">
+								<div className="flex min-w-0 flex-1 flex-col items-center sm:min-w-[140px] sm:gap-1">
+									<div className="flex items-center gap-1 sm:gap-2">
 										<img
 											src={style.logo}
 											alt={`${ticker.symbol} logo`}
 											width={16}
 											height={16}
 											loading="lazy"
+											className="flex-shrink-0"
 										/>
 										<div className="text-muted-foreground text-xs sm:text-sm">
 											{style.badge}
@@ -149,14 +150,15 @@ function PriceWithChange({
 		typeof change === "number" && Number.isFinite(change) ? change : null;
 
 	return (
-		<div className="flex flex-col items-center gap-1">
+		<div className="flex flex-col items-center gap-1 max-w-full">
 			{hasValidPrice ? (
 				<NumberFlow
 					value={value}
-					className="font-mono text-sm font-semibold"
+					className="font-mono text-xs font-semibold sm:text-sm truncate"
 					format={{
 						style: "currency",
 						currency: "USD",
+						currencyDisplay: "narrowSymbol",
 						minimumFractionDigits: decimals,
 						maximumFractionDigits: decimals,
 					}}

@@ -45,21 +45,27 @@ export const MODEL_INFO: Record<string, ModelInfoEntry> = {
 		provider: "openrouter",
 	},
 	"qwen3-max": {
-		logo: "https://nof1.ai/logos_white/qwen_logo.png",
+		logo: "/models/qwen.png",
 		color: "#8B5CF6",
 		label: "Qwen3 Max",
 		provider: "openrouter",
 	},
 	"qwen3-235b-a22b": {
-		logo: "https://nof1.ai/logos_white/qwen_logo.png",
+		logo: "/models/qwen.png",
 		color: "#8B5CF6",
 		label: "Qwen3 235B",
 		provider: "nim",
 	},
 	"qwen3-coder-480b-a35b-instruct": {
-		logo: "https://nof1.ai/logos_white/qwen_logo.png",
+		logo: "/models/qwen.png",
 		color: "#8B5CF6",
 		label: "Qwen3 Coder 480B",
+		provider: "nim",
+	},
+	"qwen3-next-80b-a3b-thinking": {
+		logo: "/models/qwen.png",
+		color: "#8B5CF6",
+		label: "Qwen3 Next 80B",
 		provider: "nim",
 	},
 	"glm-4.5-air": {

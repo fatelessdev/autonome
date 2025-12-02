@@ -1,0 +1,382 @@
+import { useState } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { ChevronDown, ChevronRight, Loader2, AlertTriangle } from "lucide-react";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/components/ui/table";
+import { cn } from "@/core/lib/utils";
+import { getModelInfo } from "@/core/shared/models/modelConfig";
+import { orpc } from "@/server/orpc/client";
+import type { FailureEntry } from "@/server/features/analytics/types";
+
+export const Route = createFileRoute("/failures")({
+	component: FailuresRoute,
+});
+
+const formatDate = (date: Date) =>
+	new Intl.DateTimeFormat("en-US", {
+		month: "short",
+		day: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
+	}).format(new Date(date));
+
+const formatPercent = (value: number) => `${value.toFixed(2)}%`;
+
+function FailureCard({ failure }: { failure: FailureEntry }) {
+	const [isOpen, setIsOpen] = useState(false);
+	const modelInfo = getModelInfo(failure.modelName);
+
+	// Parse response payload for more details
+	const payload = failure.responsePayload as Record<string, unknown> | null;
+	const prompt = (payload?.prompt as string) || null;
+	const decisions = (payload?.decisions as unknown[]) || [];
+	const executionResults = (payload?.executionResults as unknown[]) || [];
+
+	// Find failed executions
+	const failedExecutions = executionResults.filter(
+		(r: unknown) => (r as { success?: boolean })?.success === false,
+	);
+
+	return (
+		<Collapsible open={isOpen} onOpenChange={setIsOpen}>
+			<Card className="mb-4">
+				<CollapsibleTrigger asChild>
+					<CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+						<div className="flex items-center justify-between">
+							<div className="flex items-center gap-3">
+								{modelInfo.logo ? (
+									<img
+										src={modelInfo.logo}
+										alt={failure.modelName}
+										className="h-8 w-8 rounded"
+									/>
+								) : (
+									<div
+										className="h-8 w-8 rounded flex items-center justify-center text-xs font-bold text-white"
+										style={{ backgroundColor: modelInfo.color }}
+									>
+										{failure.modelName.slice(0, 2).toUpperCase()}
+									</div>
+								)}
+								<div>
+									<CardTitle className="text-base flex items-center gap-2">
+										{failure.modelName}
+										{failure.failureReason && (
+											<Badge variant="destructive" className="text-xs">
+												<AlertTriangle className="h-3 w-3 mr-1" />
+												Classified
+											</Badge>
+										)}
+									</CardTitle>
+									<CardDescription>
+										{formatDate(failure.createdAt)} •{" "}
+										{failure.toolCalls.length} tool calls
+										{failedExecutions.length > 0 && (
+											<span className="text-red-500">
+												{" "}
+												• {failedExecutions.length} failed
+											</span>
+										)}
+									</CardDescription>
+								</div>
+							</div>
+							<Button variant="ghost" size="sm">
+								{isOpen ? (
+									<ChevronDown className="h-4 w-4" />
+								) : (
+									<ChevronRight className="h-4 w-4" />
+								)}
+							</Button>
+						</div>
+					</CardHeader>
+				</CollapsibleTrigger>
+				<CollapsibleContent>
+					<CardContent className="pt-0">
+						{/* Failure Reason */}
+						{failure.failureReason && (
+							<div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+								<h4 className="font-semibold text-red-500 mb-1 flex items-center gap-2">
+									<AlertTriangle className="h-4 w-4" />
+									AI Failure Analysis
+								</h4>
+								<p className="text-sm text-muted-foreground">
+									{failure.failureReason}
+								</p>
+							</div>
+						)}
+
+						{/* Response */}
+						<div className="mb-4">
+							<h4 className="font-semibold mb-2">Model Response</h4>
+							<pre className="text-sm bg-muted p-3 rounded-lg overflow-x-auto whitespace-pre-wrap max-h-40 overflow-y-auto">
+								{failure.response || "(empty)"}
+							</pre>
+						</div>
+
+						{/* Prompt (collapsed by default) */}
+						{prompt && (
+							<Collapsible className="mb-4">
+								<CollapsibleTrigger asChild>
+									<Button
+										variant="outline"
+										size="sm"
+										className="mb-2 w-full justify-start"
+									>
+										<ChevronRight className="h-4 w-4 mr-2" />
+										View Prompt
+									</Button>
+								</CollapsibleTrigger>
+								<CollapsibleContent>
+									<pre className="text-xs bg-muted p-3 rounded-lg overflow-x-auto whitespace-pre-wrap max-h-60 overflow-y-auto">
+										{prompt}
+									</pre>
+								</CollapsibleContent>
+							</Collapsible>
+						)}
+
+						{/* Tool Calls */}
+						{failure.toolCalls.length > 0 && (
+							<div className="mb-4">
+								<h4 className="font-semibold mb-2">Tool Calls</h4>
+								<div className="space-y-2">
+									{failure.toolCalls.map((tc) => {
+										let parsedMeta: Record<string, unknown> | null = null;
+										try {
+											parsedMeta = JSON.parse(tc.metadata);
+										} catch {
+											// Ignore
+										}
+
+										const results = (parsedMeta?.results as unknown[]) || [];
+										const hasFailure = results.some(
+											(r: unknown) =>
+												(r as { success?: boolean })?.success === false,
+										);
+
+										return (
+											<Collapsible key={tc.id}>
+												<div
+													className={cn(
+														"p-3 rounded-lg border",
+														hasFailure
+															? "border-red-500/30 bg-red-500/5"
+															: "border-border bg-muted/30",
+													)}
+												>
+													<CollapsibleTrigger asChild>
+														<div className="flex items-center justify-between cursor-pointer">
+															<div className="flex items-center gap-2">
+																<Badge
+																	variant={
+																		hasFailure ? "destructive" : "secondary"
+																	}
+																>
+																	{tc.toolCallType}
+																</Badge>
+																<span className="text-xs text-muted-foreground">
+																	{formatDate(tc.createdAt)}
+																</span>
+															</div>
+															<ChevronRight className="h-4 w-4" />
+														</div>
+													</CollapsibleTrigger>
+													<CollapsibleContent className="mt-2">
+														<pre className="text-xs bg-background p-2 rounded overflow-x-auto whitespace-pre-wrap max-h-40 overflow-y-auto">
+															{JSON.stringify(parsedMeta, null, 2)}
+														</pre>
+													</CollapsibleContent>
+												</div>
+											</Collapsible>
+										);
+									})}
+								</div>
+							</div>
+						)}
+
+						{/* Decisions Summary */}
+						{decisions.length > 0 && (
+							<div>
+								<h4 className="font-semibold mb-2">
+									Decisions ({decisions.length})
+								</h4>
+								<div className="text-xs text-muted-foreground">
+									{decisions
+										.map((d: unknown) => {
+											const decision = d as {
+												symbol?: string;
+												side?: string;
+											};
+											return `${decision.symbol} ${decision.side}`;
+										})
+										.join(", ")}
+								</div>
+							</div>
+						)}
+					</CardContent>
+				</CollapsibleContent>
+			</Card>
+		</Collapsible>
+	);
+}
+
+function FailuresRoute() {
+	const { data, isLoading, error } = useQuery(
+		orpc.analytics.getFailures.queryOptions({
+			input: { limit: 50 },
+		}),
+	);
+
+	return (
+		<div className="flex-1 min-h-0 overflow-auto">
+			<div className="mx-auto max-w-6xl p-6 md:p-10">
+				{/* Header */}
+				<div className="mb-6 md:mb-10">
+					<h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
+						Failures
+					</h1>
+					<p className="text-muted-foreground mt-1">
+						Recent workflow and tool call failures with detailed analysis.
+					</p>
+				</div>
+
+				{/* Model Failure Stats Summary */}
+				{data?.modelStats && data.modelStats.length > 0 && (
+					<div className="mb-8">
+						<h2 className="text-lg font-semibold mb-4">
+							Model Failure Statistics
+						</h2>
+						<div className="rounded-xl overflow-hidden border bg-card">
+							<Table>
+								<TableHeader>
+									<TableRow>
+										<TableHead>Model</TableHead>
+										<TableHead className="text-right">
+											Failed Workflows
+										</TableHead>
+										<TableHead className="text-right">
+											Failed Tool Calls
+										</TableHead>
+										<TableHead className="text-right">
+											Total Invocations
+										</TableHead>
+										<TableHead className="text-right">Failure Rate</TableHead>
+									</TableRow>
+								</TableHeader>
+								<TableBody>
+									{data.modelStats.map((stat) => {
+										const modelInfo = getModelInfo(stat.modelName);
+										return (
+											<TableRow key={stat.modelId}>
+												<TableCell className="font-medium">
+													<div className="flex items-center gap-2">
+														{modelInfo.logo ? (
+															<img
+																src={modelInfo.logo}
+																alt={stat.modelName}
+																className="h-5 w-5 rounded"
+															/>
+														) : (
+															<div
+																className="h-5 w-5 rounded flex items-center justify-center text-[8px] font-bold text-white"
+																style={{ backgroundColor: modelInfo.color }}
+															>
+																{stat.modelName.slice(0, 2).toUpperCase()}
+															</div>
+														)}
+														{stat.modelName}
+													</div>
+												</TableCell>
+												<TableCell className="text-right">
+													<span
+														className={cn(
+															stat.failedWorkflowCount > 0 && "text-red-500",
+														)}
+													>
+														{stat.failedWorkflowCount}
+													</span>
+												</TableCell>
+												<TableCell className="text-right">
+													<span
+														className={cn(
+															stat.failedToolCallCount > 0 && "text-yellow-500",
+														)}
+													>
+														{stat.failedToolCallCount}
+													</span>
+												</TableCell>
+												<TableCell className="text-right">
+													{stat.invocationCount}
+												</TableCell>
+												<TableCell className="text-right">
+													<span
+														className={cn(
+															stat.failureRate > 10
+																? "text-red-500"
+																: stat.failureRate > 5
+																	? "text-yellow-500"
+																	: "text-muted-foreground",
+														)}
+													>
+														{formatPercent(stat.failureRate)}
+													</span>
+												</TableCell>
+											</TableRow>
+										);
+									})}
+								</TableBody>
+							</Table>
+						</div>
+					</div>
+				)}
+
+				{/* Recent Failures */}
+				<div>
+					<h2 className="text-lg font-semibold mb-4">Recent Failures</h2>
+					{isLoading ? (
+						<div className="flex h-64 items-center justify-center">
+							<Loader2 className="h-8 w-8 animate-spin" />
+						</div>
+					) : error ? (
+						<div className="p-6 text-sm text-red-500">
+							Failed to load failures: {error.message}
+						</div>
+					) : !data?.failures?.length ? (
+						<div className="flex h-64 items-center justify-center">
+							<p className="text-muted-foreground">
+								No failures detected. All systems nominal! 🎉
+							</p>
+						</div>
+					) : (
+						<div>
+							{data.failures.map((failure) => (
+								<FailureCard key={failure.invocationId} failure={failure} />
+							))}
+						</div>
+					)}
+				</div>
+			</div>
+		</div>
+	);
+}

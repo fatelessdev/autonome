@@ -1,14 +1,15 @@
 import "@/polyfill";
-
-import { google } from "@ai-sdk/google";
-import type { MistralLanguageModelOptions } from "@ai-sdk/mistral";
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { convertToModelMessages, ToolLoopAgent } from "ai";
+import { mistral, type MistralLanguageModelOptions } from "@ai-sdk/mistral";
+import { convertToModelMessages, ToolLoopAgent, stepCountIs } from "ai";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { SQL_ASSISTANT_PROMPT } from "@/server/chat/sqlPrompt";
 import { tools } from "@/server/chat/tools";
-import { env } from "process";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { env } from "@/env";
+// Primary model for initial analysis and tool orchestration
+const primaryModel = mistral("codestral-latest");
 
 // AI SDK-compatible chat endpoint
 async function handleChat({ request }: { request: Request }) {
@@ -32,12 +33,27 @@ async function handleChat({ request }: { request: Request }) {
 			headers: {
 				Authorization: `Bearer ${env.NIM_API_KEY}`,
 			},
+			// fetch: async (url, options) => {
+			// 	if (options.method === 'POST' && options.body) {
+			// 		const body = JSON.parse(options.body as string);
+
+			// 		// INJECT YOUR CUSTOM PARAMETERS HERE
+			// 		body.chat_template_kwargs = { thinking: true };
+
+			// 		options.body = JSON.stringify(body);
+			// 	}
+			// 	return fetch(url, options);
+			// },
 		});
-		const model = nim.chatModel("moonshotai/kimi-k2-instruct-0905");
+		const openrouter = createOpenRouter({
+			apiKey: env.OPENROUTER_API_KEY,
+		});
 
 		const sqlAgent = new ToolLoopAgent({
-			model: google("gemini-2.5-flash"),
-			instructions: SQL_ASSISTANT_PROMPT,
+			// model: primaryModel,
+			model: mistral("codestral-latest"),
+			// instructions: SQL_ASSISTANT_PROMPT,
+			instructions: "You are an helpful assistant",
 			providerOptions: {
 				google: {
 					thinkingConfig: {
@@ -48,19 +64,19 @@ async function handleChat({ request }: { request: Request }) {
 				mistral: {
 					parallelToolCalls: true,
 				} satisfies MistralLanguageModelOptions,
+				nim: {
+					chat_template_kwargs: { thinking: false }
+				},
+				openrouter: {
+					reasoning: {
+						effort: 'high',
+						exclude: false, // Set true to hide thinking from final output
+					}
+				},
 			},
 			tools,
 			toolChoice: "auto",
-			prepareStep: async ({ messages: stepMessages }) => {
-				// Use a stronger model for complex reasoning after initial steps
-				if (stepMessages.length > 0) {
-					return {
-						model: model,
-					};
-				}
-				// Continue with default settings
-				return {};
-			},
+			stopWhen: stepCountIs(10),
 		});
 
 		const result = await sqlAgent.stream({

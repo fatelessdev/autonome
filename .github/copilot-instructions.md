@@ -10,8 +10,9 @@ TanStack Start + React 19 + oRPC + PostgreSQL/Drizzle + AI SDK v6 + Tailwind v4 
 4. **Database**: Always quote capitalized identifiers (`"Models"`, `"Orders"`)
 5. **Polyfills**: Add `import '@/polyfill'` at top of oRPC router files
 6. **No bandaid fixes**: NEVER use workarounds or overrides to fix bugs. Always fix issues at their source/core.
-7. **Adaptive refactoring**: When modifying code, if you stumble upon sloppy code refactor that code to improve clarity and maintainability.
-
+7. **Adaptive refactoring**: When modifying code, if you stumble upon sloppy code even if it's not directly related, refactor that code to improve clarity and maintainability.
+8. **Adaptive knowledge**: When working on a feature, familiarize yourself with all related files (e.g. DB schema, oRPC router, events, client code) to ensure holistic understanding and improvements and at the end update this doc with any new insights.
+9. **Thorough implementation**: When making changes to a feature, ensure all related aspects (DB schema, oRPC procedures, frontend code, events) are updated accordingly to maintain consistency and functionality.
 
 ## Commands
 
@@ -20,6 +21,7 @@ bun --bun run dev          # Dev server
 bun --bun run build        # Production build  
 bun run db:generate        # Generate migrations after schema changes
 bun run db:migrate         # Apply migrations
+bun run db:seed            # Reset database and seed with default models
 pnpx shadcn@latest add X   # Add UI component
 ```
 
@@ -74,6 +76,24 @@ const { data } = useQuery(orpc.trading.getPositions.queryOptions({ input: {} }))
 | Environment | [src/env.ts](src/env.ts) |
 | Trading logic | [src/server/features/trading](src/server/features/trading) |
 | Simulator | [src/server/features/simulator](src/server/features/simulator) |
+| Trading calculations | [src/core/shared/trading/calculations.ts](src/core/shared/trading/calculations.ts) |
+| Analytics | [src/server/features/analytics](src/server/features/analytics) |
+| Scheduler bootstrap | [src/server/schedulers/bootstrap.ts](src/server/schedulers/bootstrap.ts) |
+
+## Shared Utilities
+
+**Trading Calculations** (`@/core/shared/trading/calculations`):
+- `calculateUnrealizedPnl()` - P&L from position + current price
+- `calculateSharpeRatioFromPortfolio()` - Portfolio NAV-based Sharpe (preferred)
+- `calculateSharpeRatioFromTrades()` - Trade P&L-based Sharpe (simplified)
+- `calculateReturnPercent()`, `calculateWinRate()`, `calculateExpectancy()`
+- `mean()`, `median()`, `standardDeviation()` - Statistical helpers
+- `INITIAL_CAPITAL` (10,000) - Constant for return calculations
+
+**Scheduler Initialization**:
+- Use `globalThis` variables for singleton state (survives HMR)
+- `bootstrap.ts` guards with `globalThis.__autonomeSchedulersBootstrapped`
+- Called from both `instrument.server.mjs` and `__root.tsx` (guards prevent duplicates)
 
 ## Code Style (Biome)
 

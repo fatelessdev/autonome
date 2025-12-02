@@ -32,6 +32,49 @@ function useChart() {
 	return context;
 }
 
+/**
+ * Hook to detect if container has valid dimensions
+ * Prevents Recharts from rendering with width=-1 or height=-1
+ */
+function useHasValidDimensions(
+	ref: React.RefObject<HTMLDivElement | null>,
+): boolean {
+	const [hasValidDimensions, setHasValidDimensions] = React.useState(false);
+
+	React.useEffect(() => {
+		const element = ref.current;
+		if (!element) return;
+
+		const checkDimensions = () => {
+			const { width, height } = element.getBoundingClientRect();
+			setHasValidDimensions(width > 0 && height > 0);
+		};
+
+		// Check immediately
+		checkDimensions();
+
+		// Also check after a short delay for layout to stabilize
+		const timeoutId = setTimeout(checkDimensions, 50);
+
+		// Use ResizeObserver for ongoing changes
+		const observer = new ResizeObserver((entries) => {
+			for (const entry of entries) {
+				const { width, height } = entry.contentRect;
+				setHasValidDimensions(width > 0 && height > 0);
+			}
+		});
+
+		observer.observe(element);
+
+		return () => {
+			clearTimeout(timeoutId);
+			observer.disconnect();
+		};
+	}, [ref]);
+
+	return hasValidDimensions;
+}
+
 function ChartContainer({
 	id,
 	className,
@@ -46,22 +89,33 @@ function ChartContainer({
 }) {
 	const uniqueId = React.useId();
 	const chartId = `chart-${id || uniqueId.replace(/:/g, "")}`;
+	const containerRef = React.useRef<HTMLDivElement>(null);
+	const hasValidDimensions = useHasValidDimensions(containerRef);
 
 	return (
 		<ChartContext.Provider value={{ config }}>
 			<div
+				ref={containerRef}
 				data-slot="chart"
 				data-chart={chartId}
 				className={cn(
-					"[&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border flex aspect-video justify-center text-xs [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-hidden [&_.recharts-sector]:outline-hidden [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-surface]:outline-hidden min-h-[280px] min-w-0",
+					"[&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border flex aspect-video justify-center text-xs [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-hidden [&_.recharts-sector]:outline-hidden [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-surface]:outline-hidden [&_.recharts-wrapper]:outline-none [&_.recharts-wrapper]:focus:outline-none [&_svg]:outline-none [&_svg]:focus:outline-none focus:outline-none outline-none min-h-[280px] min-w-0",
 					className,
 				)}
 				{...props}
 			>
 				<ChartStyle id={chartId} config={config} />
-				<RechartsPrimitive.ResponsiveContainer width="100%" height="100%">
-					{children}
-				</RechartsPrimitive.ResponsiveContainer>
+				{hasValidDimensions && (
+					<RechartsPrimitive.ResponsiveContainer
+						width="100%"
+						height="100%"
+						minWidth={1}
+						minHeight={280}
+						debounce={50}
+					>
+						{children}
+					</RechartsPrimitive.ResponsiveContainer>
+				)}
 			</div>
 		</ChartContext.Provider>
 	);

@@ -6,6 +6,7 @@ import { models, orders } from "@/db/schema";
 import { DEFAULT_SIMULATOR_OPTIONS, IS_SIMULATION_ENABLED } from "@/env";
 import { candlestickApi } from "@/server/integrations/lighter";
 import { ExchangeSimulator } from "@/server/features/simulator/exchangeSimulator";
+import { closeOrder, getOpenOrdersByModel } from "@/server/db/ordersRepository.server";
 import { refreshConversationEvents } from "@/server/features/trading/conversationsSnapshot.server";
 import { formatIstTimestamp } from "@/shared/formatting/dateFormat";
 import { normalizeNumber } from "@/shared/formatting/numberFormat";
@@ -194,8 +195,47 @@ export const tradesQuery = () =>
 	});
 
 // ==========================================
-// POSITIONS (from Orders table)
+// POSITIONS (from Orders table with live reconciliation)
 // ==========================================
+
+/**
+ * Reconcile DB orders against live simulator/exchange state.
+ * Closes any DB orders that are no longer present in live positions.
+ */
+async function reconcilePositionsWithLive(
+	modelId: string,
+	liveSymbols: Set<string>,
+	priceMap: Map<string, number | null>,
+): Promise<void> {
+	const dbOrders = await getOpenOrdersByModel(modelId);
+
+	for (const order of dbOrders) {
+		const normalizedSymbol = order.symbol.toUpperCase();
+		if (!liveSymbols.has(normalizedSymbol)) {
+			// Position exists in DB but not in live state — it was closed externally
+			const exitPrice = priceMap.get(normalizedSymbol) ?? parseFloat(order.entryPrice);
+			const entryPrice = parseFloat(order.entryPrice) || 0;
+			const quantity = parseFloat(order.quantity) || 0;
+			const isLong = order.side === "LONG";
+			const pnl = isLong
+				? (exitPrice - entryPrice) * quantity
+				: (entryPrice - exitPrice) * quantity;
+
+			try {
+				await closeOrder({
+					orderId: order.id,
+					exitPrice: exitPrice.toString(),
+					realizedPnl: pnl.toString(),
+				});
+			} catch (closeError) {
+				console.error(
+					`[Reconcile] Failed to close stale order ${order.id}:`,
+					closeError,
+				);
+			}
+		}
+	}
+}
 
 export async function fetchPositions() {
 	try {
@@ -211,6 +251,18 @@ export async function fetchPositions() {
 				totalMinutes: models.totalMinutes,
 			})
 			.from(models);
+
+		// Get live positions from simulator to reconcile with DB
+		// This ensures UI shows same positions as model prompt
+		const livePositionsByModel = new Map<string, Set<string>>();
+		if (IS_SIMULATION_ENABLED) {
+			const simulator = await ExchangeSimulator.bootstrap(DEFAULT_SIMULATOR_OPTIONS);
+			for (const model of dbModels) {
+				const livePositions = simulator.getOpenPositions(model.id);
+				const symbolSet = new Set(livePositions.map((p) => p.symbol.toUpperCase()));
+				livePositionsByModel.set(model.id, symbolSet);
+			}
+		}
 
 		// Fetch open orders directly from Orders table (single source of truth)
 		const openOrders = await db.query.orders.findMany({
@@ -232,6 +284,27 @@ export async function fetchPositions() {
 		const priceMap = new Map(
 			livePrices.map((p) => [p.symbol.toUpperCase(), p.price]),
 		);
+
+		// Reconcile DB orders against live state (close stale orders)
+		if (IS_SIMULATION_ENABLED) {
+			await Promise.all(
+				dbModels.map((model) => {
+					const liveSymbols = livePositionsByModel.get(model.id) ?? new Set();
+					return reconcilePositionsWithLive(model.id, liveSymbols, priceMap);
+				}),
+			);
+
+			// Re-fetch open orders after reconciliation
+			const reconciled = await db.query.orders.findMany({
+				where: eq(orders.status, "OPEN"),
+			});
+			ordersByModel.clear();
+			for (const order of reconciled) {
+				const existing = ordersByModel.get(order.modelId) ?? [];
+				existing.push(order);
+				ordersByModel.set(order.modelId, existing);
+			}
+		}
 
 		// Fetch total realized P&L per model from closed orders
 		const closedOrders = await db.query.orders.findMany({

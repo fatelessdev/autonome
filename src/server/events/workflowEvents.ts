@@ -18,6 +18,18 @@
  */
 
 import { EventEmitter } from "node:events";
+import {
+	emitPositionEvent,
+	type PositionEventData,
+} from "@/server/features/trading/events/positionEvents";
+import {
+	emitTradeEvent,
+	type TradeEventData,
+} from "@/server/features/trading/events/tradeEvents";
+import {
+	emitConversationEvent,
+	type ConversationEventData,
+} from "@/server/features/trading/events/conversationEvents";
 
 // ============================================================================
 // Event Types
@@ -139,13 +151,50 @@ export function emitConversationsChanged(modelIds?: string[]): void {
 /**
  * Emit all data change events after a workflow completes
  * This is the main function to call after runTradeWorkflow
+ * Also triggers the data SSE stream emitters for real-time updates
  */
-export function emitAllDataChanged(modelId: string): void {
+export async function emitAllDataChanged(modelId: string): Promise<void> {
 	const modelIds = [modelId];
 	emitPositionsChanged(modelIds);
 	emitTradesChanged(modelIds);
 	emitConversationsChanged(modelIds);
 	emitWorkflowComplete(modelId);
+
+	// Also trigger data SSE streams so clients get immediate updates
+	// Import dynamically to avoid circular dependencies
+	const [
+		{ fetchPositions },
+		{ fetchTrades },
+		{ refreshConversationEvents },
+	] = await Promise.all([
+		import("@/server/features/trading/queries.server"),
+		import("@/server/features/trading/queries.server"),
+		import("@/server/features/trading/conversationsSnapshot.server"),
+	]);
+
+	const [positions, trades, conversations] = await Promise.all([
+		fetchPositions(),
+		fetchTrades(),
+		refreshConversationEvents(),
+	]);
+
+	emitPositionEvent({
+		type: "positions:updated",
+		timestamp: new Date().toISOString(),
+		data: positions as PositionEventData[],
+	});
+
+	emitTradeEvent({
+		type: "trades:updated",
+		timestamp: new Date().toISOString(),
+		data: trades as TradeEventData[],
+	});
+
+	emitConversationEvent({
+		type: "conversations:updated",
+		timestamp: new Date().toISOString(),
+		data: conversations as ConversationEventData[],
+	});
 }
 
 // ============================================================================

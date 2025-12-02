@@ -2,23 +2,29 @@ import { QueryClient } from "@tanstack/react-query";
 import {
 	createPortfolioSnapshotMutation,
 	listModelsQuery,
+	portfolioHistoryQuery,
 } from "@/server/db/tradingRepository.server";
 import { portfolioQuery } from "@/server/features/trading/getPortfolio.server";
+import { INITIAL_CAPITAL } from "@/core/shared/trading/calculations";
 
 const PORTFOLIO_INTERVAL_MS = 1000 * 60 * 1;
 
 declare global {
-	var portfolioIntervalHandle: ReturnType<typeof setInterval> | undefined;
+	var __portfolioSchedulerInitialized: boolean | undefined;
+	var __portfolioIntervalHandle: ReturnType<typeof setInterval> | undefined;
 }
 
 export function ensurePortfolioScheduler() {
-	if (globalThis.portfolioIntervalHandle) {
+	// Double-check guard to prevent duplicate schedulers
+	if (globalThis.__portfolioSchedulerInitialized || globalThis.__portfolioIntervalHandle) {
 		return;
 	}
 
+	globalThis.__portfolioSchedulerInitialized = true;
+
 	void recordPortfolios();
 
-	globalThis.portfolioIntervalHandle = setInterval(() => {
+	globalThis.__portfolioIntervalHandle = setInterval(() => {
 		void recordPortfolios();
 	}, PORTFOLIO_INTERVAL_MS);
 }
@@ -26,12 +32,26 @@ export function ensurePortfolioScheduler() {
 async function recordPortfolios() {
 	const queryClient = new QueryClient();
 
-	console.log("[Portfolio Tracker] Recording portfolios...");
 	const models = await queryClient.fetchQuery(listModelsQuery());
-	console.log(`[Portfolio Tracker] Found ${models.length} models`);
 
 	for (const model of models) {
 		try {
+			// Check if this model has any portfolio history
+			const existingHistory = await queryClient.fetchQuery(
+				portfolioHistoryQuery(model.id),
+			);
+
+			// If no history exists, seed with initial 10k starting point
+			if (existingHistory.length === 0) {
+				await createPortfolioSnapshotMutation({
+					modelId: model.id,
+					netPortfolio: String(INITIAL_CAPITAL),
+				});
+				console.log(
+					`[Portfolio Tracker] Seeded initial ${INITIAL_CAPITAL} for ${model.name}`,
+				);
+			}
+
 			const portfolio = await queryClient.fetchQuery(
 				portfolioQuery({
 					apiKey: model.lighterApiKey,
@@ -55,9 +75,6 @@ async function recordPortfolios() {
 				await queryClient.invalidateQueries({
 					queryKey: ["portfolio-history", model.id],
 				});
-				console.log(
-					`[Portfolio Tracker] ✓ Recorded ${model.name}: $${portfolio.total}`,
-				);
 			} else {
 				console.warn(
 					`[Portfolio Tracker] Invalid portfolio data for ${model.name}:`,

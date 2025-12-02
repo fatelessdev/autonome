@@ -10,8 +10,8 @@ import type {
 } from "@/server/features/simulator/types";
 
 const cwd = process.cwd();
-const envFiles = [".env", ".env.local"];
-// const envFiles = [".env", ".env.local", ".env.production", ".env.production.local", ".env.development", ".env.development.local"];
+// const envFiles = [".env", ".env.local"];
+const envFiles = [".env", ".env.local", ".env.production", ".env.production.local", ".env.development", ".env.development.local"];
 
 for (const file of envFiles) {
 	const fullPath = resolve(cwd, file);

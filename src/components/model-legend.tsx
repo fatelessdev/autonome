@@ -112,10 +112,13 @@ export default function ModelLegend({
 		>
 			<div
 				className={cn(
-					compact
-						? "flex gap-2 overflow-x-auto pb-1"
-						: "grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6",
+					"flex gap-3 overflow-x-auto overflow-y-visible pb-2 pt-1 pl-1 scrollbar-hide",
+					compact ? "gap-2" : undefined,
 				)}
+				style={{
+					scrollbarWidth: "none",
+					msOverflowStyle: "none",
+				}}
 			>
 				{sortedModelKeys.map((key) => {
 					const originalKey = seriesMeta[key]?.originalKey ?? key;
@@ -142,15 +145,17 @@ export default function ModelLegend({
 					return (
 						<div
 							className={cn(
-								"flex flex-col items-center justify-center rounded-md border px-3 py-2 text-sm transition-all cursor-pointer",
-								compact ? "min-w-[180px] flex-shrink-0" : undefined,
+								"flex flex-col items-center justify-center rounded-md border-2 px-3 py-2 text-sm cursor-pointer",
+								"transition-[border-color,transform,box-shadow] duration-150 ease-out",
+								"min-w-[140px] flex-shrink-0",
 							)}
 							key={key}
 							onMouseEnter={() => onHoverLine(key)}
 							onMouseLeave={() => onHoverLine(null)}
 							style={{
-								borderColor: isHovered ? color : "hsl(var(--border))",
-								borderWidth: isHovered ? "2px" : "1px",
+								borderColor: isHovered ? color : "transparent",
+								background: isHovered ? undefined : "hsl(var(--card))",
+								outline: isHovered ? "none" : "1px solid hsl(var(--border))",
 								transform: isHovered ? "scale(1.05)" : "scale(1)",
 								boxShadow: isHovered ? `0 0 12px ${color}33` : "none",
 								zIndex: isHovered ? 2 : 1,
@@ -206,6 +211,7 @@ export default function ModelLegend({
 										format={{
 											style: "currency",
 											currency: "USD",
+											currencyDisplay: "narrowSymbol",
 											minimumFractionDigits: 2,
 											maximumFractionDigits: 2,
 										}}

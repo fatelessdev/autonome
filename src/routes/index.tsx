@@ -45,7 +45,7 @@ function DashboardRoute() {
 
 	return (
 		<div className="relative flex h-screen flex-col overflow-hidden">
-			<LightRays />
+			{/* <LightRays /> */}
 			<Header
 				isSidebarExpanded={isSidebarExpanded}
 				onToggleSidebar={toggleSidebar}

@@ -149,6 +149,10 @@ export async function closePosition(
 							exitPrice: (exitPrice ?? 0).toString(),
 							realizedPnl: (summary.netPnl ?? 0).toString(),
 						});
+					} else {
+						console.warn(
+							`[closePosition] No DB order found for ${symbol} (accountId=${accountId}, key=${key})`,
+						);
 					}
 				} catch (dbError) {
 					console.error(
@@ -240,6 +244,10 @@ export async function closePosition(
 							exitPrice: latestPrice.toString(),
 							realizedPnl: (summary.netPnl ?? 0).toString(),
 						});
+					} else {
+						console.warn(
+							`[closePosition] No DB order found for ${symbol} (accountId=${account.id}, key=${key})`,
+						);
 					}
 				} catch (dbError) {
 					console.error(

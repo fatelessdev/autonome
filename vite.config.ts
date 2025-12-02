@@ -1,13 +1,11 @@
 import { defineConfig } from 'vite'
 import { devtools } from '@tanstack/devtools-vite'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
+import { nitro } from 'nitro/vite'
 // standard import name is 'react'
 import react from '@vitejs/plugin-react'
 import viteTsConfigPaths from 'vite-tsconfig-paths'
 import tailwindcss from '@tailwindcss/vite'
-
-// Disable prerendering in Docker builds (no network/DB access during build)
-const isPrerenderDisabled = process.env.VITE_PRERENDER_DISABLED === 'true'
 
 const config = defineConfig({
   plugins: [
@@ -17,8 +15,8 @@ const config = defineConfig({
     }),
     tailwindcss(),
     tanstackStart({
-      prerender: isPrerenderDisabled ? { enabled: false } : {
-        enabled: true,
+      prerender: {
+        // enabled: true,
         autoSubfolderIndex: true,
         concurrency: 14,
         crawlLinks: true,
@@ -28,8 +26,13 @@ const config = defineConfig({
         onSuccess: ({ page }) => {
           console.log(`Rendered ${page.path}!`)
         },
-      }
+      },
+      sitemap: {
+        enabled: true,
+        host: 'https://goon.fast',
+      },
     }),
+    nitro({ preset: 'bun' }),
     // We use the standard 'react' plugin here, but we pass options to it.
     // This single instance handles Fast Refresh, JSX, AND your Babel compiler.
     react({

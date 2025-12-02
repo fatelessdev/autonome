@@ -9,7 +9,10 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as LeaderboardRouteImport } from './routes/leaderboard'
+import { Route as FailuresRouteImport } from './routes/failures'
 import { Route as ChatRouteImport } from './routes/chat'
+import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiSplatRouteImport } from './routes/api/$'
@@ -20,9 +23,24 @@ import { Route as ApiEventsTradesRouteImport } from './routes/api/events/trades'
 import { Route as ApiEventsPositionsRouteImport } from './routes/api/events/positions'
 import { Route as ApiEventsConversationsRouteImport } from './routes/api/events/conversations'
 
+const LeaderboardRoute = LeaderboardRouteImport.update({
+  id: '/leaderboard',
+  path: '/leaderboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FailuresRoute = FailuresRouteImport.update({
+  id: '/failures',
+  path: '/failures',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ChatRoute = ChatRouteImport.update({
   id: '/chat',
   path: '/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AnalyticsRoute = AnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -73,7 +91,10 @@ const ApiEventsConversationsRoute = ApiEventsConversationsRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/analytics': typeof AnalyticsRoute
   '/chat': typeof ChatRoute
+  '/failures': typeof FailuresRoute
+  '/leaderboard': typeof LeaderboardRoute
   '/api/$': typeof ApiSplatRoute
   '/api/chat': typeof ApiChatRoute
   '/api/events/conversations': typeof ApiEventsConversationsRoute
@@ -85,7 +106,10 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/analytics': typeof AnalyticsRoute
   '/chat': typeof ChatRoute
+  '/failures': typeof FailuresRoute
+  '/leaderboard': typeof LeaderboardRoute
   '/api/$': typeof ApiSplatRoute
   '/api/chat': typeof ApiChatRoute
   '/api/events/conversations': typeof ApiEventsConversationsRoute
@@ -98,7 +122,10 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/analytics': typeof AnalyticsRoute
   '/chat': typeof ChatRoute
+  '/failures': typeof FailuresRoute
+  '/leaderboard': typeof LeaderboardRoute
   '/api/$': typeof ApiSplatRoute
   '/api/chat': typeof ApiChatRoute
   '/api/events/conversations': typeof ApiEventsConversationsRoute
@@ -112,7 +139,10 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/analytics'
     | '/chat'
+    | '/failures'
+    | '/leaderboard'
     | '/api/$'
     | '/api/chat'
     | '/api/events/conversations'
@@ -124,7 +154,10 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/analytics'
     | '/chat'
+    | '/failures'
+    | '/leaderboard'
     | '/api/$'
     | '/api/chat'
     | '/api/events/conversations'
@@ -136,7 +169,10 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/analytics'
     | '/chat'
+    | '/failures'
+    | '/leaderboard'
     | '/api/$'
     | '/api/chat'
     | '/api/events/conversations'
@@ -149,7 +185,10 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AnalyticsRoute: typeof AnalyticsRoute
   ChatRoute: typeof ChatRoute
+  FailuresRoute: typeof FailuresRoute
+  LeaderboardRoute: typeof LeaderboardRoute
   ApiSplatRoute: typeof ApiSplatRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiEventsConversationsRoute: typeof ApiEventsConversationsRoute
@@ -162,11 +201,32 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/leaderboard': {
+      id: '/leaderboard'
+      path: '/leaderboard'
+      fullPath: '/leaderboard'
+      preLoaderRoute: typeof LeaderboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/failures': {
+      id: '/failures'
+      path: '/failures'
+      fullPath: '/failures'
+      preLoaderRoute: typeof FailuresRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/chat': {
       id: '/chat'
       path: '/chat'
       fullPath: '/chat'
       preLoaderRoute: typeof ChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/analytics': {
+      id: '/analytics'
+      path: '/analytics'
+      fullPath: '/analytics'
+      preLoaderRoute: typeof AnalyticsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -237,7 +297,10 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AnalyticsRoute: AnalyticsRoute,
   ChatRoute: ChatRoute,
+  FailuresRoute: FailuresRoute,
+  LeaderboardRoute: LeaderboardRoute,
   ApiSplatRoute: ApiSplatRoute,
   ApiChatRoute: ApiChatRoute,
   ApiEventsConversationsRoute: ApiEventsConversationsRoute,

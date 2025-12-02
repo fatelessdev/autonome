@@ -37,7 +37,20 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		],
 	}),
 
+	beforeLoad: async () => {
+		// Bootstrap schedulers on server-side only (runs once due to internal guard)
+		if (typeof window === "undefined") {
+			const { bootstrapSchedulers } = await import(
+				"@/server/schedulers/bootstrap"
+			);
+			await bootstrapSchedulers();
+		}
+	},
+
 	shellComponent: RootDocument,
+	notFoundComponent: () => {
+		return <div>404 - Page Not Found</div>;
+	}
 });
 
 function RootDocument({ children }: { children: React.ReactNode }) {

@@ -1,3 +1,4 @@
+import { getFailures, getLeaderboard, getModelStats } from "./analytics";
 import { getInvocations, getModels } from "./models";
 import {
 	getAccount,
@@ -33,5 +34,12 @@ export default {
 		getAccount,
 		resetAccount,
 		getCompletedTradesFromDB,
+	},
+
+	// Analytics
+	analytics: {
+		getModelStats,
+		getLeaderboard,
+		getFailures,
 	},
 };

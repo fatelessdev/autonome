@@ -17,7 +17,7 @@ RUN bun install --frozen-lockfile
 # ============================================
 # Stage 2: Builder
 # ============================================
-FROM oven/bun:1.2-alpine AS builder
+FROM oven/bun:latest AS builder
 
 WORKDIR /app
 
@@ -49,13 +49,13 @@ ENV VITE_APP_TITLE=${VITE_APP_TITLE}
 # Disable prerendering during Docker build (no network/DB access)
 ENV VITE_PRERENDER_DISABLED=true
 
-# Build the application (vite build outputs to dist/)
-RUN bun --bun vite build
+# Build the application using the project's build script
+RUN bun run build
 
 # ============================================
 # Stage 3: Production Runner
 # ============================================
-FROM oven/bun:1.2-alpine AS runner
+FROM oven/bun:latest AS runner
 
 WORKDIR /app
 
@@ -63,12 +63,10 @@ WORKDIR /app
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 bunjs
 
-# Copy built output from builder stage (TanStack Start outputs to dist/)
-COPY --from=builder --chown=bunjs:nodejs /app/dist ./dist
+# Copy built output from builder stage (Nitro outputs to .output/)
+# .output/public/ contains static assets, .output/server/ contains the server
+COPY --from=builder --chown=bunjs:nodejs /app/.output ./.output
 COPY --from=builder --chown=bunjs:nodejs /app/package.json ./package.json
-
-# Copy instrument file for Sentry/bootstrap
-COPY --from=builder --chown=bunjs:nodejs /app/instrument.server.mjs ./instrument.server.mjs
 
 # Install only production dependencies
 COPY --from=builder /app/node_modules ./node_modules
@@ -92,4 +90,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
 
 # Start the application and log all output to file
-CMD ["sh", "-c", "bun dist/server/server.js 2>&1 | tee /app/logs/log.txt"]
+CMD ["sh", "-c", "bun run start 2>&1 | tee /app/logs/log.txt"]

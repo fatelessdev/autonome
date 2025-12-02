@@ -1,9 +1,12 @@
+import NumberFlow from "@number-flow/react";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { MARKET_QUERIES } from "@/core/shared/markets/marketQueries";
+import { calculateUnrealizedPnl } from "@/core/shared/trading/calculations";
 import {
 	formatCurrencyValue,
 	formatLeverageValue,
-	formatSignedCurrencyValue,
-	normalizeNumber,
 } from "@/shared/formatting/numberFormat";
 import { PositionsListSkeleton } from "./loading-skeletons";
 import type { ExitPlanSelection, ModelPositions } from "./types";
@@ -22,6 +25,47 @@ export function PositionsTab({
 	filterMenu,
 	onSelectExitPlan,
 }: PositionsTabProps) {
+	// Use market prices that refresh every 10 seconds for real-time P&L
+	const { data: marketPrices } = useQuery(MARKET_QUERIES.prices());
+
+	// Build a price map for quick lookup
+	const priceMap = useMemo(() => {
+		const map = new Map<string, number>();
+		if (marketPrices) {
+			for (const price of marketPrices) {
+				if (Number.isFinite(price.price)) {
+					map.set(price.symbol.toUpperCase(), price.price);
+				}
+			}
+		}
+		return map;
+	}, [marketPrices]);
+
+	// Enrich positions with live P&L calculations
+	const enrichedPositions = useMemo(() => {
+		return positions.map((modelPos) => {
+			const enrichedModelPositions = modelPos.positions.map((position) => {
+				const currentPrice = priceMap.get(position.symbol.toUpperCase()) ?? null;
+				const liveUnrealizedPnl = calculateUnrealizedPnl(position, currentPrice);
+				return {
+					...position,
+					liveUnrealizedPnl,
+				};
+			});
+
+			const liveTotalUnrealizedPnl = enrichedModelPositions.reduce(
+				(sum, pos) => sum + pos.liveUnrealizedPnl,
+				0,
+			);
+
+			return {
+				...modelPos,
+				positions: enrichedModelPositions,
+				liveTotalUnrealizedPnl,
+			};
+		});
+	}, [positions, priceMap]);
+
 	return (
 		<div className="flex h-full min-h-0 flex-col">
 			{filterMenu}
@@ -29,8 +73,8 @@ export function PositionsTab({
 				<ScrollArea className="h-full overflow-auto">
 					{loading ? (
 						<PositionsListSkeleton />
-					) : positions.length === 0 ||
-						positions.every((group) => group.positions.length === 0) ? (
+					) : enrichedPositions.length === 0 ||
+						enrichedPositions.every((group) => group.positions.length === 0) ? (
 						<div className="flex items-center justify-center p-8">
 							<div className="text-center text-muted-foreground">
 								<p className="mb-2 font-medium text-sm">No Open Positions</p>
@@ -41,7 +85,7 @@ export function PositionsTab({
 						</div>
 					) : (
 						<div>
-							{positions.map((modelPos, modelIdx) => {
+							{enrichedPositions.map((modelPos, modelIdx) => {
 								if (modelPos.positions.length === 0) return null;
 								const modelInfo = resolveModelIdentity({
 									modelLogo: modelPos.modelLogo,
@@ -49,17 +93,8 @@ export function PositionsTab({
 								});
 								const modelColor = modelInfo.color || "#888888";
 								const modelLabel = modelInfo.label;
-								const totalUnrealizedNumeric =
-									normalizeNumber(modelPos.totalUnrealizedPnl) ??
-									modelPos.positions.reduce(
-										(sum, position) =>
-											sum + (normalizeNumber(position.unrealizedPnl) ?? 0),
-										0,
-									);
+								const totalUnrealizedNumeric = modelPos.liveTotalUnrealizedPnl;
 								const totalIsPositive = totalUnrealizedNumeric >= 0;
-								const totalUnrealizedLabel = formatSignedCurrencyValue(
-									totalUnrealizedNumeric,
-								);
 
 								return (
 									<div
@@ -108,7 +143,17 @@ export function PositionsTab({
 																: "text-red-500"
 														}`}
 													>
-														{totalUnrealizedLabel}
+														<NumberFlow
+															value={totalUnrealizedNumeric}
+															format={{
+																style: "currency",
+																currency: "USD",
+																currencyDisplay: "narrowSymbol",
+																signDisplay: "always",
+																minimumFractionDigits: 2,
+																maximumFractionDigits: 2,
+															}}
+														/>
 													</div>
 												</div>
 											</div>
@@ -125,8 +170,7 @@ export function PositionsTab({
 											</div>
 
 											{modelPos.positions.map((position, idx) => {
-												const unrealizedPnl =
-													normalizeNumber(position.unrealizedPnl) ?? 0;
+												const unrealizedPnl = position.liveUnrealizedPnl;
 												const isPnlPositive = unrealizedPnl >= 0;
 												const hasExitPlan = Boolean(
 													position.exitPlan?.target ||
@@ -194,7 +238,17 @@ export function PositionsTab({
 																		: "text-red-500"
 																}`}
 															>
-																{formatSignedCurrencyValue(unrealizedPnl)}
+																<NumberFlow
+																	value={unrealizedPnl}
+																	format={{
+																		style: "currency",
+																		currency: "USD",
+																		currencyDisplay: "narrowSymbol",
+																		signDisplay: "always",
+																		minimumFractionDigits: 2,
+																		maximumFractionDigits: 2,
+																	}}
+																/>
 															</span>
 														</div>
 													</div>
@@ -214,7 +268,7 @@ export function PositionsTab({
 												</div>
 											) : null}
 										</div>
-										{modelIdx < positions.length - 1 && <div className="h-2" />}
+										{modelIdx < enrichedPositions.length - 1 && <div className="h-2" />}
 									</div>
 								);
 							})}

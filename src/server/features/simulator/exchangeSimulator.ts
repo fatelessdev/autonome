@@ -198,13 +198,8 @@ export class ExchangeSimulator {
 			const openOrders = await getAllOpenOrders();
 
 			if (openOrders.length === 0) {
-				console.log("[Simulator] No open positions to restore from database");
 				return;
 			}
-
-			console.log(
-				`[Simulator] Restoring ${openOrders.length} open positions from database...`,
-			);
 
 			for (const order of openOrders) {
 				const account = this.getOrCreateAccount(order.modelId);
@@ -238,13 +233,8 @@ export class ExchangeSimulator {
 
 				// Update mark price
 				account.updateMarkPrice(symbol, markPrice);
-
-				console.log(
-					`[Simulator] Restored ${order.side} ${symbol} x${quantity} @ $${entryPrice} for ${order.modelId}`,
-				);
 			}
 
-			console.log("[Simulator] Position restoration complete");
 		} catch (error) {
 			console.error("[Simulator] Failed to restore positions from DB:", error);
 		}
@@ -343,9 +333,6 @@ export class ExchangeSimulator {
 								realizedPnl: pnl.toString(),
 								closeTrigger: request.trigger,
 							});
-							console.info(
-								`[Simulator] Updated Orders table for auto-close: ${request.symbol} via ${request.trigger}`,
-							);
 						}
 					} catch (orderDbError) {
 						console.error(
@@ -388,7 +375,7 @@ export class ExchangeSimulator {
 						);
 					}
 
-					emitAllDataChanged(request.accountId);
+					await emitAllDataChanged(request.accountId);
 				}
 			} finally {
 				this.pendingAutoCloses.delete(`${request.accountId}:${request.symbol}`);
@@ -555,12 +542,6 @@ export class ExchangeSimulator {
 			outcomes[symbolRaw] = result;
 			const account = this.accounts.get(accountId);
 			account?.clearPendingExit(symbol);
-
-			if (options?.autoTrigger && result.status !== "rejected") {
-				console.info(
-					`[Simulator] Auto-closed ${symbolRaw} via ${options.autoTrigger.toLowerCase()} trigger for account ${accountId}.`,
-				);
-			}
 		}
 
 		return outcomes;

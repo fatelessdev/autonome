@@ -30,6 +30,8 @@ export const models = pgTable(
 		invocationCount: integer("invocationCount").notNull().default(0),
 		totalMinutes: integer("totalMinutes").notNull().default(0),
 		accountIndex: text("accountIndex").notNull().default("0"),
+		failedWorkflowCount: integer("failedWorkflowCount").notNull().default(0),
+		failedToolCallCount: integer("failedToolCallCount").notNull().default(0),
 	},
 	(table) => ({
 		nameIdx: index("Models_name_idx").on(table.name),

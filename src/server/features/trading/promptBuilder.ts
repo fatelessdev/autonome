@@ -5,7 +5,7 @@ import type {
 	ExposureSummary,
 } from "@/server/features/trading/openPositionEnrichment";
 import type { PerformanceMetrics } from "@/server/features/trading/performanceMetrics";
-import { PROMPT } from "@/server/features/trading/prompt";
+import { SYSTEM_PROMPT, USER_PROMPT } from "@/server/features/trading/prompt";
 import {
 	buildOpenPositionsSection,
 	buildPerformanceOverview,
@@ -13,15 +13,7 @@ import {
 	formatUsd,
 } from "@/server/features/trading/promptSections";
 
-export function buildTradingPrompt({
-	account,
-	portfolio,
-	openPositions,
-	exposureSummary,
-	performanceMetrics,
-	marketIntelligence,
-	currentTime,
-}: {
+interface TradingPromptParams {
 	account: Account;
 	portfolio: PortfolioSnapshot;
 	openPositions: EnrichedOpenPosition[];
@@ -29,7 +21,27 @@ export function buildTradingPrompt({
 	performanceMetrics: PerformanceMetrics;
 	marketIntelligence: string;
 	currentTime: string;
-}): string {
+}
+
+/**
+ * Build both system and user prompts for the trading agent.
+ * System prompt contains static instructions (hidden from model context).
+ * User prompt contains dynamic session data.
+ */
+export function buildTradingPrompts(params: TradingPromptParams): {
+	systemPrompt: string;
+	userPrompt: string;
+} {
+	const {
+		account,
+		portfolio,
+		openPositions,
+		exposureSummary,
+		performanceMetrics,
+		marketIntelligence,
+		currentTime,
+	} = params;
+
 	const exposureRatio =
 		portfolio.totalValue > 0
 			? (exposureSummary.totalNotional / portfolio.totalValue) * 100
@@ -39,7 +51,7 @@ export function buildTradingPrompt({
 		: "0.0";
 	const availableCashLabel = formatUsd(portfolio.availableCash);
 
-	return PROMPT.replaceAll(
+	const userPrompt = USER_PROMPT.replaceAll(
 		"{{INVOKATION_TIMES}}",
 		account.invocationCount.toString(),
 	)
@@ -70,4 +82,18 @@ export function buildTradingPrompt({
 				exposureSummary,
 			}),
 		);
+
+	return {
+		systemPrompt: SYSTEM_PROMPT,
+		userPrompt,
+	};
+}
+
+/**
+ * @deprecated Use buildTradingPrompts() for system/user split
+ * Kept for backward compatibility - returns combined prompt
+ */
+export function buildTradingPrompt(params: TradingPromptParams): string {
+	const { systemPrompt, userPrompt } = buildTradingPrompts(params);
+	return `${systemPrompt}\n\n${userPrompt}`;
 }

@@ -1,10 +1,11 @@
-import NumberFlow from "@number-flow/react";
+﻿import NumberFlow from "@number-flow/react";
 import { TrendingUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
+	Area,
 	CartesianGrid,
+	ComposedChart,
 	Line,
-	LineChart,
 	ReferenceLine,
 	Tooltip,
 	type TooltipProps,
@@ -26,8 +27,19 @@ type SeriesMeta = Record<string, { originalKey: string }>;
 const FLOW_FORMAT_CURRENCY = {
 	style: "currency" as const,
 	currency: "USD",
+	currencyDisplay: "narrowSymbol" as const,
 	minimumFractionDigits: 2,
 	maximumFractionDigits: 2,
+};
+
+const FLOW_FORMAT_CURRENCY_COMPACT = {
+	style: "currency" as const,
+	currency: "USD",
+	currencyDisplay: "narrowSymbol" as const,
+	notation: "compact" as const,
+	compactDisplay: "short" as const,
+	minimumFractionDigits: 0,
+	maximumFractionDigits: 1,
 };
 
 const FLOW_FORMAT_PERCENT = {
@@ -107,19 +119,23 @@ const CustomEndDot = ({
 			.toUpperCase() || "•";
 
 	const numberFlowValue = valueMode === "percent" ? value / 100 : value;
-	const numberFlowFormat =
-		valueMode === "percent" ? FLOW_FORMAT_PERCENT : FLOW_FORMAT_CURRENCY;
+	const numberFlowFormat = valueMode === "percent"
+		? FLOW_FORMAT_PERCENT
+		: compact
+			? FLOW_FORMAT_CURRENCY_COMPACT
+			: FLOW_FORMAT_CURRENCY;
 
 	const labelWidth = compact ? 96 : 130;
 
 	return (
-		<g>
+		<g style={{ willChange: "opacity" }}>
 			<circle
 				cx={cx}
 				cy={cy}
 				r={isHovered ? 16 : 14}
 				fill={color}
 				opacity={isDimmed ? 0.3 : 1}
+				style={{ transition: "r 100ms, opacity 100ms" }}
 			/>
 			{logo ? (
 				<image
@@ -132,6 +148,7 @@ const CustomEndDot = ({
 					style={{
 						clipPath: `circle(${isHovered ? 16 : 14}px at 50% 50%)`,
 						pointerEvents: "none",
+						transition: "opacity 100ms",
 					}}
 					opacity={isDimmed ? 0.3 : 1}
 				/>
@@ -154,6 +171,7 @@ const CustomEndDot = ({
 				width={labelWidth}
 				height={26}
 				opacity={isDimmed ? 0.3 : 1}
+				style={{ transition: "opacity 100ms" }}
 			>
 				<div
 					style={{
@@ -208,6 +226,7 @@ const CustomTooltip = ({
 			: new Intl.NumberFormat("en-US", {
 					style: "currency",
 					currency: "USD",
+					currencyDisplay: "narrowSymbol",
 					maximumFractionDigits: 2,
 				}).format(hoveredData.value);
 
@@ -275,15 +294,80 @@ export function GlowingLineChart({
 
 	const isPercent = valueMode === "percent";
 
-	const yAxisConfig = isPercent
-		? {
-				domain: [-100, 150] as [number, number],
-				ticks: [-100, -50, 0, 50, 100, 150],
+	// Calculate dynamic y-axis based on actual data values
+	const yAxisConfig = useMemo(() => {
+		if (isPercent) {
+			// For percent mode, find min/max percent values
+			let minVal = 0;
+			let maxVal = 0;
+			for (const row of chartData) {
+				for (const key of modelKeys) {
+					const val = row[key];
+					if (typeof val === "number" && Number.isFinite(val)) {
+						minVal = Math.min(minVal, val);
+						maxVal = Math.max(maxVal, val);
+					}
+				}
 			}
-		: {
-				domain: [0, 25000] as [number, number],
-				ticks: [0, 5000, 10000, 15000, 20000, 25000],
+			// Round to nice boundaries with padding
+			const minBound = Math.floor(minVal / 25) * 25 - 25;
+			const maxBound = Math.ceil(maxVal / 25) * 25 + 25;
+			const step = Math.max(25, Math.ceil((maxBound - minBound) / 6 / 25) * 25);
+			const ticks: number[] = [];
+			for (let t = minBound; t <= maxBound; t += step) {
+				ticks.push(t);
+			}
+			return {
+				domain: [minBound, maxBound] as [number, number],
+				ticks,
 			};
+		}
+
+		// For USD mode, find min/max values across all series
+		let minVal = Number.POSITIVE_INFINITY;
+		let maxVal = 10000; // Default minimum
+		for (const row of chartData) {
+			for (const key of modelKeys) {
+				const val = row[key];
+				if (typeof val === "number" && Number.isFinite(val)) {
+					minVal = Math.min(minVal, val);
+					maxVal = Math.max(maxVal, val);
+				}
+			}
+		}
+		// Handle edge case where no data exists
+		if (!Number.isFinite(minVal)) minVal = 0;
+
+		// Calculate step size based on max value
+		const step = maxVal <= 5000 ? 1000 : maxVal <= 20000 ? 2000 : 5000;
+
+		// Round up max to next nice boundary (e.g., 11k -> 12k, 15k -> 16k)
+		const maxBound = Math.ceil(maxVal / step) * step + step;
+
+		// Dynamic lower bound rules:
+		// - If lowest is less than 2k: start from 0
+		// - Otherwise: round down to nearest step with 1k buffer
+		let minBound: number;
+		if (minVal < 2000) {
+			minBound = 0;
+		} else {
+			// Round down to nearest step, then subtract 1k buffer
+			minBound = Math.max(0, Math.floor((minVal - 1000) / step) * step);
+		}
+
+		// Generate ticks
+		const range = maxBound - minBound;
+		const tickCount = Math.min(6, Math.max(3, Math.ceil(range / step)));
+		const actualStep = Math.ceil(range / tickCount / step) * step;
+		const ticks: number[] = [];
+		for (let t = minBound; t <= maxBound; t += actualStep) {
+			ticks.push(t);
+		}
+		return {
+			domain: [minBound, maxBound] as [number, number],
+			ticks,
+		};
+	}, [chartData, modelKeys, isPercent]);
 
 	const chartMargins = useMemo(
 		() =>
@@ -320,29 +404,20 @@ export function GlowingLineChart({
 
 	return (
 		<div className="flex h-full flex-col">
-			<div
-				className={cn(
-					"border-b px-4 py-4 sm:px-6",
-					compact ? "gap-4" : undefined,
-				)}
-			>
+			<div className="border-b px-4 py-2 sm:px-6">
 				<div
 					className={cn(
-						"flex items-center justify-between gap-3",
-						compact ? "flex-col sm:flex-row sm:items-center" : undefined,
+						"flex w-full items-center justify-between gap-3",
+						compact ? "gap-2" : undefined,
 					)}
 				>
-					<div
-						className={cn(
-							"flex items-center gap-2",
-							compact ? "w-full sm:w-auto" : undefined,
-						)}
-					>
+					{/* $ and % buttons - stacked on mobile, horizontal on desktop */}
+					<div className={cn("flex gap-1.5", compact ? "flex-col" : "flex-row")}>
 						<Button
 							aria-pressed={valueMode === "usd"}
 							className={cn(
-								"h-8 px-3 text-xs font-medium transition-all",
-								compact ? "flex-1 sm:flex-initial" : undefined,
+								"text-xs font-medium",
+								compact ? "h-7 w-10" : "h-8 w-12 sm:w-auto sm:px-3",
 							)}
 							onClick={() => onValueModeChange?.("usd")}
 							onKeyDown={(e) => {
@@ -358,8 +433,8 @@ export function GlowingLineChart({
 						<Button
 							aria-pressed={valueMode === "percent"}
 							className={cn(
-								"h-8 px-3 text-xs font-medium transition-all",
-								compact ? "flex-1 sm:flex-initial" : undefined,
+								"text-xs font-medium",
+								compact ? "h-7 w-10" : "h-8 w-12 sm:w-auto sm:px-3",
 							)}
 							onClick={() => onValueModeChange?.("percent")}
 							onKeyDown={(e) => {
@@ -373,39 +448,37 @@ export function GlowingLineChart({
 							%
 						</Button>
 					</div>
-					<div
-						className={cn(
-							"text-center",
-							compact ? "order-first sm:order-none" : undefined,
-						)}
-					>
+					{/* Account value text - center */}
+					<div className="flex flex-1 flex-col items-center text-center">
 						<div className="flex items-center justify-center gap-2">
-							<h2 className="text-sm font-semibold uppercase tracking-wider">
+							<h2 className={cn(
+								"font-semibold uppercase tracking-wider",
+								"text-sm sm:text-base"
+							)}>
 								TOTAL ACCOUNT VALUE
 							</h2>
 							<Badge
-								className="border-none bg-green-500/10 text-green-500 hover:bg-green-500/20 transition-colors"
+								className="border-none bg-green-500/10 text-green-500 transition-colors hover:bg-green-500/20"
 								variant="outline"
 							>
-								<TrendingUp className="mr-1 h-3.5 w-3.5" />
-								<span className="font-semibold">Live</span>
+								<TrendingUp className={cn("mr-1", compact ? "h-3 w-3" : "h-3.5 w-3.5")} />
+								<span className={cn("font-semibold", compact ? "text-[10px]" : "text-xs sm:text-sm")}>Live</span>
 							</Badge>
 						</div>
-						<p className="mt-1 text-xs text-muted-foreground">
+						<p className={cn(
+							"mt-1 text-muted-foreground",
+							"text-[10px] sm:text-xs"
+						)}>
 							Real-time model equity tracking
 						</p>
 					</div>
-					<div
-						className={cn(
-							"flex items-center gap-2",
-							compact ? "w-full sm:w-auto" : undefined,
-						)}
-					>
+					{/* ALL and 72H buttons - stacked on mobile, horizontal on desktop */}
+					<div className={cn("flex gap-2", compact ? "flex-col" : "flex-row")}>
 						<Button
 							aria-pressed={timeFilter === "all"}
 							className={cn(
-								"h-8 px-3 text-xs font-medium transition-all",
-								compact ? "flex-1 sm:flex-initial" : undefined,
+								"text-xs font-medium",
+								compact ? "h-7 w-10" : "h-8 w-16 sm:w-auto sm:px-3",
 							)}
 							onClick={() => onTimeFilterChange?.("all")}
 							onKeyDown={(e) => {
@@ -421,8 +494,8 @@ export function GlowingLineChart({
 						<Button
 							aria-pressed={timeFilter === "72h"}
 							className={cn(
-								"h-8 px-3 text-xs font-medium transition-all",
-								compact ? "flex-1 sm:flex-initial" : undefined,
+								"text-xs font-medium",
+								compact ? "h-7 w-10" : "h-8 w-16 sm:w-auto sm:px-3",
 							)}
 							onClick={() => onTimeFilterChange?.("72h")}
 							onKeyDown={(e) => {
@@ -442,7 +515,7 @@ export function GlowingLineChart({
 				className={cn("min-h-0 flex-1 pb-0 pt-4", compact ? "px-4" : "px-6")}
 			>
 				<ChartContainer config={chartConfig} className="h-full w-full">
-					<LineChart
+					<ComposedChart
 						accessibilityLayer
 						data={chartData}
 						margin={chartMargins}
@@ -467,7 +540,8 @@ export function GlowingLineChart({
 										x2="0"
 										y2="1"
 									>
-										<stop offset="0%" stopColor={color} stopOpacity={0.3} />
+										<stop offset="0%" stopColor={color} stopOpacity={0.25} />
+										<stop offset="50%" stopColor={color} stopOpacity={0.1} />
 										<stop offset="100%" stopColor={color} stopOpacity={0} />
 									</linearGradient>
 								);
@@ -475,10 +549,10 @@ export function GlowingLineChart({
 						</defs>
 						<title>Model performance over time</title>
 						<CartesianGrid
-							strokeDasharray="3 3"
+							strokeDasharray="4 4"
 							vertical={false}
 							stroke="hsl(var(--border))"
-							opacity={0.2}
+							opacity={0.15}
 							horizontalPoints={yAxisConfig.ticks}
 						/>
 						<XAxis
@@ -534,6 +608,28 @@ export function GlowingLineChart({
 							}
 							cursor={tooltipCursor}
 						/>
+						{/* Area fills for gradient below lines */}
+						{prioritizedKeys.map((key) => {
+							const originalKey = seriesMeta[key]?.originalKey ?? key;
+							const modelInfo = getModelInfo(originalKey);
+							const isHovered = hoveredLine === key;
+							const isDimmed = Boolean(hoveredLine && hoveredLine !== key);
+
+							return (
+								<Area
+									key={`area-${key}`}
+									dataKey={key}
+									type="natural"
+									fill={`url(#gradient-${key})`}
+									stroke="none"
+									fillOpacity={isDimmed ? 0.05 : isHovered ? 0.35 : 0.2}
+									connectNulls
+									animationDuration={300}
+									animationEasing="ease-in-out"
+								/>
+							);
+						})}
+						{/* Lines on top of areas */}
 						{prioritizedKeys.map((key) => {
 							const originalKey = seriesMeta[key]?.originalKey ?? key;
 							const modelInfo = getModelInfo(originalKey);
@@ -549,10 +645,10 @@ export function GlowingLineChart({
 									key={key}
 									connectNulls
 									dataKey={key}
-									type="monotone"
+									type="natural"
 									stroke={color}
-									strokeWidth={isHovered ? 5 : 3}
-									strokeOpacity={isDimmed ? 0.15 : 0.9}
+									strokeWidth={isHovered ? 2.5 : 1.5}
+									strokeOpacity={isDimmed ? 0.2 : 1}
 									activeDot={false}
 									onMouseEnter={() => setHoveredLine(key)}
 									strokeLinecap="round"
@@ -560,7 +656,7 @@ export function GlowingLineChart({
 									animationDuration={300}
 									animationEasing="ease-in-out"
 									filter={
-										isHovered ? `drop-shadow(0 0 8px ${color})` : undefined
+										isHovered ? `drop-shadow(0 0 6px ${color})` : undefined
 									}
 									z={isHovered ? 1000 : 1}
 									dot={(dotProps) => {
@@ -581,9 +677,10 @@ export function GlowingLineChart({
 								/>
 							);
 						})}
-					</LineChart>
+					</ComposedChart>
 				</ChartContainer>
 			</div>
 		</div>
 	);
 }
+

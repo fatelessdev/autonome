@@ -6,8 +6,8 @@ import * as TanstackQuery from "@/server/integrations/tanstack-query/root-provid
 // Import the generated route tree
 import { routeTree } from "./routeTree.gen";
 
-// Create a new router instance
-export const getRouter = () => {
+// Create a new router instance - must be a named function export for TanStack Start
+export function getRouter() {
 	const rqContext = TanstackQuery.getContext();
 
 	const router = createRouter({
@@ -37,4 +37,4 @@ export const getRouter = () => {
 	}
 
 	return router;
-};
+}

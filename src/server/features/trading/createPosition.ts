@@ -196,7 +196,6 @@ export async function createPosition(
 			}
 
 			if (side === "HOLD") {
-				console.log(`Side is HOLD for ${symbol}, skipping`);
 				results.push({ symbol, side, quantity, leverage, success: true });
 				continue;
 			}
@@ -242,8 +241,6 @@ export async function createPosition(
 				triggerPrice: SignerClient.NIL_TRIGGER_PRICE,
 				orderExpiry: SignerClient.DEFAULT_IOC_EXPIRY,
 			});
-			console.log(`Position created for ${symbol}:`, response);
-
 			// Persist to database
 			try {
 				const dbOrder = await createOrder({

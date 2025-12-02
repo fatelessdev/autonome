@@ -1,12 +1,11 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { QueryClient } from "@tanstack/react-query";
-import { ToolLoopAgent, tool } from "ai";
+import { ToolLoopAgent, tool, stepCountIs } from "ai";
 import z from "zod";
 import { listModels, ToolCallType } from "@/server/db/tradingRepository";
 import {
 	createInvocationMutation,
-	createPortfolioSnapshotMutation,
 	createToolCallMutation,
 	incrementModelUsageMutation,
 	updateInvocationMutation,
@@ -44,7 +43,7 @@ import type {
 } from "@/server/features/trading/openPositions";
 import { openPositionsQuery } from "@/server/features/trading/openPositions.server";
 import { calculatePerformanceMetrics } from "@/server/features/trading/performanceMetrics";
-import { buildTradingPrompt } from "@/server/features/trading/promptBuilder";
+import { buildTradingPrompts } from "@/server/features/trading/promptBuilder";
 import type {
 	TradingDecisionWithContext,
 	TradingSignal,
@@ -55,12 +54,18 @@ import {
 	emitAllDataChanged,
 	emitBatchComplete,
 } from "@/server/events/workflowEvents";
+import { analyzeToolCallFailure } from "@/server/features/analytics/toolCallAnalyzer";
 
 declare global {
 	// eslint-disable-next-line no-var
 	var tradeIntervalHandle: ReturnType<typeof setInterval> | undefined;
 	// eslint-disable-next-line no-var
-	var tradeIntervalRunning: boolean | undefined;
+	var modelsRunning: Map<string, boolean> | undefined;
+}
+
+// Initialize per-model running state
+if (!globalThis.modelsRunning) {
+	globalThis.modelsRunning = new Map();
 }
 
 const TRADE_INTERVAL_MS = 5 * 60 * 1000;
@@ -82,6 +87,9 @@ export async function runTradeWorkflow(account: Account) {
 	const capturedDecisions: InvocationDecisionSummary[] = [];
 	const capturedExecutionResults: InvocationExecutionResultSummary[] = [];
 	const capturedClosedPositions: InvocationClosedPositionSummary[] = [];
+
+	// Track symbols acted on this session to prevent duplicate actions from dumb models
+	const actedSymbols = new Set<string>();
 
 	const marketUniverse = Object.entries(MARKETS).map(([symbol, meta]) => ({
 		symbol,
@@ -107,13 +115,8 @@ export async function runTradeWorkflow(account: Account) {
 
 	const modelInvocation = await createInvocationMutation(account.id);
 
-	await createPortfolioSnapshotMutation({
-		modelId: account.id,
-		netPortfolio: portfolio.total,
-	});
-	await queryClient.invalidateQueries({
-		queryKey: ["portfolio-history", account.id],
-	});
+	// Portfolio snapshots are recorded by the dedicated scheduler (priceTracker.ts)
+	// to avoid duplicates - no need to create one here
 
 	const currentPortfolioValue = parseFloat(portfolio.total);
 	const performanceMetrics = await calculatePerformanceMetrics(
@@ -121,7 +124,7 @@ export async function runTradeWorkflow(account: Account) {
 		currentPortfolioValue,
 	);
 
-	const enrichedPrompt = buildTradingPrompt({
+	const enrichedPrompt = buildTradingPrompts({
 		account,
 		portfolio,
 		openPositions,
@@ -139,20 +142,29 @@ export async function runTradeWorkflow(account: Account) {
 	const decisionSchema = z.object({
 		symbol: z
 			.enum(Object.keys(MARKETS) as [string, ...string[]])
-			.describe("The symbol to open the position at"),
+			.describe("Trading pair symbol (e.g., BTC, ETH, SOL)"),
 		side: z
 			.enum(["LONG", "SHORT", "HOLD"])
-			.describe("Trading signal: LONG, SHORT, or HOLD"),
-		quantity: z.number().describe("Signed quantity for the decision."),
-		leverage: z.number(),
-		profit_target: z.number(),
-		stop_loss: z.number(),
+			.describe("Trade direction"),
+		quantity: z
+			.number()
+			.describe("Position size calculated from 2% risk rule"),
+		leverage: z
+			.number()
+			.describe("Leverage 1-10x"),
+		profit_target: z
+			.number()
+			.describe("Take profit price level"),
+		stop_loss: z
+			.number()
+			.describe("Stop loss price level"),
 		invalidation_condition: z
 			.string()
-			.describe("Condition under which the position should be invalidated"),
-		confidence: z.number(),
+			.describe("When to exit if thesis breaks"),
+		confidence: z
+			.number()
+			.describe("Setup quality 0-100"),
 	});
-	// console.log(enrichedPrompt);
 
 	const nim = createOpenAICompatible({
 		name: "nim",
@@ -160,6 +172,17 @@ export async function runTradeWorkflow(account: Account) {
 		headers: {
 			Authorization: `Bearer ${env.NIM_API_KEY}`,
 		},
+		// fetch: async (url, options) => {
+		// 	if (options.method === 'POST' && options.body) {
+		// 		const body = JSON.parse(options.body as string);
+
+		// 		// INJECT YOUR CUSTOM PARAMETERS HERE
+		// 		body.chat_template_kwargs = { thinking: true };
+
+		// 		options.body = JSON.stringify(body);
+		// 	}
+		// 	return fetch(url, options);
+		// },
 	});
 	const openrouter = createOpenRouter({
 		apiKey: env.OPENROUTER_API_KEY,
@@ -172,32 +195,42 @@ export async function runTradeWorkflow(account: Account) {
 		? openrouter(account.modelName)
 		: nim.chatModel(account.modelName)) as any;
 
-	const toolChoiceMode: "auto" | "required" = "auto";
-	// const toolChoiceMode: 'auto' | 'required' = 'required'; // Enable during focused QA to force tool invocations.
-
 	const tradeAgent = new ToolLoopAgent({
 		model: selectedModel,
-		// All tools behave identically for live accounts and simulation mode.
+		instructions: enrichedPrompt.systemPrompt,
+		// Stop after 10 steps maximum to prevent infinite loops
+		stopWhen: stepCountIs(10),
+		toolChoice: "auto",
+		// Override toolChoice for models that don't support "required"
 		providerOptions: {
-			createOpenAICompatible: {
-				reasoningEffort: "high",
+			// nim: {
+			// 	chat_template_kwargs: { thinking: true }
+			// },
+			openrouter: {
+				reasoning: {
+					effort: 'high',
+					exclude: false, // Set true to hide thinking from final output
+				}
 			},
+		},
+		prepareStep: () => {
+			const modelId = account.modelName.toLowerCase();
+
+			// Models that don't support "required" tool choice
+			const autoToolModels = ["glm-4", "minimax-m2", "kimi-k2", "gpt-oss", "qwen3-next", "deepseek-r1"];
+			const requiresAutoToolChoice = autoToolModels.some(id => modelId.includes(id));
+
+			// Build typed configuration, merging providerOptions instead of replacing
+			return {
+				...(requiresAutoToolChoice && { toolChoice: "auto" as const }),
+			};
 		},
 		tools: {
 			createPosition: tool({
-				description: "Open one or more positions in the given markets",
-				inputSchema: z
-					.object({
-						decisions: z.array(decisionSchema),
-					})
-					.superRefine((value, ctx) => {
-						if (!value.decisions) {
-							ctx.addIssue({
-								code: z.ZodIssueCode.custom,
-								message: "Provide a decisions array with trading instructions.",
-							});
-						}
-					}),
+				description: "Open one or more positions atomically",
+				inputSchema: z.object({
+					decisions: z.array(decisionSchema),
+				}),
 				execute: async ({ decisions }) => {
 					const modern =
 						decisions?.map((item) => ({
@@ -227,8 +260,17 @@ export async function runTradeWorkflow(account: Account) {
 						confidence: number | null;
 					}[] = [];
 					const seenSymbols = new Set<string>();
+					const skippedDuplicates: string[] = [];
 
 					for (const entry of [...modern]) {
+						const symbol = entry.symbol;
+
+						// Check if already acted on this symbol this session
+						if (actedSymbols.has(symbol)) {
+							skippedDuplicates.push(symbol);
+							continue;
+						}
+
 						const sideRaw =
 							typeof entry.side === "string"
 								? entry.side.toUpperCase()
@@ -238,7 +280,6 @@ export async function runTradeWorkflow(account: Account) {
 						const quantity = Number.isFinite(entry.quantity)
 							? entry.quantity
 							: 0;
-						const symbol = entry.symbol;
 
 						if (!(symbol in MARKETS)) continue;
 						if (seenSymbols.has(symbol)) continue;
@@ -256,10 +297,20 @@ export async function runTradeWorkflow(account: Account) {
 						});
 					}
 
+					// Return early if all symbols were duplicates
+					if (normalized.length === 0 && skippedDuplicates.length > 0) {
+						return `Already acted on ${skippedDuplicates.join(", ")} this session. Call 'holding' if done.`;
+					}
+
 					const results = await createPosition(account, normalized);
 
 					const successful = results.filter((r) => r.success);
 					const failed = results.filter((r) => !r.success);
+
+					// Mark successful symbols as acted
+					for (const result of successful) {
+						actedSymbols.add(result.symbol);
+					}
 
 					for (const decision of normalized) {
 						capturedDecisions.push({
@@ -294,17 +345,6 @@ export async function runTradeWorkflow(account: Account) {
 						}),
 					});
 
-					if (successful.length > 0) {
-						console.log(
-							`✓ Opened positions: ${successful.map((r) => r.symbol).join(", ")}`,
-						);
-					}
-					if (failed.length > 0) {
-						console.log(
-							`✗ Failed: ${failed.map((r) => `${r.symbol} (${r.error})`).join(", ")}`,
-						);
-					}
-
 					const formatDecision = (r: (typeof results)[number]) => {
 						const pieces = [r.symbol];
 						if (r.side === "HOLD") {
@@ -330,26 +370,49 @@ export async function runTradeWorkflow(account: Account) {
 							.map(
 								(r) => `${formatDecision(r)} (${r.error ?? "unknown error"})`,
 							)
-							.join(", ")}`;
+							.join(", ")}. `;
+					}
+					if (skippedDuplicates.length > 0) {
+						response += `Skipped (already acted): ${skippedDuplicates.join(", ")}.`;
 					}
 
 					return response || "No positions were created";
 				},
 			}),
 			closePosition: tool({
-				description:
-					"Close one or more currently open positions for the provided market symbols",
+				description: "Close one or more open positions",
 				inputSchema: z.object({
 					symbols: z
 						.array(z.enum(marketSymbols as unknown as [string, ...string[]]))
-						.describe("Array of symbols whose open positions should be closed"),
+						.describe("Symbols to close"),
 				}),
 				execute: async ({ symbols }) => {
-					const closedPositions = await closePosition(account, symbols);
+					// Filter out already-acted symbols
+					const skippedDuplicates: string[] = [];
+					const symbolsToClose = symbols.filter((s) => {
+						const upper = s.toUpperCase();
+						if (actedSymbols.has(upper)) {
+							skippedDuplicates.push(upper);
+							return false;
+						}
+						return true;
+					});
+
+					if (symbolsToClose.length === 0 && skippedDuplicates.length > 0) {
+						return `Already acted on ${skippedDuplicates.join(", ")} this session. Call 'holding' if done.`;
+					}
+
+					const closedPositions = await closePosition(account, symbolsToClose);
+
+					// Mark closed symbols as acted
+					for (const pos of closedPositions) {
+						actedSymbols.add(pos.symbol);
+					}
+
 					await createToolCallMutation({
 						invocationId: modelInvocation.id,
 						type: ToolCallType.CLOSE_POSITION,
-						metadata: JSON.stringify({ symbols, closedPositions }),
+						metadata: JSON.stringify({ symbols: symbolsToClose, closedPositions }),
 					});
 
 					for (const position of closedPositions) {
@@ -365,26 +428,20 @@ export async function runTradeWorkflow(account: Account) {
 							closedAt: position.closedAt ?? null,
 						});
 					}
-					const summaryText = closedPositions
-						.map((trade) => {
-							const side = trade.side === "LONG" ? "LONG" : "SHORT";
-							const qty =
-								trade.quantity != null ? trade.quantity.toFixed(4) : "?";
-							return `${trade.symbol} (${side}) x ${qty}`;
-						})
-						.join(", ");
 
-					console.log(
-						`Position(s) for ${symbols.join(", ")} closed successfully`,
-					);
-					return summaryText.length > 0
-						? `Closed positions: ${summaryText}`
-						: `Position(s) for ${symbols.join(", ")} closed successfully`;
+					let response = closedPositions.length > 0
+						? `Closed: ${closedPositions.map((p) => `${p.symbol} (${p.side})`).join(", ")}.`
+						: "No positions were closed.";
+
+					if (skippedDuplicates.length > 0) {
+						response += ` Skipped (already acted): ${skippedDuplicates.join(", ")}.`;
+					}
+
+					return response;
 				},
 			}),
 			updateExitPlan: tool({
-				description:
-					"Tighten existing stops and optionally adjust targets without widening risk.",
+				description: "Tighten stops/targets without widening risk",
 				inputSchema: z.object({
 					updates: z
 						.array(
@@ -394,19 +451,19 @@ export async function runTradeWorkflow(account: Account) {
 								),
 								new_stop_loss: z
 									.number()
-									.describe("Updated stop price that tightens risk."),
+									.describe("New stop price (must tighten, not widen)"),
 								new_target_price: z
 									.number()
 									.optional()
 									.nullable()
-									.describe("Optional profit target."),
+									.describe("Optional new target"),
 								reason: z
 									.string()
 									.min(3)
-									.describe("Short justification for the adjustment."),
+									.describe("Per-symbol justification"),
 							}),
 						)
-						.min(1, "Provide at least one exit plan update."),
+						.min(1),
 				}),
 				execute: async ({ updates }) => {
 					const decisionsPayload: Array<{
@@ -427,11 +484,19 @@ export async function runTradeWorkflow(account: Account) {
 					}> = [];
 					const successSummaries: string[] = [];
 					const failureSummaries: string[] = [];
+					const skippedDuplicates: string[] = [];
 					const nowIso = new Date().toISOString();
 					let simulatorInstance: ExchangeSimulator | null = null;
 
 					for (const update of updates) {
 						const normalizedSymbol = update.symbol.toUpperCase();
+
+						// Check if already acted on this symbol
+						if (actedSymbols.has(normalizedSymbol)) {
+							skippedDuplicates.push(normalizedSymbol);
+							continue;
+						}
+
 						const position = openPositions.find(
 							(pos) => pos.symbol?.toUpperCase() === normalizedSymbol,
 						);
@@ -580,12 +645,18 @@ export async function runTradeWorkflow(account: Account) {
 						});
 
 						resultsPayload.push({ symbol: normalizedSymbol, success: true });
+						actedSymbols.add(normalizedSymbol);
 						successSummaries.push(
 							`${normalizedSymbol} → stop ${stopValue.toFixed(4)}${typeof updatedExitPlan.target === "number"
 								? `, target ${updatedExitPlan.target.toFixed(4)}`
 								: ""
 							}`,
 						);
+					}
+
+					// Return early if all were duplicates
+					if (decisionsPayload.length === 0 && skippedDuplicates.length > 0) {
+						return `Already acted on ${skippedDuplicates.join(", ")} this session. Call 'holding' if done.`;
 					}
 
 					if (decisionsPayload.length > 0) {
@@ -618,7 +689,9 @@ export async function runTradeWorkflow(account: Account) {
 					}
 
 					if (successSummaries.length === 0 && failureSummaries.length === 0) {
-						return "No exit plan updates were applied.";
+						return skippedDuplicates.length > 0
+							? `Skipped (already acted): ${skippedDuplicates.join(", ")}. Call 'holding' if done.`
+							: "No exit plan updates were applied.";
 					}
 
 					const responseChunks: string[] = [];
@@ -628,31 +701,96 @@ export async function runTradeWorkflow(account: Account) {
 					if (failureSummaries.length > 0) {
 						responseChunks.push(failureSummaries.join(" "));
 					}
+					if (skippedDuplicates.length > 0) {
+						responseChunks.push(`Skipped (already acted): ${skippedDuplicates.join(", ")}.`);
+					}
 
 					return (
 						responseChunks.join(" ") || "No exit plan updates were applied."
 					);
 				},
 			}),
+			// holding: tool({
+			// 	description: "Explicitly pass when no trading action is warranted this session",
+			// 	inputSchema: z.object({
+			// 		reason: z
+			// 			.string()
+			// 			.max(200)
+			// 			.describe("Why no action: primary constraint or market condition"),
+			// 	}),
+			// 	execute: async ({ reason }) => {
+			// 		// No DB recording needed - this is just a structured pass action
+			// 		return `Holding: ${reason}`;
+			// 	},
+			// }),
 		},
-		toolChoice: toolChoiceMode,
+
 	});
+
+	const AGENT_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
+	const MAX_RETRIES = 2;
+
+	const executeWithRetry = async (): Promise<Awaited<ReturnType<typeof tradeAgent.generate>>> => {
+		let lastError: Error | null = null;
+
+		for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => controller.abort(), AGENT_TIMEOUT_MS);
+
+			try {
+				const result = await tradeAgent.generate({
+					prompt: enrichedPrompt.userPrompt,
+					abortSignal: controller.signal,
+				});
+				clearTimeout(timeoutId);
+				return result;
+			} catch (error) {
+				clearTimeout(timeoutId);
+				lastError = error instanceof Error ? error : new Error(String(error));
+
+				// Check if this is a retryable error
+				const isTimeout = controller.signal.aborted || lastError.name === "TimeoutError";
+				const isServerError = lastError.message.includes("500") || lastError.message.includes("502");
+				const isRetryable = isTimeout || isServerError;
+
+				if (!isRetryable || attempt === MAX_RETRIES) {
+					console.error(
+						`[TradeAgent] ${account.name} failed after ${attempt + 1} attempt(s): ${lastError.message}`,
+					);
+					throw lastError;
+				}
+
+				// Exponential backoff: 5s, 15s
+				const backoffMs = 5000 * (attempt + 1);
+				console.warn(
+					`[TradeAgent] ${account.name} attempt ${attempt + 1} failed (${isTimeout ? "timeout" : "server error"}), retrying in ${backoffMs / 1000}s...`,
+				);
+				await new Promise((resolve) => setTimeout(resolve, backoffMs));
+			}
+		}
+
+		// Should never reach here, but TypeScript needs this
+		throw lastError ?? new Error("Unknown error in retry loop");
+	};
 
 	let result: Awaited<ReturnType<typeof tradeAgent.generate>>;
 	try {
-		result = await tradeAgent.generate({
-			prompt: enrichedPrompt,
-		});
+		result = await executeWithRetry();
 	} catch (error) {
-		const failureMessage = `Trade workflow aborted: ${error instanceof Error ? error.message : String(error)
-			}`;
-		console.error("Trade agent execution failed", error);
+		const failureMessage = `Trade workflow aborted: ${error instanceof Error ? error.message : String(error)}`;
+		console.error(`[TradeAgent] ${account.name} execution failed`, error);
+
+		// Increment failed workflow count
+		await incrementModelUsageMutation({
+			modelId: account.id,
+			deltas: { failedWorkflowCountDelta: 1 },
+		});
 
 		await updateInvocationMutation({
 			id: modelInvocation.id,
 			response: failureMessage,
 			responsePayload: buildInvocationResponsePayload({
-				prompt: enrichedPrompt,
+				prompt: enrichedPrompt.userPrompt,
 				result: null,
 				decisions: capturedDecisions,
 				executionResults: capturedExecutionResults,
@@ -684,17 +822,13 @@ export async function runTradeWorkflow(account: Account) {
 	const responseText = result.text.trim();
 
 	const responsePayload = buildInvocationResponsePayload({
-		prompt: enrichedPrompt,
+		prompt: enrichedPrompt.userPrompt,
 		result,
 		decisions: capturedDecisions,
 		executionResults: capturedExecutionResults,
 		closedPositions: capturedClosedPositions,
 	});
 
-	console.log(
-		`[TradeExecutor] Saving invocation ${modelInvocation.id}. Prompt length: ${enrichedPrompt.length}`,
-	);
-	// console.log("[TradeExecutor] Payload:", JSON.stringify(responsePayload, null, 2));
 
 	await updateInvocationMutation({
 		id: modelInvocation.id,
@@ -702,35 +836,63 @@ export async function runTradeWorkflow(account: Account) {
 		responsePayload,
 	});
 
+	// Analyze tool call failures with Codestral
+	// Fire and forget - don't block workflow completion
+	analyzeToolCallFailure({
+		modelId: account.id,
+		invocationId: modelInvocation.id,
+		responseText,
+		isError: false,
+		toolCalls: toolCallTelemetry,
+		decisions: capturedDecisions,
+		closedPositions: capturedClosedPositions,
+	}).catch((err) => {
+		console.warn("Tool call analysis failed:", err);
+	});
+
 	// Refresh positions to emit SSE update after any position changes
 	await fetchPositions();
-	console.log(responseText);
 
 	// Emit unified workflow event - clients will refetch via oRPC
-	emitAllDataChanged(account.id);
+	await emitAllDataChanged(account.id);
 
 	return responseText;
 }
 
 export async function executeScheduledTrades() {
-	if (globalThis.tradeIntervalRunning) {
+	const models = await listModels();
+	const validModels = models.filter((model) => {
+		if (!model.lighterApiKey) {
+			console.warn(
+				`Model ${model.id} missing lighterApiKey; skipping scheduled trade`,
+			);
+			return false;
+		}
+		return true;
+	});
+
+	if (validModels.length === 0) {
 		return;
 	}
 
-	globalThis.tradeIntervalRunning = true;
+	// Filter out models that are still running from previous cycle
+	const modelsToRun = validModels.filter((model) => {
+		const isRunning = globalThis.modelsRunning?.get(model.id) ?? false;
+		return !isRunning;
+	});
 
-	try {
-		const models = await listModels();
-		const processedModels: string[] = [];
+	if (modelsToRun.length === 0) {
+		return;
+	}
 
-		for (const model of models) {
-			if (!model.lighterApiKey) {
-				console.warn(
-					`Model ${model.id} missing lighterApiKey; skipping scheduled trade`,
-				);
-				continue;
-			}
+	// Mark models as running
+	for (const model of modelsToRun) {
+		globalThis.modelsRunning?.set(model.id, true);
+	}
 
+	// Run models in parallel - each completes independently
+	const runModel = async (model: (typeof modelsToRun)[number]) => {
+		try {
 			await runTradeWorkflow({
 				apiKey: model.lighterApiKey,
 				modelName: model.openRouterModelName,
@@ -740,17 +902,29 @@ export async function executeScheduledTrades() {
 				accountIndex: model.accountIndex,
 				totalMinutes: model.totalMinutes,
 			});
-			processedModels.push(model.id);
+			return { modelId: model.id, success: true as const };
+		} catch (error) {
+			console.error(`Model ${model.name} trade workflow failed:`, error);
+			return { modelId: model.id, success: false as const, error };
+		} finally {
+			// Always mark model as no longer running
+			globalThis.modelsRunning?.set(model.id, false);
 		}
+	};
 
-		if (processedModels.length > 0) {
-			emitBatchComplete(processedModels);
+	// Fire off all models in parallel, don't block scheduler
+	Promise.allSettled(modelsToRun.map(runModel)).then((results) => {
+		const successful = results
+			.filter(
+				(r): r is PromiseFulfilledResult<{ modelId: string; success: true }> =>
+					r.status === "fulfilled" && r.value.success,
+			)
+			.map((r) => r.value.modelId);
+
+		if (successful.length > 0) {
+			emitBatchComplete(successful);
 		}
-	} catch (error) {
-		console.error("Scheduled trade execution failed", error);
-	} finally {
-		globalThis.tradeIntervalRunning = false;
-	}
+	});
 }
 
 export function ensureTradeScheduler() {
