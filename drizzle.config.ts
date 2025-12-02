@@ -7,5 +7,8 @@ export default defineConfig({
   schema: './src/db/schema.ts',
   dbCredentials: {
     url: env.DATABASE_URL,
-  }
+    ssl: {
+      rejectUnauthorized: false,
+    },
+  },
 })

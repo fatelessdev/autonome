@@ -18,6 +18,9 @@
     "db:studio": "drizzle-kit studio",
     "db:seed": "bun run scripts/seed.ts"
   },
+  "workspaces": [
+    "lighter-sdk-ts"
+  ],
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.1",
     "@ai-sdk/google": "^3.0.0-beta.43",
