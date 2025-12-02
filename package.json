@@ -53,6 +53,7 @@
     "@radix-ui/react-use-controllable-state": "^1.2.2",
     "@react-spring/three": "^10.0.3",
     "@react-three/fiber": "^9.4.0",
+    "@sentry/react": "^10.28.0",
     "@sentry/tanstackstart-react": "^10.22.0",
     "@shadergradient/react": "^2.4.5",
     "@t3-oss/env-core": "^0.13.8",
