@@ -16,3 +16,4 @@ drizzle/*.json
 .env.docker
 .env.local
 drizzle
+.netlify

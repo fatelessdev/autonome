@@ -32,7 +32,7 @@ const config = defineConfig({
         host: 'https://goon.fast',
       },
     }),
-    nitro({ preset: 'bun' }),
+    nitro(),
     // We use the standard 'react' plugin here, but we pass options to it.
     // This single instance handles Fast Refresh, JSX, AND your Babel compiler.
     react({
