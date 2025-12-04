@@ -27,6 +27,8 @@ const COIN_STYLES: Record<
 	BTC: { badge: "BTC", logo: "/coins/btc.svg", decimals: 2 },
 	ETH: { badge: "ETH", logo: "/coins/eth.svg", decimals: 2 },
 	SOL: { badge: "SOL", logo: "/coins/sol.svg", decimals: 3 },
+	ZEC: { badge: "ZEC", logo: "/coins/zec.webp", decimals: 3 },
+	HYPE: { badge: "HYPE", logo: "/coins/hype.webp", decimals: 4 },
 };
 
 export default function CryptoTracker() {

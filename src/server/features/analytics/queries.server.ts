@@ -2,7 +2,7 @@
  * Analytics Queries - Database queries for analytics data
  */
 
-import { and, desc, eq, gte, inArray, isNotNull } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull } from "drizzle-orm";
 
 import { db } from "@/db";
 import { invocations, models, orders, portfolioSize, toolCalls } from "@/db/schema";
@@ -13,6 +13,7 @@ import type {
 	LeaderboardEntry,
 	LeaderboardWindow,
 	ModelFailureStats,
+	StepTelemetry,
 	ToolCallFailure,
 } from "./types";
 
@@ -493,6 +494,12 @@ export async function getRecentFailures(limit = 50): Promise<FailureEntry[]> {
 			? (payload?.failureReason as string) ?? (payload?.error as string) ?? null
 			: null;
 
+		// Extract step telemetry from responsePayload
+		const stepTelemetry = (payload?.stepTelemetry as StepTelemetry[] | undefined) ?? undefined;
+		const totalSteps = (payload?.totalSteps as number | undefined) ?? stepTelemetry?.length;
+		const totalInputTokens = (payload?.totalInputTokens as number | undefined) ?? undefined;
+		const totalOutputTokens = (payload?.totalOutputTokens as number | undefined) ?? undefined;
+
 		entries.push({
 			invocationId: inv.id,
 			modelId: inv.modelId,
@@ -502,10 +509,28 @@ export async function getRecentFailures(limit = 50): Promise<FailureEntry[]> {
 			createdAt: inv.createdAt,
 			toolCalls: toolCallList,
 			failureReason,
+			stepTelemetry,
+			totalSteps,
+			totalInputTokens,
+			totalOutputTokens,
 		});
 
 		if (entries.length >= limit) break;
 	}
 
 	return entries;
+}
+
+/**
+ * Get the earliest portfolio snapshot timestamp (run start time)
+ * Returns null if no snapshots exist
+ */
+export async function getRunStartTime(): Promise<Date | null> {
+	const result = await db
+		.select({ createdAt: portfolioSize.createdAt })
+		.from(portfolioSize)
+		.orderBy(asc(portfolioSize.createdAt))
+		.limit(1);
+
+	return result[0]?.createdAt ?? null;
 }

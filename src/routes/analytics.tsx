@@ -9,7 +9,7 @@ import {
 	getSortedRowModel,
 	useReactTable,
 } from "@tanstack/react-table";
-import { ArrowUpDown, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import { ArrowUpDown, ChevronDown, ChevronUp, Download, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +27,7 @@ import type {
 	OverallStats,
 	AdvancedStats,
 } from "@/server/features/analytics/types";
+import { exportAnalyticsToExcel } from "@/core/utils/excelExport";
 
 export const Route = createFileRoute("/analytics")({
 	component: AnalyticsRoute,
@@ -369,10 +370,50 @@ function AnalyticsTable<T extends OverallStats | AdvancedStats>({
 
 function AnalyticsRoute() {
 	const [mode, setMode] = useState<StatsMode>("overall");
+	const [isExporting, setIsExporting] = useState(false);
 
+	// Current view data
 	const { data, isLoading, error } = useQuery(
 		orpc.analytics.getModelStats.queryOptions({ input: { mode } }),
 	);
+
+	// Run info for export filename
+	const { data: runInfo } = useQuery(
+		orpc.analytics.getRunInfo.queryOptions({ input: {} }),
+	);
+
+	// Pre-fetch both datasets for export
+	const { data: overallData, refetch: refetchOverall } = useQuery({
+		...orpc.analytics.getModelStats.queryOptions({ input: { mode: "overall" } }),
+		staleTime: 30000, // Cache for 30 seconds
+	});
+	const { data: advancedData, refetch: refetchAdvanced } = useQuery({
+		...orpc.analytics.getModelStats.queryOptions({ input: { mode: "advanced" } }),
+		staleTime: 30000,
+	});
+
+	const handleExport = async () => {
+		setIsExporting(true);
+		try {
+			// Ensure we have fresh data
+			const [overallResult, advancedResult] = await Promise.all([
+				refetchOverall(),
+				refetchAdvanced(),
+			]);
+			
+			const overall = overallResult.data?.overall ?? overallData?.overall ?? [];
+			const advanced = advancedResult.data?.advanced ?? advancedData?.advanced ?? [];
+			
+			if (overall.length === 0 && advanced.length === 0) {
+				console.warn("No data to export");
+				return;
+			}
+			
+			exportAnalyticsToExcel(overall, advanced, runInfo?.runStartTime ?? null);
+		} finally {
+			setIsExporting(false);
+		}
+	};
 
 	return (
 		<div className="relative flex h-screen flex-col overflow-hidden">
@@ -380,28 +421,46 @@ function AnalyticsRoute() {
 			<header className="relative z-10 flex items-center justify-between border-b border-zinc-800 px-6 py-4">
 				<h1 className="text-2xl font-semibold">Analytics</h1>
 				
-				{/* Mode Toggle */}
-				<div className="flex gap-1 rounded-lg p-1">
+				<div className="flex items-center gap-4">
+					{/* Export Button */}
 					<Button
-						variant={mode === "overall" ? "secondary" : "ghost"}
+						variant="outline"
 						size="sm"
-						onClick={() => setMode("overall")}
-						className={cn(
-							"px-4",
-						)}
+						onClick={handleExport}
+						disabled={isLoading || isExporting}
+						className="gap-2"
 					>
-						Overall
-					</Button>
-					<Button
-						variant={mode === "advanced" ? "secondary" : "ghost"}
-						size="sm"
-						onClick={() => setMode("advanced")}
-						className={cn(
-							"px-4",
+						{isExporting ? (
+							<Loader2 className="h-4 w-4 animate-spin" />
+						) : (
+							<Download className="h-4 w-4" />
 						)}
-					>
-						Advanced
+						Export Excel
 					</Button>
+
+					{/* Mode Toggle */}
+					<div className="flex gap-1 rounded-lg p-1">
+						<Button
+							variant={mode === "overall" ? "secondary" : "ghost"}
+							size="sm"
+							onClick={() => setMode("overall")}
+							className={cn(
+								"px-4",
+							)}
+						>
+							Overall
+						</Button>
+						<Button
+							variant={mode === "advanced" ? "secondary" : "ghost"}
+							size="sm"
+							onClick={() => setMode("advanced")}
+							className={cn(
+								"px-4",
+							)}
+						>
+							Advanced
+						</Button>
+					</div>
 				</div>
 			</header>
 

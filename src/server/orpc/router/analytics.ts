@@ -10,11 +10,11 @@ import {
 	calculateOverallStats,
 	getClosedTradesForModels,
 	getModelAccountValues,
-	getAllModels,
 	getLeaderboardData,
 	getRecentFailures,
 	getModelFailureStats,
 	getAllModelsWithFailureCounts,
+	getRunStartTime,
 } from "@/server/features/analytics";
 
 // ==================== Schema Definitions ====================
@@ -92,6 +92,15 @@ const ToolCallFailureSchema = z.object({
 	createdAt: z.date(),
 });
 
+const StepTelemetrySchema = z.object({
+	stepNumber: z.number(),
+	toolNames: z.array(z.string()),
+	inputTokens: z.number(),
+	outputTokens: z.number(),
+	totalTokens: z.number(),
+	timestamp: z.string(),
+});
+
 const FailureEntrySchema = z.object({
 	invocationId: z.string(),
 	modelId: z.string(),
@@ -101,6 +110,10 @@ const FailureEntrySchema = z.object({
 	createdAt: z.date(),
 	toolCalls: z.array(ToolCallFailureSchema),
 	failureReason: z.string().nullable(),
+	stepTelemetry: z.array(StepTelemetrySchema).optional(),
+	totalSteps: z.number().optional(),
+	totalInputTokens: z.number().optional(),
+	totalOutputTokens: z.number().optional(),
 });
 
 const ModelFailureStatsSchema = z.object({
@@ -204,5 +217,14 @@ export const getFailures = os
 				getModelFailureStats(),
 			]);
 			return { failures, modelStats };
+		});
+	});
+
+export const getRunInfo = os
+	.output(z.object({ runStartTime: z.date().nullable() }))
+	.handler(async () => {
+		return Sentry.startSpan({ name: "analytics.getRunInfo" }, async () => {
+			const runStartTime = await getRunStartTime();
+			return { runStartTime };
 		});
 	});

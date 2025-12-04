@@ -2,6 +2,19 @@
  * Analytics Types - Trading statistics for model performance analysis
  */
 
+/**
+ * Step-level telemetry captured during agent execution.
+ * Imported from invocationResponse but re-exported for analytics use.
+ */
+export interface StepTelemetry {
+	stepNumber: number;
+	toolNames: string[];
+	inputTokens: number;
+	outputTokens: number;
+	totalTokens: number;
+	timestamp: string;
+}
+
 export interface OverallStats {
 	modelId: string;
 	modelName: string;
@@ -83,6 +96,14 @@ export interface FailureEntry {
 	createdAt: Date;
 	toolCalls: ToolCallFailure[];
 	failureReason: string | null;
+	/** Step-level execution telemetry for debugging */
+	stepTelemetry?: StepTelemetry[];
+	/** Total steps executed before failure/completion */
+	totalSteps?: number;
+	/** Total input tokens consumed */
+	totalInputTokens?: number;
+	/** Total output tokens consumed */
+	totalOutputTokens?: number;
 }
 
 export interface ToolCallFailure {

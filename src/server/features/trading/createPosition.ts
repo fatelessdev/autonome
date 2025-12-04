@@ -11,7 +11,11 @@ import { SignerClient } from "@/server/features/trading/signerClient";
 import { MARKETS } from "@/shared/markets/marketMetadata";
 import { candlestickApi } from "@/server/integrations/lighter";
 import { NonceManagerType } from "../../../../lighter-sdk-ts/nonce_manager";
-import { createOrder } from "@/server/db/ordersRepository.server";
+import {
+	createOrder,
+	getOpenOrderBySymbol,
+	scaleIntoOrder,
+} from "@/server/db/ordersRepository.server";
 
 export interface PositionRequest {
 	symbol: string;
@@ -101,32 +105,80 @@ export async function createPosition(
 				} else {
 					const entryPrice = execution.averagePrice ?? 0;
 
-					// Persist to database
+					// Check for existing open order to scale into
 					try {
-						const dbOrder = await createOrder({
-							modelId: accountId,
-							symbol: symbol.toUpperCase(),
-							side,
-							quantity: orderQuantity.toString(),
-							entryPrice: entryPrice.toString(),
-							leverage: leverage?.toString() ?? null,
-							exitPlan: {
-								stop: stopLoss ?? null,
-								target: profitTarget ?? null,
-								invalidation: invalidationCondition ?? null,
-								confidence: confidence ?? null,
-							},
-						});
+						const existingOrder = await getOpenOrderBySymbol(
+							accountId,
+							symbol.toUpperCase(),
+						);
 
-						results.push({
-							symbol,
-							side,
-							quantity,
-							leverage,
-							entryPrice,
-							success: true,
-							orderId: dbOrder.id,
-						});
+						if (existingOrder && existingOrder.side === side) {
+							// Scale into existing position using weighted avg formula
+							const prevQty = parseFloat(existingOrder.quantity);
+							const prevEntry = parseFloat(existingOrder.entryPrice);
+							const newQty = orderQuantity;
+							const prevNotional = prevEntry * prevQty;
+							const newNotional = entryPrice * newQty;
+							const totalQty = prevQty + newQty;
+							const newAvgEntry =
+								totalQty !== 0
+									? (prevNotional + newNotional) / totalQty
+									: entryPrice;
+
+							const updatedOrder = await scaleIntoOrder({
+								orderId: existingOrder.id,
+								additionalQuantity: newQty.toString(),
+								newEntryPrice: entryPrice.toString(),
+								newAvgEntryPrice: newAvgEntry.toString(),
+								exitPlan: {
+									stop: stopLoss ?? existingOrder.exitPlan?.stop ?? null,
+									target:
+										profitTarget ?? existingOrder.exitPlan?.target ?? null,
+									invalidation:
+										invalidationCondition ??
+										existingOrder.exitPlan?.invalidation ??
+										null,
+									confidence:
+										confidence ?? existingOrder.exitPlan?.confidence ?? null,
+								},
+							});
+
+							results.push({
+								symbol,
+								side,
+								quantity: totalQty,
+								leverage,
+								entryPrice: newAvgEntry,
+								success: true,
+								orderId: updatedOrder.id,
+							});
+						} else {
+							// Create new order (either no existing position or opposite side)
+							const dbOrder = await createOrder({
+								modelId: accountId,
+								symbol: symbol.toUpperCase(),
+								side,
+								quantity: orderQuantity.toString(),
+								entryPrice: entryPrice.toString(),
+								leverage: leverage?.toString() ?? null,
+								exitPlan: {
+									stop: stopLoss ?? null,
+									target: profitTarget ?? null,
+									invalidation: invalidationCondition ?? null,
+									confidence: confidence ?? null,
+								},
+							});
+
+							results.push({
+								symbol,
+								side,
+								quantity,
+								leverage,
+								entryPrice,
+								success: true,
+								orderId: dbOrder.id,
+							});
+						}
 					} catch (dbError) {
 						console.error(
 							`[createPosition] DB persist failed for ${symbol}:`,
@@ -226,7 +278,8 @@ export async function createPosition(
 
 			const directionIsLong = side === "LONG";
 			const orderQuantity = Math.abs(quantity);
-			const response = await client.createOrder({
+			// Execute order on exchange (response used for confirmation, not stored)
+			await client.createOrder({
 				marketIndex: market.marketId,
 				clientOrderIndex: market.clientOrderIndex,
 				baseAmount: Math.round(orderQuantity * market.qtyDecimals),
@@ -241,32 +294,79 @@ export async function createPosition(
 				triggerPrice: SignerClient.NIL_TRIGGER_PRICE,
 				orderExpiry: SignerClient.DEFAULT_IOC_EXPIRY,
 			});
-			// Persist to database
+			// Check for existing open order to scale into
 			try {
-				const dbOrder = await createOrder({
-					modelId: account.id,
-					symbol: symbol.toUpperCase(),
-					side,
-					quantity: orderQuantity.toString(),
-					entryPrice: latestPrice.toString(),
-					leverage: leverage?.toString() ?? null,
-					exitPlan: {
-						stop: stopLoss ?? null,
-						target: profitTarget ?? null,
-						invalidation: invalidationCondition ?? null,
-						confidence: confidence ?? null,
-					},
-				});
+				const existingOrder = await getOpenOrderBySymbol(
+					account.id,
+					symbol.toUpperCase(),
+				);
 
-				results.push({
-					symbol,
-					side,
-					quantity,
-					leverage,
-					entryPrice: latestPrice,
-					success: true,
-					orderId: dbOrder.id,
-				});
+				if (existingOrder && existingOrder.side === side) {
+					// Scale into existing position using weighted avg formula
+					const prevQty = parseFloat(existingOrder.quantity);
+					const prevEntry = parseFloat(existingOrder.entryPrice);
+					const newQty = orderQuantity;
+					const prevNotional = prevEntry * prevQty;
+					const newNotional = latestPrice * newQty;
+					const totalQty = prevQty + newQty;
+					const newAvgEntry =
+						totalQty !== 0
+							? (prevNotional + newNotional) / totalQty
+							: latestPrice;
+
+					const updatedOrder = await scaleIntoOrder({
+						orderId: existingOrder.id,
+						additionalQuantity: newQty.toString(),
+						newEntryPrice: latestPrice.toString(),
+						newAvgEntryPrice: newAvgEntry.toString(),
+						exitPlan: {
+							stop: stopLoss ?? existingOrder.exitPlan?.stop ?? null,
+							target: profitTarget ?? existingOrder.exitPlan?.target ?? null,
+							invalidation:
+								invalidationCondition ??
+								existingOrder.exitPlan?.invalidation ??
+								null,
+							confidence:
+								confidence ?? existingOrder.exitPlan?.confidence ?? null,
+						},
+					});
+
+					results.push({
+						symbol,
+						side,
+						quantity: totalQty,
+						leverage,
+						entryPrice: newAvgEntry,
+						success: true,
+						orderId: updatedOrder.id,
+					});
+				} else {
+					// Create new order (either no existing position or opposite side)
+					const dbOrder = await createOrder({
+						modelId: account.id,
+						symbol: symbol.toUpperCase(),
+						side,
+						quantity: orderQuantity.toString(),
+						entryPrice: latestPrice.toString(),
+						leverage: leverage?.toString() ?? null,
+						exitPlan: {
+							stop: stopLoss ?? null,
+							target: profitTarget ?? null,
+							invalidation: invalidationCondition ?? null,
+							confidence: confidence ?? null,
+						},
+					});
+
+					results.push({
+						symbol,
+						side,
+						quantity,
+						leverage,
+						entryPrice: latestPrice,
+						success: true,
+						orderId: dbOrder.id,
+					});
+				}
 			} catch (dbError) {
 				console.error(
 					`[createPosition] DB persist failed for ${symbol}:`,

@@ -38,6 +38,12 @@ export const MODEL_INFO: Record<string, ModelInfoEntry> = {
 		label: "Claude Sonnet 4.5",
 		provider: "openrouter",
 	},
+	"kat-coder-pro": {
+		logo: "/models/kwaipilot.png",
+		color: "#31DAF3",
+		label: "Kat Coder Pro",
+		provider: "openrouter",
+	},
 	"grok-4.1-fast": {
 		logo: "/models/grok.webp",
 		color: "#000000",

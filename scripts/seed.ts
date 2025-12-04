@@ -31,15 +31,22 @@ const db = drizzle(pool);
 
 // Model definitions - openRouterModelName -> name extraction
 const MODEL_DEFINITIONS = [
-	"x-ai/grok-4.1-fast:free",
 	"deepseek-ai/deepseek-r1-0528",
+	"kwaipilot/kat-coder-pro:free",
 	"deepseek-ai/deepseek-v3.1-terminus",
 	"openai/gpt-oss-120b",
 	"minimaxai/minimax-m2",
 	"moonshotai/kimi-k2-instruct-0905",
 	"qwen/qwen3-next-80b-a3b-thinking",
-	"z-ai/glm-4.5-air:free",
+	"qwen/qwen3-235b-a22b",
+	// "z-ai/glm-4.5-air:free",
 ];
+
+// Special model for consensus orchestrator (uses voting across multiple models)
+const CONSENSUS_MODEL = {
+	name: "consensus-orchestrator",
+	openRouterModelName: "consensus/multi-model-voting",
+};
 
 /**
  * Extract display name from openRouterModelName
@@ -98,7 +105,29 @@ async function seed() {
 			console.log(`  ✓ Added: ${name} (${openRouterModelName})`);
 		}
 
-		console.log(`\n✅ Successfully seeded ${MODEL_DEFINITIONS.length} models`);
+		// Insert consensus orchestrator model
+		// await db.execute(sql`
+		// 	INSERT INTO "Models" (
+		// 		"id",
+		// 		"name",
+		// 		"openRoutermodelName",
+		// 		"lighterApiKey",
+		// 		"invocationCount",
+		// 		"totalMinutes",
+		// 		"accountIndex"
+		// 	) VALUES (
+		// 		${crypto.randomUUID()},
+		// 		${CONSENSUS_MODEL.name},
+		// 		${CONSENSUS_MODEL.openRouterModelName},
+		// 		'0',
+		// 		0,
+		// 		0,
+		// 		'0'
+		// 	)
+		// `);
+		// console.log(`  ✓ Added: ${CONSENSUS_MODEL.name} (multi-model voting orchestrator)`);
+
+		console.log(`\n✅ Successfully seeded ${MODEL_DEFINITIONS.length + 1} models (including consensus)`);
 	} catch (error) {
 		console.error("❌ Seed failed:", error);
 		process.exit(1);

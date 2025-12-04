@@ -18,9 +18,6 @@
     "db:studio": "drizzle-kit studio",
     "db:seed": "bun run scripts/seed.ts"
   },
-  "workspaces": [
-    "lighter-sdk-ts"
-  ],
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.1",
     "@ai-sdk/google": "^3.0.0-beta.43",
@@ -111,6 +108,7 @@
     "tw-animate-css": "^1.3.6",
     "use-stick-to-bottom": "^1.1.1",
     "vite-tsconfig-paths": "^5.1.4",
+    "xlsx": "^0.18.5",
     "zod": "^4.1.11"
   },
   "devDependencies": {

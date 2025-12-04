@@ -1,0 +1,70 @@
+/**
+ * Tool Context Types
+ * Shared interfaces and types for trading agent tools
+ */
+
+import type { Account } from "@/server/features/trading/accounts";
+import type {
+	InvocationClosedPositionSummary,
+	InvocationDecisionSummary,
+	InvocationExecutionResultSummary,
+} from "@/server/features/trading/invocationResponse";
+import type { EnrichedOpenPosition } from "@/server/features/trading/openPositionEnrichment";
+import type { TradingDecisionWithContext } from "@/server/features/trading/tradingDecisions";
+
+/**
+ * Shared context passed to all tools during a trading session.
+ * Contains account info, invocation tracking, and mutable state.
+ */
+export interface ToolContext {
+	/** The account/model executing trades */
+	account: Account;
+
+	/** Current invocation ID for tool call tracking */
+	invocationId: string;
+
+	/** Open positions enriched with decision context */
+	openPositions: EnrichedOpenPosition[];
+
+	/** Decision index for tracking trading decisions */
+	decisionIndex: Map<string, TradingDecisionWithContext>;
+
+	/** Symbols already acted on this session (prevents duplicate actions) */
+	actedSymbols: Set<string>;
+
+	/** Captured decisions for invocation payload */
+	capturedDecisions: InvocationDecisionSummary[];
+
+	/** Captured execution results for invocation payload */
+	capturedExecutionResults: InvocationExecutionResultSummary[];
+
+	/** Captured closed positions for invocation payload */
+	capturedClosedPositions: InvocationClosedPositionSummary[];
+}
+
+/**
+ * Result from a position creation/update operation
+ */
+export interface PositionResult {
+	symbol: string;
+	side: "LONG" | "SHORT" | "HOLD";
+	quantity: number | null;
+	leverage: number | null;
+	success: boolean;
+	error?: string | null;
+}
+
+/**
+ * Result from a position close operation
+ */
+export interface ClosePositionResult {
+	symbol: string;
+	side: "LONG" | "SHORT";
+	quantity: number | null;
+	entryPrice: number | null;
+	exitPrice: number | null;
+	netPnl: number | null;
+	realizedPnl: number | null;
+	unrealizedPnl: number | null;
+	closedAt: string | null;
+}

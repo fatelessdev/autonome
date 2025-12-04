@@ -252,14 +252,21 @@ export async function fetchPositions() {
 			})
 			.from(models);
 
-		// Get live positions from simulator to reconcile with DB
-		// This ensures UI shows same positions as model prompt
+		// Get full simulator snapshots - this is the single source of truth for all position data
+		// Using snapshots ensures UI shows exact same values as the model prompt
+		const simulatorSnapshotsByModel = new Map<
+			string,
+			Awaited<ReturnType<typeof ExchangeSimulator.prototype.getAccountSnapshot>>
+		>();
 		const livePositionsByModel = new Map<string, Set<string>>();
 		if (IS_SIMULATION_ENABLED) {
 			const simulator = await ExchangeSimulator.bootstrap(DEFAULT_SIMULATOR_OPTIONS);
 			for (const model of dbModels) {
-				const livePositions = simulator.getOpenPositions(model.id);
-				const symbolSet = new Set(livePositions.map((p) => p.symbol.toUpperCase()));
+				const snapshot = simulator.getAccountSnapshot(model.id);
+				simulatorSnapshotsByModel.set(model.id, snapshot);
+				const symbolSet = new Set(
+					snapshot.positions.map((p) => p.symbol.toUpperCase()),
+				);
 				livePositionsByModel.set(model.id, symbolSet);
 			}
 		}
@@ -325,9 +332,62 @@ export async function fetchPositions() {
 
 		const results = dbModels.map((model) => {
 			try {
-				const modelOrders = ordersByModel.get(model.id) ?? [];
+				// When simulation is enabled, use simulator's position data directly
+				// This ensures UI shows exact same values as the model prompt (single source of truth)
+				if (IS_SIMULATION_ENABLED) {
+					const snapshot = simulatorSnapshotsByModel.get(model.id);
+					if (snapshot) {
+						// Get exit plans from DB orders (simulator doesn't persist all metadata)
+						const modelOrders = ordersByModel.get(model.id) ?? [];
+						const exitPlansBySymbol = new Map(
+							modelOrders.map((o) => [o.symbol.toUpperCase(), o.exitPlan]),
+						);
+						const openedAtBySymbol = new Map(
+							modelOrders.map((o) => [
+								o.symbol.toUpperCase(),
+								o.openedAt?.toISOString() ?? null,
+							]),
+						);
 
-				// Transform orders to expected position format with live prices
+						const enrichedPositions = snapshot.positions.map((pos) => {
+							const symbolUpper = pos.symbol.toUpperCase();
+							const exitPlan = exitPlansBySymbol.get(symbolUpper) ?? null;
+
+							return {
+								symbol: pos.symbol,
+								position: `${pos.quantity} ${pos.symbol}`,
+								sign: pos.side,
+								side: pos.side,
+								quantity: pos.quantity,
+								entryPrice: pos.avgEntryPrice,
+								markPrice: pos.markPrice,
+								currentPrice: pos.markPrice,
+								notional: pos.notional.toFixed(2),
+								unrealizedPnl: pos.unrealizedPnl.toFixed(2),
+								realizedPnl: pos.realizedPnl.toFixed(2),
+								liquidationPrice: "N/A",
+								leverage: pos.leverage,
+								confidence: exitPlan?.confidence ?? null,
+								signal: pos.side,
+								exitPlan: exitPlan ?? pos.exitPlan,
+								lastDecisionAt: openedAtBySymbol.get(symbolUpper) ?? null,
+								decisionStatus: "FILLED",
+							};
+						});
+
+						return {
+							modelId: model.id,
+							modelName: model.name,
+							modelLogo: model.modelLogo,
+							positions: enrichedPositions,
+							totalUnrealizedPnl: snapshot.totalUnrealizedPnl,
+							availableCash: snapshot.availableCash,
+						};
+					}
+				}
+
+				// Fallback: Build positions from DB orders (used when simulator is disabled)
+				const modelOrders = ordersByModel.get(model.id) ?? [];
 				const enrichedPositions = modelOrders.map((order) => {
 					const currentPrice =
 						priceMap.get(order.symbol.toUpperCase()) ?? null;
@@ -371,7 +431,7 @@ export async function fetchPositions() {
 					};
 				});
 
-				// Calculate totals
+				// Calculate totals for non-simulation mode
 				const totalUnrealizedPnl = enrichedPositions.reduce(
 					(sum, p) => sum + parseFloat(p.unrealizedPnl),
 					0,
@@ -382,11 +442,9 @@ export async function fetchPositions() {
 					const lev = p.leverage ?? 1;
 					return sum + notional / lev;
 				}, 0);
-
 				const totalRealizedPnl = realizedPnlByModel.get(model.id) ?? 0;
-
 				const initialCapital = DEFAULT_SIMULATOR_OPTIONS.initialCapital;
-				const calculatedAvailableCash = Math.max(
+				const availableCash = Math.max(
 					initialCapital - totalMarginUsed + totalRealizedPnl,
 					0,
 				);
@@ -397,7 +455,7 @@ export async function fetchPositions() {
 					modelLogo: model.modelLogo,
 					positions: enrichedPositions,
 					totalUnrealizedPnl,
-					availableCash: calculatedAvailableCash,
+					availableCash,
 				};
 			} catch (error) {
 				console.error(`Error fetching positions for ${model.id}`, error);

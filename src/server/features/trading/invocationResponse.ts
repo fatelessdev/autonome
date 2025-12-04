@@ -1,5 +1,18 @@
 import type { GenerateTextResult } from "ai";
 
+/**
+ * Step-level telemetry captured during agent execution via onStepFinish.
+ * Useful for debugging failures and analyzing cost/performance.
+ */
+export interface StepTelemetry {
+	stepNumber: number;
+	toolNames: string[];
+	inputTokens: number;
+	outputTokens: number;
+	totalTokens: number;
+	timestamp: string;
+}
+
 export interface InvocationDecisionSummary {
 	symbol: string;
 	side: "LONG" | "SHORT" | "HOLD";
@@ -45,6 +58,13 @@ export interface InvocationResponsePayload {
 		modelId: string | null;
 		timestamp: string | null;
 	} | null;
+	/** Step-level telemetry for debugging and cost analysis */
+	stepTelemetry?: StepTelemetry[];
+	/** Total steps executed before completion or failure */
+	totalSteps?: number;
+	/** Aggregated token usage across all steps */
+	totalInputTokens?: number;
+	totalOutputTokens?: number;
 }
 
 export function buildInvocationResponsePayload({
@@ -53,12 +73,14 @@ export function buildInvocationResponsePayload({
 	decisions,
 	executionResults,
 	closedPositions,
+	stepTelemetry,
 }: {
 	prompt: string;
 	result: GenerateTextResult<any, any> | null;
 	decisions: InvocationDecisionSummary[];
 	executionResults: InvocationExecutionResultSummary[];
 	closedPositions: InvocationClosedPositionSummary[];
+	stepTelemetry?: StepTelemetry[];
 }): InvocationResponsePayload {
 	const base = (result ?? {}) as {
 		finishReason?: unknown;
@@ -79,6 +101,11 @@ export function buildInvocationResponsePayload({
 		timestamp = provider.timestamp;
 	}
 
+	// Aggregate step telemetry
+	const totalSteps = stepTelemetry?.length ?? 0;
+	const totalInputTokens = stepTelemetry?.reduce((acc, s) => acc + s.inputTokens, 0) ?? 0;
+	const totalOutputTokens = stepTelemetry?.reduce((acc, s) => acc + s.outputTokens, 0) ?? 0;
+
 	return {
 		prompt,
 		decisions,
@@ -95,5 +122,9 @@ export function buildInvocationResponsePayload({
 					timestamp,
 				}
 			: null,
+		stepTelemetry,
+		totalSteps,
+		totalInputTokens,
+		totalOutputTokens,
 	};
 }

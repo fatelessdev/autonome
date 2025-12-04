@@ -336,31 +336,29 @@ export function GlowingLineChart({
 			}
 		}
 		// Handle edge case where no data exists
-		if (!Number.isFinite(minVal)) minVal = 0;
+		if (!Number.isFinite(minVal)) minVal = 10000;
 
-		// Calculate step size based on max value
-		const step = maxVal <= 5000 ? 1000 : maxVal <= 20000 ? 2000 : 5000;
+		// Fixed step size for ±2k unlocking
+		const STEP = 2000;
+		const DEFAULT_MIN = 8000;
+		const DEFAULT_MAX = 12000;
 
-		// Round up max to next nice boundary (e.g., 11k -> 12k, 15k -> 16k)
-		const maxBound = Math.ceil(maxVal / step) * step + step;
-
-		// Dynamic lower bound rules:
-		// - If lowest is less than 2k: start from 0
-		// - Otherwise: round down to nearest step with 1k buffer
-		let minBound: number;
-		if (minVal < 2000) {
-			minBound = 0;
-		} else {
-			// Round down to nearest step, then subtract 1k buffer
-			minBound = Math.max(0, Math.floor((minVal - 1000) / step) * step);
+		// Start with default bounds (8k-12k)
+		// Unlock lower bound in 2k increments when data goes below
+		// Unlock upper bound in 2k increments when data goes above
+		let minBound = DEFAULT_MIN;
+		while (minVal < minBound && minBound > 0) {
+			minBound -= STEP;
 		}
 
-		// Generate ticks
-		const range = maxBound - minBound;
-		const tickCount = Math.min(6, Math.max(3, Math.ceil(range / step)));
-		const actualStep = Math.ceil(range / tickCount / step) * step;
+		let maxBound = DEFAULT_MAX;
+		while (maxVal > maxBound) {
+			maxBound += STEP;
+		}
+
+		// Generate ticks at 2k intervals
 		const ticks: number[] = [];
-		for (let t = minBound; t <= maxBound; t += actualStep) {
+		for (let t = minBound; t <= maxBound; t += STEP) {
 			ticks.push(t);
 		}
 		return {

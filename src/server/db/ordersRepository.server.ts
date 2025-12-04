@@ -42,6 +42,19 @@ export type UpdateExitPlanParams = {
 	};
 };
 
+export type ScaleOrderParams = {
+	orderId: string;
+	additionalQuantity: string;
+	newEntryPrice: string;
+	newAvgEntryPrice: string;
+	exitPlan?: {
+		stop: number | null;
+		target: number | null;
+		invalidation: string | null;
+		confidence: number | null;
+	} | null;
+};
+
 export type OrderWithModel = Order & {
 	model: {
 		name: string;
@@ -117,6 +130,50 @@ export async function updateOrderExitPlan(
 			exitPlan: params.exitPlan,
 			updatedAt: new Date(),
 		})
+		.where(eq(orders.id, params.orderId))
+		.returning();
+
+	return updated;
+}
+
+/**
+ * Scale into an existing position (aggregate quantity, recalculate weighted avg entry)
+ * Uses formula: newAvgEntry = (prevNotional + newNotional) / totalQty
+ */
+export async function scaleIntoOrder(params: ScaleOrderParams): Promise<Order> {
+	const updateData: {
+		quantity: string;
+		entryPrice: string;
+		updatedAt: Date;
+		exitPlan?: {
+			stop: number | null;
+			target: number | null;
+			invalidation: string | null;
+			confidence: number | null;
+		} | null;
+	} = {
+		quantity: (
+			parseFloat(params.additionalQuantity) +
+			parseFloat(
+				(
+					await db.query.orders.findFirst({
+						where: eq(orders.id, params.orderId),
+						columns: { quantity: true },
+					})
+				)?.quantity ?? "0",
+			)
+		).toString(),
+		entryPrice: params.newAvgEntryPrice,
+		updatedAt: new Date(),
+	};
+
+	if (params.exitPlan !== undefined) {
+		updateData.exitPlan = params.exitPlan;
+	}
+
+	const [updated] = await db
+		.update(orders)
+		.set(updateData)
 		.where(eq(orders.id, params.orderId))
 		.returning();
 

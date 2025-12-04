@@ -2,12 +2,7 @@ import { defineNitroConfig } from "nitro/config";
 
 export default defineNitroConfig({
     compatibilityDate: "2025-07-15",
-    preset: "vercel",
-    vercel: {
-        functions: {
-            runtime: "bun1.x"
-        }
-    },
+    preset: "bun",
     minify: true,
     compressPublicAssets: true,
     prerender: {

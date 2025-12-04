@@ -1,4 +1,4 @@
-import { getFailures, getLeaderboard, getModelStats } from "./analytics";
+import { getFailures, getLeaderboard, getModelStats, getRunInfo } from "./analytics";
 import { getInvocations, getModels } from "./models";
 import {
 	getAccount,
@@ -41,5 +41,6 @@ export default {
 		getModelStats,
 		getLeaderboard,
 		getFailures,
+		getRunInfo,
 	},
 };
