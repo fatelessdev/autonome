@@ -284,6 +284,8 @@ const SYMBOL_ICON_MAP: Record<string, { src: string; alt: string }> = {
 	BTC: { src: "/coins/btc.svg", alt: "BTC" },
 	ETH: { src: "/coins/eth.svg", alt: "ETH" },
 	SOL: { src: "/coins/sol.svg", alt: "SOL" },
+	ZEC: { src: "/coins/zec.webp", alt: "ZEC" },
+	HYPE: { src: "/coins/hype.webp", alt: "HYPE" },
 };
 
 function renderSymbolIcon(symbol: string) {

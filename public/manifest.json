@@ -1,6 +1,7 @@
 {
   "short_name": "Autonome",
-  "name": "Autonome",
+  "name": "Autonome - AI Cryptocurrency Trading Platform",
+  "description": "AI-powered autonomous cryptocurrency trading platform with real-time portfolio analytics, multi-model AI strategies, and sophisticated trading simulation.",
   "icons": [
     {
       "src": "favicon.ico",
@@ -8,18 +9,20 @@
       "type": "image/x-icon"
     },
     {
-      "src": "logo192.png",
+      "src": "logo.png",
       "type": "image/png",
-      "sizes": "192x192"
-    },
-    {
-      "src": "logo512.png",
-      "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "background_color": "#000000",
+  "categories": ["finance", "productivity", "utilities"],
+  "lang": "en-US",
+  "dir": "ltr",
+  "prefer_related_applications": false
 }

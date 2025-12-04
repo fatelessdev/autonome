@@ -25,7 +25,7 @@ export const models = pgTable(
 	{
 		id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
 		name: text("name").notNull(),
-		openRouterModelName: text("openRoutermodelName").notNull(),
+		openRouterModelName: text("openRouterModelName").notNull(),
 		lighterApiKey: text("lighterApiKey").notNull().default("0"),
 		invocationCount: integer("invocationCount").notNull().default(0),
 		totalMinutes: integer("totalMinutes").notNull().default(0),

@@ -51,9 +51,9 @@ async function handleChat({ request }: { request: Request }) {
 
 		const sqlAgent = new ToolLoopAgent({
 			// model: primaryModel,
-			model: mistral("codestral-latest"),
-			// instructions: SQL_ASSISTANT_PROMPT,
-			instructions: "You are an helpful assistant",
+			model: openrouter('kwaipilot/kat-coder-pro:free'),
+			instructions: SQL_ASSISTANT_PROMPT,
+			// instructions: "You are an helpful assistant",
 			providerOptions: {
 				google: {
 					thinkingConfig: {

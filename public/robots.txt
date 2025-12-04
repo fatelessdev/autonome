@@ -1,3 +1,33 @@
 # https://www.robotstxt.org/robotstxt.html
+# Autonome - AI Cryptocurrency Trading Platform
+
 User-agent: *
-Disallow:
+Allow: /
+Disallow: /api/
+Disallow: /_build/
+
+# Crawl-delay for politeness
+Crawl-delay: 1
+
+# Sitemap
+Sitemap: https://goon.fast/sitemap.xml
+
+# Google specific
+User-agent: Googlebot
+Allow: /
+Disallow: /api/
+
+# Bing specific
+User-agent: Bingbot
+Allow: /
+Disallow: /api/
+
+# Social media crawlers
+User-agent: Twitterbot
+Allow: /
+
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: LinkedInBot
+Allow: /

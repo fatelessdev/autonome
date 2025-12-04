@@ -39,7 +39,7 @@ const MODEL_DEFINITIONS = [
 	"moonshotai/kimi-k2-instruct-0905",
 	"qwen/qwen3-next-80b-a3b-thinking",
 	"qwen/qwen3-235b-a22b",
-	// "z-ai/glm-4.5-air:free",
+	"z-ai/glm-4.5-air:free",
 ];
 
 // Special model for consensus orchestrator (uses voting across multiple models)
@@ -86,7 +86,7 @@ async function seed() {
 				INSERT INTO "Models" (
 					"id",
 					"name",
-					"openRoutermodelName",
+					"openRouterModelName",
 					"lighterApiKey",
 					"invocationCount",
 					"totalMinutes",
@@ -110,7 +110,7 @@ async function seed() {
 		// 	INSERT INTO "Models" (
 		// 		"id",
 		// 		"name",
-		// 		"openRoutermodelName",
+		// 		"openRouterModelName",
 		// 		"lighterApiKey",
 		// 		"invocationCount",
 		// 		"totalMinutes",
