@@ -69,10 +69,10 @@ export function ModelChatTab({
 	};
 
 	return (
-		<div className="flex h-full min-h-0 flex-col">
+		<div className="flex h-full min-h-0 flex-col overflow-hidden">
 			{filterMenu}
-			<div className="relative flex-1 min-h-0">
-				<ScrollArea className="h-full overflow-auto">
+			<div className="relative flex-1 min-h-0 min-w-0 overflow-hidden">
+				<ScrollArea className="h-full w-full">
 					{loading ? (
 						<ModelChatSkeleton />
 					) : conversations.length === 0 ? (
@@ -86,7 +86,7 @@ export function ModelChatTab({
 							</div>
 						</div>
 					) : (
-						<div className="w-full overflow-hidden">
+						<div className="w-full max-w-full overflow-hidden">
 							{conversations.map((conv, idx) => {
 								const modelInfo = resolveModelIdentity({
 									modelLogo: conv.modelLogo,
@@ -103,9 +103,9 @@ export function ModelChatTab({
 									activeConversationPanels[conv.id] ?? "response";
 
 								return (
-									<div key={conv.id} className="min-w-0">
+									<div key={conv.id} className="min-w-0 max-w-full overflow-hidden">
 										<div
-											className="rounded px-4 py-4 transition-colors hover:bg-accent/30 min-w-0 overflow-hidden"
+											className="rounded px-4 py-4 transition-colors hover:bg-accent/30 min-w-0 max-w-full overflow-hidden"
 											style={{ backgroundColor: `${modelColor}10` }}
 										>
 											<div className="mb-3 flex items-center justify-between">
@@ -168,7 +168,7 @@ export function ModelChatTab({
 											</button>
 
 											{isExpanded ? (
-												<div className="mt-4 space-y-4">
+												<div className="mt-4 space-y-4 min-w-0 max-w-full overflow-hidden">
 													<div
 														className="flex items-center gap-2 rounded-lg border bg-background/70 p-1"
 														style={{ borderColor: `${modelColor}22` }}
@@ -201,12 +201,15 @@ export function ModelChatTab({
 													</div>
 
 													{activePanel === "response" ? (
-														<section className="overflow-hidden">
+														<section className="min-w-0 max-w-full overflow-hidden">
 															<div
-																className="rounded-lg border bg-background/60 p-3 overflow-hidden"
-																style={{ borderColor: `${modelColor}33`, wordBreak: "break-all", overflowWrap: "anywhere" }}
+																className="rounded-lg border bg-background/60 p-3 min-w-0 max-w-full overflow-hidden"
+																style={{ borderColor: `${modelColor}33` }}
 															>
-																<div className="prose prose-invert prose-sm max-w-none overflow-hidden [&_*]:break-all">
+																<div 
+																	className="prose prose-invert prose-sm max-w-none min-w-0 overflow-hidden"
+																	style={{ wordBreak: "break-word", overflowWrap: "anywhere" }}
+																>
 																	<ReactMarkdown
 																		remarkPlugins={[remarkGfm]}
 																		rehypePlugins={[rehypeRaw]}

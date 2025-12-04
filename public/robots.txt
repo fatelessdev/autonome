@@ -1,5 +1,5 @@
 # https://www.robotstxt.org/robotstxt.html
-# Autonome - AI Cryptocurrency Trading Platform
+# Autonome
 
 User-agent: *
 Allow: /

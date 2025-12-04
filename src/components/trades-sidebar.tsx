@@ -76,7 +76,7 @@ export default function TradesSidebar({
 		useState<ExitPlanSelection | null>(null);
 	const sidebarRef = useRef<HTMLDivElement>(null);
 	const isAnimating = useRef(false);
-	const firstRender = useRef(true);
+	const hasAnimatedOnce = useRef(false);
 
 	const { trades, conversations, positions, modelOptions, loading } =
 		useTradingDashboardData();
@@ -84,15 +84,15 @@ export default function TradesSidebar({
 	const collapsedWidth = isMobile ? "0px" : COLLAPSED_WIDTH;
 	const targetWidth = isExpanded ? EXPANDED_WIDTH : collapsedWidth;
 
-	// GSAP animation effect
+	// GSAP animation effect - only animate after first render
 	useEffect(() => {
 		if (typeof window === "undefined") return;
 		const element = sidebarRef.current;
 		if (!element) return;
 
-		if (firstRender.current) {
-			firstRender.current = false;
-			gsap.set(element, { width: targetWidth });
+		// Skip animation on first mount - width is already set via inline style
+		if (!hasAnimatedOnce.current) {
+			hasAnimatedOnce.current = true;
 			return;
 		}
 
@@ -201,6 +201,7 @@ export default function TradesSidebar({
 				top: 0,
 				bottom: 0,
 				zIndex: 50,
+				width: targetWidth, // Set initial width to prevent flash
 				backgroundColor: "hsl(var(--background))",
 				pointerEvents: !isExpanded && isMobile ? "none" : "auto",
 			}}

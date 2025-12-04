@@ -24,6 +24,27 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
+  /* Prose overflow fix for markdown content */
+  .prose {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+  .prose pre {
+    white-space: pre-wrap;
+    word-break: break-all;
+    overflow-x: auto;
+  }
+  .prose code {
+    word-break: break-all;
+  }
+  .prose p,
+  .prose li,
+  .prose td,
+  .prose th {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
 }
 
 @theme {

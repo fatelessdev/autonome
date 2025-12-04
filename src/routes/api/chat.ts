@@ -64,7 +64,7 @@ async function handleChat({ request }: { request: Request }) {
 				mistral: {
 					parallelToolCalls: true,
 				} satisfies MistralLanguageModelOptions,
-				nim: {
+			nim: {
 					chat_template_kwargs: { thinking: false }
 				},
 				openrouter: {

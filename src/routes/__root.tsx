@@ -27,7 +27,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			// Basic
 			{ charSet: "utf-8" },
 			{ name: "viewport", content: "width=device-width, initial-scale=1" },
-			{ title: `${SITE_NAME} - AI Cryptocurrency Trading Platform` },
+			{ title: `${SITE_NAME}` },
 			{ name: "description", content: SITE_DESCRIPTION },
 
 			// Keywords
@@ -68,7 +68,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			// Open Graph
 			{ property: "og:type", content: "website" },
 			{ property: "og:url", content: SITE_URL },
-			{ property: "og:title", content: `${SITE_NAME} - AI Cryptocurrency Trading Platform` },
+			{ property: "og:title", content: `${SITE_NAME}` },
 			{ property: "og:description", content: SITE_DESCRIPTION },
 			{ property: "og:image", content: OG_IMAGE },
 			{ property: "og:image:width", content: "1200" },
@@ -80,7 +80,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			// Twitter Card
 			{ name: "twitter:card", content: "summary_large_image" },
 			{ name: "twitter:url", content: SITE_URL },
-			{ name: "twitter:title", content: `${SITE_NAME} - AI Cryptocurrency Trading Platform` },
+			{ name: "twitter:title", content: `${SITE_NAME}` },
 			{ name: "twitter:description", content: SITE_DESCRIPTION },
 			{ name: "twitter:image", content: OG_IMAGE },
 			{ name: "twitter:image:alt", content: "Autonome - AI Trading Platform" },
