@@ -12,6 +12,11 @@ import {
 	getPositions,
 	getTrades,
 } from "./trading";
+import {
+	getVariants,
+	getVariantStats,
+	getVariantHistory,
+} from "./variants";
 
 export default {
 	// Trading procedures
@@ -42,5 +47,12 @@ export default {
 		getLeaderboard,
 		getFailures,
 		getRunInfo,
+	},
+
+	// Variants (strategy configuration)
+	variants: {
+		getVariants,
+		getVariantStats,
+		getVariantHistory,
 	},
 };

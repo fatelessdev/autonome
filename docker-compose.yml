@@ -1,7 +1,7 @@
 services:
   app:
     image: smoggyowo/autonome:latest
-    container_name: autonome-app
+    container_name: autonome
     restart: unless-stopped
     env_file:
       - .env.docker

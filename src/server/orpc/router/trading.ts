@@ -28,6 +28,7 @@ export const getTrades = os
 					id: trade.id || "",
 					modelId: trade.modelId || "",
 					modelName: trade.modelName || "",
+					modelVariant: trade.modelVariant || undefined,
 					modelRouterName: trade.modelRouterName || undefined,
 					modelKey: trade.modelRouterName || trade.modelId || "",
 					side: (
@@ -83,6 +84,7 @@ export const getPositions = os
 				const positions = (result || []).map((modelPos: any) => ({
 					modelId: modelPos.modelId || "",
 					modelName: modelPos.modelName || "",
+					modelVariant: modelPos.modelVariant || undefined,
 					modelLogo:
 						typeof modelPos.modelLogo === "string"
 							? modelPos.modelLogo
@@ -239,6 +241,11 @@ export const getPortfolioHistory = os
 										typeof entry.model.name === "string"
 											? entry.model.name
 											: "",
+									variant:
+										typeof entry.model.variant === "string" &&
+										["OG", "Minimal", "Verbose", "AGI"].includes(entry.model.variant)
+											? entry.model.variant
+											: undefined,
 									openRouterModelName:
 										typeof entry.model.openRouterModelName === "string"
 											? entry.model.openRouterModelName

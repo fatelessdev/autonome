@@ -18,6 +18,7 @@ export interface StepTelemetry {
 export interface OverallStats {
 	modelId: string;
 	modelName: string;
+	variant?: string;
 	accountValue: number;
 	returnPercent: number;
 	totalPnl: number;
@@ -31,6 +32,7 @@ export interface OverallStats {
 export interface AdvancedStats {
 	modelId: string;
 	modelName: string;
+	variant?: string;
 	accountValue: number;
 	avgTradeSize: number;
 	medianTradeSize: number;
@@ -79,6 +81,7 @@ export type LeaderboardSortKey = "pnlPercent" | "pnlAbsolute" | "maxDrawdown";
 export interface LeaderboardEntry {
 	modelId: string;
 	modelName: string;
+	variant: string;
 	pnlPercent: number;
 	pnlAbsolute: number;
 	maxDrawdown: number;
@@ -116,6 +119,7 @@ export interface ToolCallFailure {
 export interface ModelFailureStats {
 	modelId: string;
 	modelName: string;
+	variant: string;
 	failedWorkflowCount: number;
 	failedToolCallCount: number;
 	invocationCount: number;

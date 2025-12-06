@@ -1,5 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
 import { models, orders } from "@/db/schema";
@@ -127,6 +127,7 @@ type TradeRecord = {
 	modelId: string;
 	modelName: string;
 	modelRouterName: string | null;
+	modelVariant: string;
 	symbol: string;
 	side: string;
 	quantity: number | null;
@@ -140,20 +141,44 @@ type TradeRecord = {
 };
 
 export async function fetchTrades(): Promise<TradeRecord[]> {
-	// Fetch closed orders directly from Orders table
-	const closedOrders = await db.query.orders.findMany({
-		where: eq(orders.status, "CLOSED"),
-		with: {
-			model: {
-				columns: {
-					name: true,
-					openRouterModelName: true,
+	// Fetch 100 closed orders per variant to ensure fair representation
+	// This avoids one active variant dominating the trades list
+	const variants = ["OG", "Minimal", "Verbose", "AGI"] as const;
+	const LIMIT_PER_VARIANT = 100;
+
+	const variantQueries = variants.map((variant) =>
+		db.query.orders.findMany({
+			where: and(
+				eq(orders.status, "CLOSED"),
+				inArray(
+					orders.modelId,
+					db
+						.select({ id: models.id })
+						.from(models)
+						.where(eq(models.variant, variant)),
+				),
+			),
+			with: {
+				model: {
+					columns: {
+						name: true,
+						openRouterModelName: true,
+						variant: true,
+					},
 				},
 			},
-		},
-		orderBy: desc(orders.closedAt),
-		limit: 100,
-	});
+			orderBy: desc(orders.closedAt),
+			limit: LIMIT_PER_VARIANT,
+		}),
+	);
+
+	const variantResults = await Promise.all(variantQueries);
+	const closedOrders = variantResults
+		.flat()
+		.sort(
+			(a, b) =>
+				(b.closedAt?.getTime() ?? 0) - (a.closedAt?.getTime() ?? 0),
+		);
 
 	return closedOrders.map((order) => {
 		const openedAt = order.openedAt;
@@ -168,6 +193,7 @@ export async function fetchTrades(): Promise<TradeRecord[]> {
 			modelId: order.modelId,
 			modelName: order.model?.name ?? "Unknown",
 			modelRouterName: order.model?.openRouterModelName ?? null,
+			modelVariant: order.model?.variant ?? "OG",
 			symbol: order.symbol,
 			side: order.side,
 			quantity,
@@ -245,6 +271,7 @@ export async function fetchPositions() {
 				id: models.id,
 				name: models.name,
 				modelLogo: models.openRouterModelName,
+				variant: models.variant,
 				lighterApiKey: models.lighterApiKey,
 				accountIndex: models.accountIndex,
 				invocationCount: models.invocationCount,
@@ -379,6 +406,7 @@ export async function fetchPositions() {
 							modelId: model.id,
 							modelName: model.name,
 							modelLogo: model.modelLogo,
+							modelVariant: model.variant,
 							positions: enrichedPositions,
 							totalUnrealizedPnl: snapshot.totalUnrealizedPnl,
 							availableCash: snapshot.availableCash,
@@ -453,6 +481,7 @@ export async function fetchPositions() {
 					modelId: model.id,
 					modelName: model.name,
 					modelLogo: model.modelLogo,
+					modelVariant: model.variant,
 					positions: enrichedPositions,
 					totalUnrealizedPnl,
 					availableCash,
@@ -463,6 +492,7 @@ export async function fetchPositions() {
 					modelId: model.id,
 					modelName: model.name,
 					modelLogo: model.modelLogo,
+					modelVariant: model.variant,
 					positions: [],
 					totalUnrealizedPnl: 0,
 					availableCash: DEFAULT_SIMULATOR_OPTIONS.initialCapital,
@@ -500,6 +530,7 @@ export async function fetchPortfolioHistory() {
 			model: {
 				columns: {
 					name: true,
+					variant: true,
 					openRouterModelName: true,
 				},
 			},
@@ -515,6 +546,7 @@ export async function fetchPortfolioHistory() {
 		updatedAt: entry.updatedAt.toISOString(),
 		model: {
 			name: entry.model?.name ?? "Unknown Model",
+			variant: entry.model?.variant ?? undefined,
 			openRouterModelName: entry.model?.openRouterModelName ?? "unknown-model",
 		},
 	}));

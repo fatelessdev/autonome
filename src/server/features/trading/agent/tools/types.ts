@@ -12,6 +12,11 @@ import type {
 import type { EnrichedOpenPosition } from "@/server/features/trading/openPositionEnrichment";
 import type { TradingDecisionWithContext } from "@/server/features/trading/tradingDecisions";
 
+// TODO: Re-enable symbol action limits later
+// /** Maximum actions (create/close) per symbol per session */
+// export const MAX_ACTIONS_PER_SYMBOL = 2;
+export const MAX_ACTIONS_PER_SYMBOL = Infinity;
+
 /**
  * Shared context passed to all tools during a trading session.
  * Contains account info, invocation tracking, and mutable state.
@@ -31,6 +36,12 @@ export interface ToolContext {
 
 	/** Symbols already acted on this session (prevents duplicate actions) */
 	actedSymbols: Set<string>;
+
+	/**
+	 * Per-symbol action counts for session limits.
+	 * Tracks number of create/close actions per symbol.
+	 */
+	symbolActionCounts: Map<string, number>;
 
 	/** Captured decisions for invocation payload */
 	capturedDecisions: InvocationDecisionSummary[];

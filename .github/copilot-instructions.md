@@ -27,9 +27,9 @@ pnpx shadcn@latest add X   # Add UI component
 
 ## Architecture
 
-**Data Flow**: Client → `orpc.*.*.queryOptions()` → [src/server/orpc/router](src/server/orpc/router) → [src/server/features](src/server/features) → DB
+**Data Flow**: Client → `orpc.*.*.queryOptions()` → [src/server/orpc/router](../src/server/orpc/router) → [src/server/features](../src/server/features) → DB
 
-**Real-time**: SSE via [src/server/events/workflowEvents.ts](src/server/events/workflowEvents.ts) → `emitAllDataChanged(modelId)` → clients invalidate TanStack Query
+**Real-time**: SSE via [src/server/events/workflowEvents.ts](../src/server/events/workflowEvents.ts) → `emitAllDataChanged(modelId)` → clients invalidate TanStack Query
 
 **Trading**: Orders table = single source of truth (OPEN=positions, CLOSED=trades). Simulator rehydrates from DB on bootstrap.
 
@@ -70,15 +70,15 @@ const { data } = useQuery(orpc.trading.getPositions.queryOptions({ input: {} }))
 
 | Purpose | Location |
 |---------|----------|
-| oRPC router | [src/server/orpc/router/index.ts](src/server/orpc/router/index.ts) |
-| DB schema | [src/db/schema.ts](src/db/schema.ts) |
-| SSE events | [src/server/events/workflowEvents.ts](src/server/events/workflowEvents.ts) |
-| Environment | [src/env.ts](src/env.ts) |
-| Trading logic | [src/server/features/trading](src/server/features/trading) |
-| Simulator | [src/server/features/simulator](src/server/features/simulator) |
-| Trading calculations | [src/core/shared/trading/calculations.ts](src/core/shared/trading/calculations.ts) |
-| Analytics | [src/server/features/analytics](src/server/features/analytics) |
-| Scheduler bootstrap | [src/server/schedulers/bootstrap.ts](src/server/schedulers/bootstrap.ts) |
+| oRPC router | [src/server/orpc/router/index.ts](../src/server/orpc/router/index.ts) |
+| DB schema | [src/db/schema.ts](../src/db/schema.ts) |
+| SSE events | [src/server/events/workflowEvents.ts](../src/server/events/workflowEvents.ts) |
+| Environment | [src/env.ts](../src/env.ts) |
+| Trading logic | [src/server/features/trading](../src/server/features/trading) |
+| Simulator | [src/server/features/simulator](../src/server/features/simulator) |
+| Trading calculations | [src/core/shared/trading/calculations.ts](../src/core/shared/trading/calculations.ts) |
+| Analytics | [src/server/features/analytics](../src/server/features/analytics) |
+| Scheduler bootstrap | [src/server/schedulers/bootstrap.ts](../src/server/schedulers/bootstrap.ts) |
 
 ## Shared Utilities
 
@@ -94,6 +94,12 @@ const { data } = useQuery(orpc.trading.getPositions.queryOptions({ input: {} }))
 - Use `globalThis` variables for singleton state (survives HMR)
 - `bootstrap.ts` guards with `globalThis.__autonomeSchedulersBootstrapped`
 - Called from both `instrument.server.mjs` and `__root.tsx` (guards prevent duplicates)
+
+## Session Notes
+
+- Shared market price fetching now exposed via `useMarketPrices` (in `marketQueries`); reuse instead of duplicating queries.
+- Failures analytics are variant-filterable end-to-end (oRPC `getFailures` accepts `variant`).
+- Dashboard UX: crypto tracker has desktop dropdown + mobile pill selector; performance graph shows active variant badge and hides filters on mobile.
 
 ## Code Style (Biome)
 

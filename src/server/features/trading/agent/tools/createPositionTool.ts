@@ -12,7 +12,7 @@ import { createPosition } from "@/server/features/trading/createPosition";
 import { MARKETS } from "@/shared/markets/marketMetadata";
 
 import { decisionSchema, type NormalizedDecision } from "../schemas";
-import type { ToolContext } from "./types";
+import { MAX_ACTIONS_PER_SYMBOL, type ToolContext } from "./types";
 
 /**
  * Creates the createPosition tool with the given context
@@ -44,15 +44,23 @@ export function createPositionTool(ctx: ToolContext) {
 			const normalized: NormalizedDecision[] = [];
 			const seenSymbols = new Set<string>();
 			const skippedDuplicates: string[] = [];
+			const skippedLimitReached: string[] = [];
 
 			for (const entry of [...modern]) {
 				const symbol = entry.symbol;
 
-				// Check if already acted on this symbol this session
+				// Check if already acted on this symbol this session (duplicate in same invocation)
 				if (ctx.actedSymbols.has(symbol)) {
 					skippedDuplicates.push(symbol);
 					continue;
 				}
+
+				// TODO: Re-enable per-symbol session limits later
+				// const currentCount = ctx.symbolActionCounts.get(symbol) ?? 0;
+				// if (currentCount >= MAX_ACTIONS_PER_SYMBOL) {
+				// 	skippedLimitReached.push(symbol);
+				// 	continue;
+				// }
 
 				const sideRaw =
 					typeof entry.side === "string" ? entry.side.toUpperCase() : "HOLD";
@@ -76,9 +84,18 @@ export function createPositionTool(ctx: ToolContext) {
 				});
 			}
 
-			// Return early if all symbols were duplicates
-			if (normalized.length === 0 && skippedDuplicates.length > 0) {
-				return `Already acted on ${skippedDuplicates.join(", ")} this session. Call 'holding' if done.`;
+			// Return early if all symbols were duplicates or hit limits
+			if (normalized.length === 0) {
+				const messages: string[] = [];
+				if (skippedDuplicates.length > 0) {
+					messages.push(`Already acted on ${skippedDuplicates.join(", ")} this invocation`);
+				}
+				if (skippedLimitReached.length > 0) {
+					messages.push(`Session limit (${MAX_ACTIONS_PER_SYMBOL}) reached for ${skippedLimitReached.join(", ")}`);
+				}
+				return messages.length > 0
+					? `${messages.join(". ")}. Call 'holding' if done.`
+					: "No valid positions to create.";
 			}
 
 			const results = await createPosition(ctx.account, normalized);
@@ -86,9 +103,11 @@ export function createPositionTool(ctx: ToolContext) {
 			const successful = results.filter((r) => r.success);
 			const failed = results.filter((r) => !r.success);
 
-			// Mark successful symbols as acted
+			// Mark successful symbols as acted and increment counts
 			for (const result of successful) {
 				ctx.actedSymbols.add(result.symbol);
+				const current = ctx.symbolActionCounts.get(result.symbol) ?? 0;
+				ctx.symbolActionCounts.set(result.symbol, current + 1);
 			}
 
 			// Capture decisions for telemetry
@@ -154,7 +173,10 @@ export function createPositionTool(ctx: ToolContext) {
 					.join(", ")}. `;
 			}
 			if (skippedDuplicates.length > 0) {
-				response += `Skipped (already acted): ${skippedDuplicates.join(", ")}.`;
+				response += `Skipped (already acted): ${skippedDuplicates.join(", ")}. `;
+			}
+			if (skippedLimitReached.length > 0) {
+				response += `Skipped (session limit): ${skippedLimitReached.join(", ")}.`;
 			}
 
 			return response || "No positions were created";

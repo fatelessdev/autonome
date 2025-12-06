@@ -20,12 +20,15 @@ export const orderStatusEnum = pgEnum("OrderStatus", ["OPEN", "CLOSED"]);
 
 export const orderSideEnum = pgEnum("OrderSide", ["LONG", "SHORT"]);
 
+export const variantEnum = pgEnum("Variant", ["OG", "Minimal", "Verbose", "AGI"]);
+
 export const models = pgTable(
 	"Models",
 	{
 		id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
 		name: text("name").notNull(),
 		openRouterModelName: text("openRouterModelName").notNull(),
+		variant: variantEnum("variant").notNull().default("OG"),
 		lighterApiKey: text("lighterApiKey").notNull().default("0"),
 		invocationCount: integer("invocationCount").notNull().default(0),
 		totalMinutes: integer("totalMinutes").notNull().default(0),
@@ -35,7 +38,8 @@ export const models = pgTable(
 	},
 	(table) => ({
 		nameIdx: index("Models_name_idx").on(table.name),
-		nameUnique: uniqueIndex("Models_name_key").on(table.name),
+		// Unique on name + variant so each model can have 4 variants
+		nameVariantUnique: uniqueIndex("Models_name_variant_key").on(table.name, table.variant),
 	}),
 );
 
@@ -219,3 +223,12 @@ export const OrderSide = {
 } as const;
 
 export type OrderSide = (typeof orderSideEnum.enumValues)[number];
+
+export const Variant = {
+	OG: variantEnum.enumValues[0],
+	Minimal: variantEnum.enumValues[1],
+	Verbose: variantEnum.enumValues[2],
+	AGI: variantEnum.enumValues[3],
+} as const;
+
+export type Variant = (typeof variantEnum.enumValues)[number];

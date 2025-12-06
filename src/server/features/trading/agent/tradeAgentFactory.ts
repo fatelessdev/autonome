@@ -9,12 +9,14 @@ import { Output, ToolLoopAgent, stepCountIs, hasToolCall } from "ai";
 import * as Sentry from "@sentry/react";
 
 import { env } from "@/env";
+import { SUPPORTED_MARKETS } from "@/core/shared/markets/marketMetadata";
 import type { Account } from "@/server/features/trading/accounts";
 import type { StepTelemetry } from "@/server/features/trading/invocationResponse";
 import { getModelProvider } from "@/shared/models/modelConfig";
 
 import { agentOutputSchema, callOptionsSchema } from "./schemas";
 import { createTradingTools, type ToolContext } from "./tools";
+import { MAX_ACTIONS_PER_SYMBOL } from "./tools/types";
 
 /**
  * Configuration for creating a trade agent
@@ -28,13 +30,19 @@ export interface TradeAgentConfig {
 	toolContext: ToolContext;
 	/** Callback for capturing step telemetry */
 	onStepTelemetry?: (telemetry: StepTelemetry) => void;
+	/**
+	 * Callback to rebuild the user prompt with fresh data.
+	 * Called before each step after the first to ensure the agent
+	 * sees current portfolio state (cash, exposure, positions).
+	 */
+	rebuildUserPrompt?: () => Promise<string>;
 }
 
 /**
  * Creates a configured ToolLoopAgent for trading
  */
 export function createTradeAgent(config: TradeAgentConfig) {
-	const { account, systemPrompt, toolContext, onStepTelemetry } = config;
+	const { account, systemPrompt, toolContext, onStepTelemetry, rebuildUserPrompt } = config;
 
 	// Initialize providers
 	const nim = createOpenAICompatible({
@@ -107,6 +115,58 @@ export function createTradeAgent(config: TradeAgentConfig) {
 				},
 			};
 		},
+		// Re-fetch portfolio data and update the user prompt before each step
+		// This ensures the agent sees current cash/exposure/positions after tool calls
+		// prepareStep: async ({ stepNumber, messages }) => {
+		// 	// TODO: Re-enable symbol limit tool restriction later
+		// 	// Check if all symbols have hit their per-session action limit
+		// 	// If so, restrict to only holding and updateExitPlan tools
+		// 	// const allSymbolsAtLimit = SUPPORTED_MARKETS.every((symbol) => {
+		// 	// 	const count = toolContext.symbolActionCounts.get(symbol) ?? 0;
+		// 	// 	return count >= MAX_ACTIONS_PER_SYMBOL;
+		// 	// });
+
+		// 	// Base result with potential tool restrictions
+		// 	const baseResult: {
+		// 		messages?: typeof messages;
+		// 		activeTools?: string[];
+		// 	} = {};
+
+		// 	// if (allSymbolsAtLimit) {
+		// 	// 	// Only allow holding and updateExitPlan when all symbols are at limit
+		// 	// 	baseResult.activeTools = ["holding", "updateExitPlan"];
+		// 	// }
+
+		// 	// Only rebuild prompt after the first step (when there have been tool calls)
+		// 	if (stepNumber === 0 || !rebuildUserPrompt) {
+		// 		return baseResult;
+		// 	}
+
+		// 	try {
+		// 		const freshUserPrompt = await rebuildUserPrompt();
+
+		// 		// Find and update the last user message with fresh data
+		// 		// We need to rebuild the messages array with the updated prompt
+		// 		const updatedMessages = messages.map((msg, index) => {
+		// 			// Find the first user message (initial prompt) and update it
+		// 			if (msg.role === "user" && index === 0) {
+		// 				return {
+		// 					...msg,
+		// 					content: freshUserPrompt,
+		// 				};
+		// 			}
+		// 			return msg;
+		// 		});
+
+		// 		return { ...baseResult, messages: updatedMessages };
+		// 	} catch (error) {
+		// 		console.warn(
+		// 			`[TradeAgent] Failed to refresh prompt for step ${stepNumber}:`,
+		// 			error,
+		// 		);
+		// 		return baseResult;
+		// 	}
+		// },
 		// Per-step telemetry for cost tracking and debugging
 		onStepFinish: ({ toolCalls, usage }) => {
 			currentStepNumber++;

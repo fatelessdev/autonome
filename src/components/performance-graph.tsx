@@ -4,7 +4,8 @@ import ModelLegend from "@/components/model-legend";
 import type { ChartConfig } from "@/components/ui/chart";
 import { GlowingLineChart } from "@/components/ui/glowing-line";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PORTFOLIO_QUERIES } from "@/core/shared/markets/marketQueries";
+import { useVariant } from "@/components/variant-context";
+import { PORTFOLIO_QUERIES, type PortfolioHistoryEntry } from "@/core/shared/markets/marketQueries";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { getModelInfo } from "@/shared/models/modelConfig";
 
@@ -24,22 +25,32 @@ export default function PerformanceGraph() {
 		defaultValue: false,
 	});
 
+	const { selectedVariant } = useVariant();
+
 	const {
 		data: portfolioData,
 		isPending,
 		isError,
 	} = useQuery(PORTFOLIO_QUERIES.history());
 
+	// Filter by variant when not "all"
+	const filteredPortfolioData = useMemo(() => {
+		if (!portfolioData || selectedVariant === "all") return portfolioData;
+		return portfolioData.filter((entry: PortfolioHistoryEntry) => entry.model?.variant === selectedVariant);
+	}, [portfolioData, selectedVariant]);
+
 	const { chartData, chartConfig, seriesMeta } = useMemo(() => {
-		if (!portfolioData || portfolioData.length === 0) {
+		if (!filteredPortfolioData || filteredPortfolioData.length === 0) {
 			return {
 				chartData: [] as DataPoint[],
 				chartConfig: {} as ChartConfig,
 				seriesMeta: {} as SeriesMeta,
 			};
 		}
-		return buildChartArtifacts(portfolioData);
-	}, [portfolioData]);
+		// Average values across variants when showing all variants (aggregate mode)
+		const shouldAverage = selectedVariant === "all";
+		return buildChartArtifacts(filteredPortfolioData, shouldAverage);
+	}, [filteredPortfolioData, selectedVariant]);
 
 	const filteredData = useMemo(
 		() => filterByTime(chartData, timeFilter),
@@ -124,8 +135,9 @@ function buildChartArtifacts(
 		modelId: string;
 		netPortfolio: string;
 		createdAt: string;
-		model: { name: string };
+		model: { name: string; variant?: string };
 	}>,
+	shouldAverage = false,
 ): {
 	chartData: DataPoint[];
 	chartConfig: ChartConfig;
@@ -135,6 +147,7 @@ function buildChartArtifacts(
 		.map((entry) => ({
 			t: new Date(entry.createdAt).getTime(),
 			name: entry.model.name,
+			modelId: entry.modelId,
 			v: Number(entry.netPortfolio),
 		}))
 		.filter((point) => Number.isFinite(point.v))
@@ -162,11 +175,12 @@ function buildChartArtifacts(
 	const rows: DataPoint[] = [];
 	let bucketStart = points[0].t;
 	let bucketEnd = points[0].t;
-	let bucketRows: Record<string, number> = {};
+	// Track multiple values per series for averaging
+	let bucketValues: Record<string, { values: number[]; modelIds: Set<string> }> = {};
 	const lastKnown: Record<string, number | null | undefined> = {};
 
 	const flush = () => {
-		if (!Object.keys(bucketRows).length) {
+		if (!Object.keys(bucketValues).length) {
 			return;
 		}
 
@@ -179,7 +193,19 @@ function buildChartArtifacts(
 		const row: DataPoint = { month: timestamp, timestamp: center };
 
 		for (const [_originalName, safeKey] of nameToSeriesKey.entries()) {
-			const value = bucketRows[safeKey];
+			const bucket = bucketValues[safeKey];
+			let value: number | null = null;
+			
+			if (bucket && bucket.values.length > 0) {
+				if (shouldAverage && bucket.values.length > 1) {
+					// Average across all variants for this model
+					value = bucket.values.reduce((sum, v) => sum + v, 0) / bucket.values.length;
+				} else {
+					// Use the last value (original behavior for single variant mode)
+					value = bucket.values[bucket.values.length - 1];
+				}
+			}
+			
 			if (typeof value === "number" && Number.isFinite(value)) {
 				row[safeKey] = value;
 				lastKnown[safeKey] = value;
@@ -191,7 +217,7 @@ function buildChartArtifacts(
 		}
 
 		rows.push(row);
-		bucketRows = {};
+		bucketValues = {};
 	};
 
 	for (const point of points) {
@@ -203,7 +229,23 @@ function buildChartArtifacts(
 		bucketEnd = Math.max(bucketEnd, point.t);
 		const safeKey = nameToSeriesKey.get(point.name);
 		if (!safeKey) continue;
-		bucketRows[safeKey] = point.v;
+		
+		// Collect all values per model name for averaging
+		if (!bucketValues[safeKey]) {
+			bucketValues[safeKey] = { values: [], modelIds: new Set() };
+		}
+		// Only add value if we haven't seen this modelId in this bucket yet
+		// This ensures we don't double-count the same variant
+		if (!bucketValues[safeKey].modelIds.has(point.modelId)) {
+			bucketValues[safeKey].values.push(point.v);
+			bucketValues[safeKey].modelIds.add(point.modelId);
+		} else {
+			// Update the value for this modelId (take the latest)
+			const idx = Array.from(bucketValues[safeKey].modelIds).indexOf(point.modelId);
+			if (idx >= 0) {
+				bucketValues[safeKey].values[idx] = point.v;
+			}
+		}
 	}
 	flush();
 

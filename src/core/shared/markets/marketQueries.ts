@@ -1,4 +1,4 @@
-import { type QueryClient, queryOptions } from "@tanstack/react-query";
+import { type QueryClient, queryOptions, useQuery } from "@tanstack/react-query";
 
 import { orpc } from "@/server/orpc/client";
 import { SUPPORTED_MARKETS } from "./marketMetadata";
@@ -27,6 +27,7 @@ export type PortfolioHistoryEntry = {
 	updatedAt: string;
 	model: {
 		name: string;
+		variant?: "OG" | "Minimal" | "Verbose" | "AGI";
 		openRouterModelName: string;
 	};
 };
@@ -187,6 +188,10 @@ function normalizePortfolioHistory(
 			}
 
 			const modelRecord = model as Record<string, unknown>;
+			const variant = typeof modelRecord.variant === "string" &&
+				["OG", "Minimal", "Verbose", "AGI"].includes(modelRecord.variant)
+				? (modelRecord.variant as "OG" | "Minimal" | "Verbose" | "AGI")
+				: undefined;
 			return {
 				id,
 				modelId,
@@ -198,6 +203,7 @@ function normalizePortfolioHistory(
 						typeof modelRecord.name === "string"
 							? modelRecord.name
 							: "Unknown Model",
+					variant,
 					openRouterModelName:
 						typeof modelRecord.openRouterModelName === "string"
 							? modelRecord.openRouterModelName
@@ -215,6 +221,7 @@ async function requestPortfolioHistory() {
 		...entry,
 		model: {
 			name: entry.model?.name || "Unknown Model",
+			variant: entry.model?.variant || undefined,
 			openRouterModelName: entry.model?.openRouterModelName || "unknown-model",
 		},
 	}));
@@ -247,7 +254,71 @@ export const MARKET_QUERIES = {
 	prefetchPrices: prefetchMarketPrices,
 };
 
+export function useMarketPrices(symbols: readonly MarketSymbol[] = SUPPORTED_MARKETS) {
+	return useQuery(marketPricesQueryOptions(symbols));
+}
+
 export const PORTFOLIO_QUERIES = {
 	history: portfolioHistoryQueryOptions,
 	prefetchHistory: prefetchPortfolioHistory,
+};
+
+// ==================== Variant History ====================
+
+export type VariantHistoryPoint = {
+	timestamp: string;
+	value: number;
+};
+
+export type VariantHistoryEntry = {
+	variantId: "OG" | "Minimal" | "Verbose" | "AGI";
+	label: string;
+	color: string;
+	history: VariantHistoryPoint[];
+};
+
+export type VariantHistoryResponse = {
+	variants: VariantHistoryEntry[];
+	aggregate: VariantHistoryPoint[];
+};
+
+const VARIANT_QUERY_KEYS = {
+	history: (window: "24h" | "7d" | "30d") =>
+		["portfolio", "variant-history", window] as const,
+	stats: () => ["variants", "stats"] as const,
+} as const;
+
+async function requestVariantHistory(window: "24h" | "7d" | "30d") {
+	const data = await orpc.variants.getVariantHistory.call({ window });
+	return data as VariantHistoryResponse;
+}
+
+export const variantHistoryQueryOptions = (
+	window: "24h" | "7d" | "30d" = "7d",
+) =>
+	queryOptions({
+		queryKey: VARIANT_QUERY_KEYS.history(window),
+		queryFn: () => requestVariantHistory(window),
+		staleTime: 3 * 60_000,
+		gcTime: 15 * 60_000,
+		refetchInterval: 3 * 60_000,
+	});
+
+async function requestVariantStats() {
+	const data = await orpc.variants.getVariantStats.call({});
+	return data.stats;
+}
+
+export const variantStatsQueryOptions = () =>
+	queryOptions({
+		queryKey: VARIANT_QUERY_KEYS.stats(),
+		queryFn: requestVariantStats,
+		staleTime: 3 * 60_000,
+		gcTime: 15 * 60_000,
+		refetchInterval: 3 * 60_000,
+	});
+
+export const VARIANT_QUERIES = {
+	history: variantHistoryQueryOptions,
+	stats: variantStatsQueryOptions,
 };

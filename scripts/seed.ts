@@ -6,6 +6,7 @@
  * This script will:
  * 1. Truncate all tables (cascade)
  * 2. Insert the predefined AI models into the Models table
+ *    - Each model gets 4 rows, one per variant (OG, Minimal, Verbose, AGI)
  */
 
 import { config } from "dotenv";
@@ -29,24 +30,19 @@ if (!DATABASE_URL) {
 const pool = new Pool({ connectionString: DATABASE_URL });
 const db = drizzle(pool);
 
-// Model definitions - openRouterModelName -> name extraction
+// All variants to create for each model
+const VARIANTS = ["OG", "Minimal", "Verbose", "AGI"] as const;
+
+// Model definitions - openRouterModelName
 const MODEL_DEFINITIONS = [
 	"deepseek-ai/deepseek-r1-0528",
-	"kwaipilot/kat-coder-pro:free",
 	"deepseek-ai/deepseek-v3.1-terminus",
 	"openai/gpt-oss-120b",
 	"minimaxai/minimax-m2",
 	"moonshotai/kimi-k2-instruct-0905",
 	"qwen/qwen3-next-80b-a3b-thinking",
 	"qwen/qwen3-235b-a22b",
-	"z-ai/glm-4.5-air:free",
 ];
-
-// Special model for consensus orchestrator (uses voting across multiple models)
-const CONSENSUS_MODEL = {
-	name: "consensus-orchestrator",
-	openRouterModelName: "consensus/multi-model-voting",
-};
 
 /**
  * Extract display name from openRouterModelName
@@ -76,58 +72,43 @@ async function seed() {
 
 		console.log("✅ All tables truncated\n");
 
-		// Step 2: Insert models
+		// Step 2: Insert models (one row per model-variant combination)
 		console.log("📦 Inserting models...");
 
+		let totalInserted = 0;
 		for (const openRouterModelName of MODEL_DEFINITIONS) {
 			const name = extractModelName(openRouterModelName);
 
-			await db.execute(sql`
-				INSERT INTO "Models" (
-					"id",
-					"name",
-					"openRouterModelName",
-					"lighterApiKey",
-					"invocationCount",
-					"totalMinutes",
-					"accountIndex"
-				) VALUES (
-					${crypto.randomUUID()},
-					${name},
-					${openRouterModelName},
-					'0',
-					0,
-					0,
-					'0'
-				)
-			`);
+			for (const variant of VARIANTS) {
+				await db.execute(sql`
+					INSERT INTO "Models" (
+						"id",
+						"name",
+						"openRouterModelName",
+						"variant",
+						"lighterApiKey",
+						"invocationCount",
+						"totalMinutes",
+						"accountIndex"
+					) VALUES (
+						${crypto.randomUUID()},
+						${name},
+						${openRouterModelName},
+						${variant},
+						'0',
+						0,
+						0,
+						'0'
+					)
+				`);
 
-			console.log(`  ✓ Added: ${name} (${openRouterModelName})`);
+				console.log(`  ✓ Added: ${name} (${variant})`);
+				totalInserted++;
+			}
 		}
 
-		// Insert consensus orchestrator model
-		// await db.execute(sql`
-		// 	INSERT INTO "Models" (
-		// 		"id",
-		// 		"name",
-		// 		"openRouterModelName",
-		// 		"lighterApiKey",
-		// 		"invocationCount",
-		// 		"totalMinutes",
-		// 		"accountIndex"
-		// 	) VALUES (
-		// 		${crypto.randomUUID()},
-		// 		${CONSENSUS_MODEL.name},
-		// 		${CONSENSUS_MODEL.openRouterModelName},
-		// 		'0',
-		// 		0,
-		// 		0,
-		// 		'0'
-		// 	)
-		// `);
-		// console.log(`  ✓ Added: ${CONSENSUS_MODEL.name} (multi-model voting orchestrator)`);
-
-		console.log(`\n✅ Successfully seeded ${MODEL_DEFINITIONS.length + 1} models (including consensus)`);
+		console.log(`\n✅ Successfully seeded ${totalInserted} model-variant combinations`);
+		console.log(`   (${MODEL_DEFINITIONS.length} models × ${VARIANTS.length} variants)`);
 	} catch (error) {
 		console.error("❌ Seed failed:", error);
 		process.exit(1);

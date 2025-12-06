@@ -1,5 +1,4 @@
-// Risk settings (adjust for account size)
-const INITIAL_CAPITAL = 10000; // For display only
+// Risk settings
 const MIN_CASH_BUFFER = 300; // $300 minimum cash reserve
 const RISK_PER_TRADE_PCT = 0.03; // 3% of portfolio per trade
 
@@ -29,7 +28,7 @@ C. **OPTIMIZE?** Tighten stops via updateExitPlan (never widen risk)
 **STEP 2: SCAN FOR NEW TRADES**
 Only if cash > $${MIN_CASH_BUFFER} AND exposure < 300%:
 - Look for RSI extremes, MACD momentum, EMA alignment, funding profiles
-- Risk ${RISK_PER_TRADE_PCT * 100}% per trade ($${(INITIAL_CAPITAL * RISK_PER_TRADE_PCT).toFixed(0)})
+- Risk ${RISK_PER_TRADE_PCT * 100}% per trade (calculate from portfolio_value in PERFORMANCE section)
 - Batch multiple decisions in single createPosition call
 
 **STEP 3: DEFAULT TO HOLD**
@@ -64,7 +63,7 @@ Cash: {{AVAILABLE_CASH}} | Exposure: {{EXPOSURE_TO_EQUITY_PCT}}%
 
 == PERFORMANCE ==
 {{PERFORMANCE_OVERVIEW}}
-
+p
 Analyze the data above and take action.`;
 
 /**

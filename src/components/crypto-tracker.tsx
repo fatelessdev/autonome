@@ -1,12 +1,11 @@
 import NumberFlow from "@number-flow/react";
-import { useQuery } from "@tanstack/react-query";
-import React, { useMemo, useRef } from "react";
+import { useMemo, useRef } from "react";
+
 import { Skeleton } from "@/components/ui/skeleton";
+import { VariantSelector } from "@/components/variant-selector";
+import { useVariant } from "@/components/variant-context";
 import { SUPPORTED_MARKETS } from "@/core/shared/markets/marketMetadata";
-import {
-	MARKET_QUERIES,
-	type MarketPrice,
-} from "@/core/shared/markets/marketQueries";
+import { useMarketPrices, type MarketPrice } from "@/core/shared/markets/marketQueries";
 
 const TRACKED_SYMBOLS = SUPPORTED_MARKETS;
 const TRACKED_SYMBOL_SET = new Set(TRACKED_SYMBOLS);
@@ -33,13 +32,14 @@ const COIN_STYLES: Record<
 
 export default function CryptoTracker() {
 	const previousTickersRef = useRef<CryptoTicker[]>([]);
+	const { selectedVariant, setSelectedVariant } = useVariant();
 
 	const {
 		data: marketPrices,
 		isPending,
 		isRefetching,
 		isError,
-	} = useQuery(MARKET_QUERIES.prices(TRACKED_SYMBOLS));
+	} = useMarketPrices(TRACKED_SYMBOLS);
 
 	const sanitizedPrices = useMemo(() => {
 		if (!marketPrices) return null;
@@ -86,24 +86,30 @@ export default function CryptoTracker() {
 	const shouldShowError = isError && !isPending && displayTickers.length === 0;
 
 	return (
-		<div className="flex items-center border-b py-[5px] px-4 sm:px-6 overflow-hidden">
-			{shouldShowSkeleton ? (
-				<TickerSkeleton />
-			) : shouldShowError ? (
-				<p className="text-center text-muted-foreground text-sm">
-					Unable to load market prices. Retrying shortly...
-				</p>
-			) : displayTickers.length === 0 ? (
-				<p className="text-center text-muted-foreground text-sm">
-					Fetching market prices...
-				</p>
-			) : (
-				<div className="flex w-full items-center justify-between sm:justify-start sm:gap-4 overflow-hidden">
-					{displayTickers.map((ticker, index) => {
-						const style = COIN_STYLES[ticker.symbol];
-						return (
-							<React.Fragment key={ticker.symbol}>
-								<div className="flex min-w-0 flex-1 flex-col items-center sm:min-w-[140px] sm:gap-1">
+		<div className="border-b px-4 py-2 sm:px-6 sm:py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+			<div
+				className="flex items-center gap-2 sm:gap-4 overflow-x-auto flex-nowrap scrollbar-hide"
+				style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+			>
+				{shouldShowSkeleton ? (
+					<TickerSkeleton />
+				) : shouldShowError ? (
+					<p className="text-muted-foreground text-sm">
+						Unable to load market prices. Retrying shortly...
+					</p>
+				) : displayTickers.length === 0 ? (
+					<p className="text-muted-foreground text-sm">
+						Fetching market prices...
+					</p>
+				) : (
+					<div className="flex items-center gap-2 sm:gap-4 flex-nowrap">
+						{displayTickers.map((ticker) => {
+							const style = COIN_STYLES[ticker.symbol];
+							return (
+								<div
+									key={ticker.symbol}
+									className="flex min-w-[82px] flex-col items-center gap-1 sm:min-w-[140px] sm:gap-1.5"
+								>
 									<div className="flex items-center gap-1 sm:gap-2">
 										<img
 											src={style.logo}
@@ -111,9 +117,9 @@ export default function CryptoTracker() {
 											width={16}
 											height={16}
 											loading="lazy"
-											className="flex-shrink-0"
+											className="flex-shrink-0 h-4"
 										/>
-										<div className="text-muted-foreground text-xs sm:text-sm">
+										<div className="text-muted-foreground text-[9px] sm:text-sm font-semibold">
 											{style.badge}
 										</div>
 									</div>
@@ -121,17 +127,21 @@ export default function CryptoTracker() {
 										value={ticker.price}
 										change={ticker.change24h}
 										decimals={style.decimals}
-										source={ticker.source}
 									/>
 								</div>
-								{index !== displayTickers.length - 1 ? (
-									<div className="hidden h-10 w-px bg-border sm:block" />
-								) : null}
-							</React.Fragment>
-						);
-					})}
-				</div>
-			)}
+							);
+						})}
+					</div>
+				)}
+			</div>
+			{/* Desktop only - variant selector on the right */}
+			<div className="hidden sm:flex sm:items-center sm:justify-center">
+				<VariantSelector
+					layout="desktop"
+					value={selectedVariant}
+					onChange={setSelectedVariant}
+				/>
+			</div>
 		</div>
 	);
 }
@@ -140,12 +150,10 @@ function PriceWithChange({
 	value,
 	change,
 	decimals,
-	source,
 }: {
 	value: number;
 	change: number | null;
 	decimals: number;
-	source: MarketPrice["source"];
 }) {
 	const hasValidPrice = Number.isFinite(value);
 	const formattedChange =
@@ -156,7 +164,7 @@ function PriceWithChange({
 			{hasValidPrice ? (
 				<NumberFlow
 					value={value}
-					className="font-mono text-xs font-semibold sm:text-sm truncate"
+					className="font-mono text-[8px] font-semibold sm:text-sm truncate"
 					format={{
 						style: "currency",
 						currency: "USD",
@@ -182,7 +190,6 @@ function PriceWithChange({
 						? "–"
 						: `${formattedChange >= 0 ? "+" : ""}${formattedChange.toFixed(2)}%`} */}
 				</span>
-				{/* <span className="text-muted-foreground">· {source}</span> */}
 			</div>
 		</div>
 	);
@@ -197,7 +204,7 @@ function sanitizePrices(prices: MarketPrice[]): MarketPrice[] {
 
 function TickerSkeleton() {
 	return (
-		<div className="flex w-full flex-wrap items-center justify-center gap-2.5 sm:justify-start sm:gap-4">
+		<div className="flex w-full flex-wrap items-center justify-start gap-2.5 sm:gap-4">
 			{TRACKED_SYMBOLS.map((symbol) => (
 				<div
 					key={symbol}

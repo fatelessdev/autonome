@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight, Loader2, AlertTriangle, Clock, Zap, DollarSign } from "lucide-react";
 
+import { VariantSelector } from "@/components/variant-selector";
+import { useVariant, type VariantId } from "@/components/variant-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +14,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
 	Collapsible,
 	CollapsibleContent,
@@ -28,11 +31,13 @@ import {
 import { cn } from "@/core/lib/utils";
 import { getModelInfo } from "@/core/shared/models/modelConfig";
 import { orpc } from "@/server/orpc/client";
-import type { FailureEntry, StepTelemetry } from "@/server/features/analytics/types";
+import type { FailureEntry } from "@/server/features/analytics/types";
 
 export const Route = createFileRoute("/failures")({
 	component: FailuresRoute,
 });
+
+type VariantFilter = VariantId;
 
 const formatDate = (date: Date) =>
 	new Intl.DateTimeFormat("en-US", {
@@ -356,27 +361,99 @@ function FailureCard({ failure }: { failure: FailureEntry }) {
 }
 
 function FailuresRoute() {
+	const [showTotal, setShowTotal] = useState(false);
+	const { selectedVariant, setSelectedVariant } = useVariant();
 	const { data, isLoading, error } = useQuery(
 		orpc.analytics.getFailures.queryOptions({
-			input: { limit: 50 },
+			input: { limit: 50, variant: selectedVariant as VariantFilter },
 		}),
 	);
 
+	// Reset showTotal when switching away from aggregate view
+	useEffect(() => {
+		if (selectedVariant !== "all" && showTotal) {
+			setShowTotal(false);
+		}
+	}, [selectedVariant, showTotal]);
+
+	// Calculate totaled stats when "Total" is checked
+	const displayModelStats = useMemo(() => {
+		if (!data?.modelStats) return [];
+		if (selectedVariant !== "all" || !showTotal) return data.modelStats;
+
+		// Group by model name and sum the stats
+		const byModelName = new Map<string, typeof data.modelStats>();
+		for (const stat of data.modelStats) {
+			const existing = byModelName.get(stat.modelName) ?? [];
+			existing.push(stat);
+			byModelName.set(stat.modelName, existing);
+		}
+
+		return Array.from(byModelName.entries()).map(([modelName, entries]) => {
+			const totalWorkflow = entries.reduce((sum, e) => sum + e.failedWorkflowCount, 0);
+			const totalToolCall = entries.reduce((sum, e) => sum + e.failedToolCallCount, 0);
+			const totalInvocations = entries.reduce((sum, e) => sum + e.invocationCount, 0);
+			return {
+				modelId: entries[0].modelId,
+				modelName,
+				variant: "TOTAL",
+				failedWorkflowCount: totalWorkflow,
+				failedToolCallCount: totalToolCall,
+				invocationCount: totalInvocations,
+				failureRate:
+					totalInvocations > 0
+						? ((totalWorkflow + totalToolCall) / totalInvocations) * 100
+						: 0,
+			};
+		});
+	}, [data?.modelStats, selectedVariant, showTotal]);
+
 	return (
-		<div className="flex-1 min-h-0 overflow-auto">
-			<div className="mx-auto max-w-6xl p-6 md:p-10">
+		<div className="flex-1 min-h-0 overflow-hidden">
+			<div className="mx-auto h-full max-w-6xl overflow-auto p-6 md:p-10 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 				{/* Header */}
-				<div className="mb-6 md:mb-10">
-					<h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
-						Failures
-					</h1>
-					<p className="text-muted-foreground mt-1">
-						Recent workflow and tool call failures with detailed analysis.
-					</p>
+				<div className="mb-6 md:mb-10 flex flex-col gap-3 md:gap-4 md:flex-row md:items-center md:justify-between">
+					<div className="space-y-1">
+						<h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
+							Failures
+						</h1>
+						<p className="text-muted-foreground mt-1">
+							Recent workflow and tool call failures with detailed analysis.
+						</p>
+					</div>
+					<div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
+						<span className="text-sm text-muted-foreground font-mono">COMPETITION:</span>
+						<VariantSelector
+							value={selectedVariant as VariantId}
+							onChange={setSelectedVariant}
+							className="hidden sm:inline-flex"
+						/>
+						<VariantSelector
+							layout="mobile"
+							value={selectedVariant as VariantId}
+							onChange={setSelectedVariant}
+							className="sm:hidden"
+						/>
+						{selectedVariant === "all" && (
+							<div className="flex items-center gap-2">
+								<Checkbox
+									id="total-failures"
+									checked={showTotal}
+									onCheckedChange={(checked) => setShowTotal(checked === true)}
+								/>
+								<label
+									htmlFor="total-failures"
+									className="text-sm font-medium cursor-pointer"
+								>
+									TOTAL
+								</label>
+							</div>
+						)}
+					</div>
 				</div>
 
 				{/* Model Failure Stats Summary */}
-				{data?.modelStats && data.modelStats.length > 0 && (
+				{displayModelStats.length > 0 && (
 					<div className="mb-8">
 						<h2 className="text-lg font-semibold mb-4">
 							Model Failure Statistics
@@ -386,6 +463,9 @@ function FailuresRoute() {
 								<TableHeader>
 									<TableRow>
 										<TableHead>Model</TableHead>
+										{selectedVariant === "all" && !showTotal && (
+											<TableHead>Variant</TableHead>
+										)}
 										<TableHead className="text-right">
 											Failed Workflows
 										</TableHead>
@@ -399,10 +479,10 @@ function FailuresRoute() {
 									</TableRow>
 								</TableHeader>
 								<TableBody>
-									{data.modelStats.map((stat) => {
+									{displayModelStats.map((stat) => {
 										const modelInfo = getModelInfo(stat.modelName);
 										return (
-											<TableRow key={stat.modelId}>
+											<TableRow key={`${stat.modelId}-${stat.variant}`}>
 												<TableCell className="font-medium">
 													<div className="flex items-center gap-2">
 														{modelInfo.logo ? (
@@ -422,6 +502,19 @@ function FailuresRoute() {
 														{stat.modelName}
 													</div>
 												</TableCell>
+												{selectedVariant === "all" && !showTotal && (
+													<TableCell>
+														<span className={cn(
+															"px-2 py-0.5 rounded text-xs font-medium",
+															stat.variant === "OG" && "bg-green-500/20 text-green-500",
+															stat.variant === "Minimal" && "bg-blue-500/20 text-blue-500",
+															stat.variant === "Verbose" && "bg-purple-500/20 text-purple-500",
+															stat.variant === "AGI" && "bg-amber-500/20 text-amber-500",
+														)}>
+															{stat.variant}
+														</span>
+													</TableCell>
+												)}
 												<TableCell className="text-right">
 													<span
 														className={cn(

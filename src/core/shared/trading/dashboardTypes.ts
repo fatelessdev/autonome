@@ -9,6 +9,7 @@ export type Trade = {
 	id: string;
 	modelId: string;
 	modelName: string;
+	modelVariant?: "OG" | "Minimal" | "Verbose" | "AGI";
 	modelRouterName: string;
 	modelKey: string;
 	symbol: string;
@@ -50,6 +51,7 @@ export type Position = {
 export type ModelPositions = {
 	modelId: string;
 	modelName: string;
+	modelVariant?: "OG" | "Minimal" | "Verbose" | "AGI";
 	modelLogo: string;
 	positions: Position[];
 	totalUnrealizedPnl?: number;
@@ -60,6 +62,7 @@ export type Conversation = {
 	id: string;
 	modelId: string;
 	modelName: string;
+	modelVariant?: "OG" | "Minimal" | "Verbose" | "AGI";
 	modelLogo: string;
 	response: string;
 	prompt?: string | null;
@@ -99,6 +102,8 @@ export type ModelOption = {
 	label: string;
 	logo: string;
 	color: string;
+	variants?: Array<Trade["modelVariant"]>;
+	matchers?: string[];
 };
 
 export type TradingDashboardData = {

@@ -94,7 +94,7 @@ export const MODEL_INFO: Record<string, ModelInfoEntry> = {
 	},
 	"kimi-k2-instruct-0905": {
 		logo: "/models/kimi.png",
-		color: "#121212",
+		color: "#6B5CE7",
 		label: "Kimi K2 Instruct",
 		provider: "nim",
 	},
@@ -102,9 +102,35 @@ export const MODEL_INFO: Record<string, ModelInfoEntry> = {
 
 export type ModelInfo = ModelInfoEntry & { provider?: ModelProvider };
 
+/**
+ * Normalize model name for matching.
+ * Handles variations like casing and extra characters.
+ */
+function normalizeModelName(name: string): string {
+	return name
+		.toLowerCase()
+		.trim()
+		.replace(/[^a-z0-9-]/g, "-")
+		.replace(/-+/g, "-")
+		.replace(/^-|-$/g, "");
+}
+
+/**
+ * Get model info by name.
+ * Attempts exact match first, then normalized match.
+ */
 export function getModelInfo(modelName: string): ModelInfo {
+	// Exact match
 	if (MODEL_INFO[modelName]) {
 		return MODEL_INFO[modelName];
+	}
+
+	// Normalized match
+	const normalizedInput = normalizeModelName(modelName);
+	for (const [key, value] of Object.entries(MODEL_INFO)) {
+		if (normalizeModelName(key) === normalizedInput) {
+			return value;
+		}
 	}
 
 	return {

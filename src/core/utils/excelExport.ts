@@ -7,6 +7,27 @@ import * as XLSX from "xlsx";
 import type { OverallStats, AdvancedStats } from "@/server/features/analytics/types";
 
 /**
+ * Leaderboard entry for export
+ */
+export interface LeaderboardEntry {
+	modelName: string;
+	variant: string;
+	pnlPercent: number;
+	pnlAbsolute: number;
+	maxDrawdown: number;
+	startValue: number;
+	endValue: number;
+}
+
+/**
+ * Leaderboard data for each variant
+ */
+export interface LeaderboardVariantData {
+	variant: string;
+	entries: LeaderboardEntry[];
+}
+
+/**
  * Format hold time in minutes to human-readable string
  */
 function formatHoldTime(minutes: number): string {
@@ -46,6 +67,7 @@ export function exportAnalyticsToExcel(
 	const overallData = [
 		[
 			"Model",
+			"Variant",
 			"Account Value ($)",
 			"Return %",
 			"Total P&L ($)",
@@ -57,6 +79,7 @@ export function exportAnalyticsToExcel(
 		],
 		...overallStats.map((stat) => [
 			stat.modelName,
+			stat.variant ?? "Unknown",
 			stat.accountValue,
 			stat.returnPercent,
 			stat.totalPnl,
@@ -74,6 +97,7 @@ export function exportAnalyticsToExcel(
 	const advancedData = [
 		[
 			"Model",
+			"Variant",
 			"Account Value ($)",
 			"Avg Trade Size ($)",
 			"Median Trade Size ($)",
@@ -96,6 +120,7 @@ export function exportAnalyticsToExcel(
 		],
 		...advancedStats.map((stat) => [
 			stat.modelName,
+			stat.variant ?? "Unknown",
 			stat.accountValue,
 			stat.avgTradeSize,
 			stat.medianTradeSize,
@@ -130,6 +155,135 @@ export function exportAnalyticsToExcel(
 	const link = document.createElement("a");
 	link.href = url;
 	link.download = `${timestamp}_${runningHours}_Autonome.xlsx`;
+	document.body.appendChild(link);
+	link.click();
+	document.body.removeChild(link);
+	URL.revokeObjectURL(url);
+}
+
+/**
+ * Create a leaderboard data sheet
+ */
+function createLeaderboardSheet(
+	entries: LeaderboardEntry[],
+	includeVariant: boolean,
+): XLSX.WorkSheet {
+	const headers = includeVariant
+		? ["Model", "Variant", "PnL %", "PnL $", "Max Drawdown %", "Start Value $", "End Value $"]
+		: ["Model", "PnL %", "PnL $", "Max Drawdown %", "Start Value $", "End Value $"];
+
+	const data = [
+		headers,
+		...entries.map((entry) =>
+			includeVariant
+				? [
+						entry.modelName,
+						entry.variant,
+						entry.pnlPercent,
+						entry.pnlAbsolute,
+						entry.maxDrawdown,
+						entry.startValue,
+						entry.endValue,
+					]
+				: [
+						entry.modelName,
+						entry.pnlPercent,
+						entry.pnlAbsolute,
+						entry.maxDrawdown,
+						entry.startValue,
+						entry.endValue,
+					],
+		),
+	];
+
+	return XLSX.utils.aoa_to_sheet(data);
+}
+
+/**
+ * Calculate averaged entries across variants for each model
+ */
+function calculateAverageEntries(entries: LeaderboardEntry[]): LeaderboardEntry[] {
+	const byModelName = new Map<string, LeaderboardEntry[]>();
+	
+	for (const entry of entries) {
+		const existing = byModelName.get(entry.modelName) ?? [];
+		existing.push(entry);
+		byModelName.set(entry.modelName, existing);
+	}
+
+	return Array.from(byModelName.entries()).map(([modelName, modelEntries]) => {
+		const avgPnlPercent = modelEntries.reduce((sum, e) => sum + e.pnlPercent, 0) / modelEntries.length;
+		const avgPnlAbsolute = modelEntries.reduce((sum, e) => sum + e.pnlAbsolute, 0) / modelEntries.length;
+		const avgMaxDrawdown = modelEntries.reduce((sum, e) => sum + e.maxDrawdown, 0) / modelEntries.length;
+		const avgStartValue = modelEntries.reduce((sum, e) => sum + e.startValue, 0) / modelEntries.length;
+		const avgEndValue = modelEntries.reduce((sum, e) => sum + e.endValue, 0) / modelEntries.length;
+
+		return {
+			modelName,
+			variant: "AVG",
+			pnlPercent: avgPnlPercent,
+			pnlAbsolute: avgPnlAbsolute,
+			maxDrawdown: avgMaxDrawdown,
+			startValue: avgStartValue,
+			endValue: avgEndValue,
+		};
+	}).sort((a, b) => b.pnlPercent - a.pnlPercent);
+}
+
+/**
+ * Export leaderboard data to Excel with 6 sheets:
+ * 1. OG - OG variant entries
+ * 2. Minimal - Minimal variant entries
+ * 3. Verbose - Verbose variant entries
+ * 4. AGI - AGI variant entries
+ * 5. All Models - All models across all variants
+ * 6. Average - Averaged stats per model across variants
+ * 
+ * Filename format: YYYY-MM-DD_Leaderboard_{window}.xlsx
+ */
+export function exportLeaderboardToExcel(
+	variantData: LeaderboardVariantData[],
+	window: string,
+): void {
+	const timestamp = new Date().toISOString().slice(0, 10);
+
+	// Create workbook
+	const wb = XLSX.utils.book_new();
+
+	// Add a sheet for each variant (OG, Minimal, Verbose, AGI)
+	const variants = ["OG", "Minimal", "Verbose", "AGI"];
+	for (const variant of variants) {
+		const data = variantData.find((d) => d.variant === variant);
+		if (data && data.entries.length > 0) {
+			const sheet = createLeaderboardSheet(data.entries, false);
+			XLSX.utils.book_append_sheet(wb, sheet, variant);
+		}
+	}
+
+	// All Models sheet - combine all variants
+	const allEntries = variantData.flatMap((d) => d.entries);
+	if (allEntries.length > 0) {
+		const allSheet = createLeaderboardSheet(allEntries, true);
+		XLSX.utils.book_append_sheet(wb, allSheet, "All Models");
+	}
+
+	// Average sheet - averaged stats per model
+	if (allEntries.length > 0) {
+		const avgEntries = calculateAverageEntries(allEntries);
+		const avgSheet = createLeaderboardSheet(avgEntries, false);
+		XLSX.utils.book_append_sheet(wb, avgSheet, "Average");
+	}
+
+	// Generate binary and trigger download
+	const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+	const blob = new Blob([wbout], {
+		type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+	});
+
+	const url = URL.createObjectURL(blob);
+	const link = document.createElement("a");
+	link.href = url;
+	link.download = `${timestamp}_Leaderboard_${window}.xlsx`;
 	document.body.appendChild(link);
 	link.click();
 	document.body.removeChild(link);

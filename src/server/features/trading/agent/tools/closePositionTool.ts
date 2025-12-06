@@ -11,7 +11,7 @@ import { createToolCallMutation } from "@/server/db/tradingRepository.server";
 import { closePosition } from "@/server/features/trading/closePosition";
 
 import { marketSymbols } from "../schemas";
-import type { ToolContext } from "./types";
+import { MAX_ACTIONS_PER_SYMBOL, type ToolContext } from "./types";
 
 /**
  * Creates the closePosition tool with the given context
@@ -26,25 +26,43 @@ export function closePositionTool(ctx: ToolContext) {
 		}),
 		execute: async ({ symbols }) => {
 			// Filter out already-acted symbols
+			// TODO: Re-enable session limit filtering later
 			const skippedDuplicates: string[] = [];
+			const skippedLimitReached: string[] = [];
 			const symbolsToClose = symbols.filter((s) => {
 				const upper = s.toUpperCase();
 				if (ctx.actedSymbols.has(upper)) {
 					skippedDuplicates.push(upper);
 					return false;
 				}
+				// const currentCount = ctx.symbolActionCounts.get(upper) ?? 0;
+				// if (currentCount >= MAX_ACTIONS_PER_SYMBOL) {
+				// 	skippedLimitReached.push(upper);
+				// 	return false;
+				// }
 				return true;
 			});
 
-			if (symbolsToClose.length === 0 && skippedDuplicates.length > 0) {
-				return `Already acted on ${skippedDuplicates.join(", ")} this session. Call 'holding' if done.`;
+			if (symbolsToClose.length === 0) {
+				const messages: string[] = [];
+				if (skippedDuplicates.length > 0) {
+					messages.push(`Already acted on ${skippedDuplicates.join(", ")} this invocation`);
+				}
+				if (skippedLimitReached.length > 0) {
+					messages.push(`Session limit (${MAX_ACTIONS_PER_SYMBOL}) reached for ${skippedLimitReached.join(", ")}`);
+				}
+				return messages.length > 0
+					? `${messages.join(". ")}. Call 'holding' if done.`
+					: "No positions to close.";
 			}
 
 			const closedPositions = await closePosition(ctx.account, symbolsToClose);
 
-			// Mark closed symbols as acted
+			// Mark closed symbols as acted and increment counts
 			for (const pos of closedPositions) {
 				ctx.actedSymbols.add(pos.symbol);
+				const current = ctx.symbolActionCounts.get(pos.symbol) ?? 0;
+				ctx.symbolActionCounts.set(pos.symbol, current + 1);
 			}
 
 			// Record tool call in database
@@ -76,6 +94,9 @@ export function closePositionTool(ctx: ToolContext) {
 
 			if (skippedDuplicates.length > 0) {
 				response += ` Skipped (already acted): ${skippedDuplicates.join(", ")}.`;
+			}
+			if (skippedLimitReached.length > 0) {
+				response += ` Skipped (session limit): ${skippedLimitReached.join(", ")}.`;
 			}
 
 			return response;

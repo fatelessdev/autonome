@@ -1,8 +1,7 @@
 import NumberFlow from "@number-flow/react";
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MARKET_QUERIES } from "@/core/shared/markets/marketQueries";
+import { useMarketPrices } from "@/core/shared/markets/marketQueries";
 import { calculateUnrealizedPnl } from "@/core/shared/trading/calculations";
 import {
 	formatCurrencyValue,
@@ -26,7 +25,7 @@ export function PositionsTab({
 	onSelectExitPlan,
 }: PositionsTabProps) {
 	// Use market prices that refresh every 10 seconds for real-time P&L
-	const { data: marketPrices } = useQuery(MARKET_QUERIES.prices());
+	const { data: marketPrices } = useMarketPrices();
 
 	// Build a price map for quick lookup
 	const priceMap = useMemo(() => {

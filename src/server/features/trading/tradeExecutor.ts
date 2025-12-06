@@ -22,8 +22,7 @@ import {
 	type InvocationExecutionResultSummary,
 	type StepTelemetry,
 } from "@/server/features/trading/invocationResponse";
-import { formatMarketSnapshots } from "@/server/features/trading/marketData";
-import { marketSnapshotsQuery } from "@/server/features/trading/marketData.server";
+import { getSharedMarketIntelligence, invalidateMarketIntelligenceCache } from "@/server/features/trading/marketIntelligenceCache";
 import {
 	enrichOpenPositions,
 	summarizePositionRisk,
@@ -32,7 +31,11 @@ import { openPositionsQuery } from "@/server/features/trading/openPositions.serv
 import { calculatePerformanceMetrics } from "@/server/features/trading/performanceMetrics";
 import { buildTradingPrompts } from "@/server/features/trading/promptBuilder";
 import type { TradingDecisionWithContext } from "@/server/features/trading/tradingDecisions";
-import { MARKETS } from "@/shared/markets/marketMetadata";
+import {
+	type VariantId,
+	DEFAULT_VARIANT,
+	getVariantConfig,
+} from "@/server/features/trading/prompts/variants";
 import {
 	emitAllDataChanged,
 	emitBatchComplete,
@@ -88,18 +91,14 @@ export async function runTradeWorkflow(account: Account) {
 	// Track symbols acted on this session to prevent duplicate actions
 	const actedSymbols = new Set<string>();
 
-	// Fetch market data
-	const marketUniverse = Object.entries(MARKETS).map(([symbol, meta]) => ({
-		symbol,
-		marketId: meta.marketId,
-	}));
+	// Track per-symbol action counts for session limits
+	const symbolActionCounts = new Map<string, number>();
 
+	// Fetch shared market data (cached across all models in the same cycle)
 	let marketIntelligence = "Market data unavailable.";
 	try {
-		const snapshots = await queryClient.fetchQuery(
-			marketSnapshotsQuery(marketUniverse),
-		);
-		marketIntelligence = formatMarketSnapshots(snapshots);
+		const { formatted } = await getSharedMarketIntelligence();
+		marketIntelligence = formatted;
 	} catch (error) {
 		console.error("Failed to assemble market intelligence", error);
 	}
@@ -121,6 +120,10 @@ export async function runTradeWorkflow(account: Account) {
 		currentPortfolioValue,
 	);
 
+	// Get variant config for temperature and other settings
+	const variantId = account.variant ?? DEFAULT_VARIANT;
+	const variantConfig = getVariantConfig(variantId);
+
 	// Build prompts
 	const enrichedPrompt = buildTradingPrompts({
 		account,
@@ -130,6 +133,8 @@ export async function runTradeWorkflow(account: Account) {
 		performanceMetrics,
 		marketIntelligence,
 		currentTime,
+		variant: variantId,
+		symbolActionCounts,
 	});
 
 	// Create tool context for shared state
@@ -139,9 +144,49 @@ export async function runTradeWorkflow(account: Account) {
 		openPositions,
 		decisionIndex,
 		actedSymbols,
+		symbolActionCounts,
 		capturedDecisions,
 		capturedExecutionResults,
 		capturedClosedPositions,
+	};
+
+	/**
+	 * Rebuilds the user prompt with fresh portfolio data.
+	 * Called by prepareStep after each tool call to ensure the agent
+	 * sees current cash/exposure/positions.
+	 */
+	const rebuildUserPrompt = async (): Promise<string> => {
+		// Re-fetch fresh portfolio and positions data
+		const freshQueryClient = new QueryClient();
+		const [freshPortfolio, freshPositionsRaw, freshDecisionIndex] = await Promise.all([
+			freshQueryClient.fetchQuery(portfolioQuery(account)),
+			freshQueryClient.fetchQuery(openPositionsQuery(account)),
+			account.id
+				? fetchLatestDecisionIndex(account.id)
+				: Promise.resolve(new Map<string, TradingDecisionWithContext>()),
+		]);
+
+		const freshPositions = enrichOpenPositions(freshPositionsRaw, freshDecisionIndex);
+		const freshExposure = summarizePositionRisk(freshPositions);
+
+		// Update tool context with fresh positions (for subsequent tool calls)
+		toolContext.openPositions = freshPositions;
+		toolContext.decisionIndex = freshDecisionIndex;
+
+		// Rebuild the prompt with fresh data
+		const freshPrompt = buildTradingPrompts({
+			account,
+			portfolio: freshPortfolio,
+			openPositions: freshPositions,
+			exposureSummary: freshExposure,
+			performanceMetrics, // Metrics don't change mid-invocation
+			marketIntelligence, // Market data doesn't change mid-invocation
+			currentTime,
+			variant: variantId,
+			symbolActionCounts, // Include current action counts
+		});
+
+		return freshPrompt.userPrompt;
 	};
 
 	// Create the agent
@@ -150,6 +195,7 @@ export async function runTradeWorkflow(account: Account) {
 		systemPrompt: enrichedPrompt.systemPrompt,
 		toolContext,
 		onStepTelemetry: (telemetry) => capturedStepTelemetry.push(telemetry),
+		rebuildUserPrompt,
 	});
 
 	// Execute with retry logic
@@ -348,6 +394,7 @@ export async function executeScheduledTrades() {
 				id: model.id,
 				accountIndex: model.accountIndex,
 				totalMinutes: model.totalMinutes,
+				variant: (model.variant as VariantId) ?? DEFAULT_VARIANT,
 			});
 			return { modelId: model.id, success: true as const };
 		} catch (error) {
@@ -374,6 +421,7 @@ export async function executeScheduledTrades() {
 				id: consensusModel.id,
 				accountIndex: consensusModel.accountIndex,
 				totalMinutes: consensusModel.totalMinutes,
+				variant: (consensusModel.variant as VariantId) ?? DEFAULT_VARIANT,
 			});
 			return { modelId: consensusModel.id, success: true as const };
 		} catch (error) {
@@ -391,6 +439,9 @@ export async function executeScheduledTrades() {
 	];
 
 	Promise.allSettled(allPromises).then((results) => {
+		// Invalidate market cache after batch completes so next cycle gets fresh data
+		invalidateMarketIntelligenceCache();
+
 		const successful = results
 			.filter(
 				(r): r is PromiseFulfilledResult<{ modelId: string; success: true }> =>

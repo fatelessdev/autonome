@@ -5,13 +5,18 @@ import type {
 	ExposureSummary,
 } from "@/server/features/trading/openPositionEnrichment";
 import type { PerformanceMetrics } from "@/server/features/trading/performanceMetrics";
-import { SYSTEM_PROMPT, USER_PROMPT } from "@/server/features/trading/prompt";
+import {
+	type VariantId,
+	DEFAULT_VARIANT,
+	getVariantConfig,
+} from "@/server/features/trading/prompts/variants";
 import {
 	buildOpenPositionsSection,
 	buildPerformanceOverview,
 	buildPortfolioSnapshotSection,
 	formatUsd,
 } from "@/server/features/trading/promptSections";
+import { SUPPORTED_MARKETS } from "@/core/shared/markets/marketMetadata";
 
 interface TradingPromptParams {
 	account: Account;
@@ -21,6 +26,10 @@ interface TradingPromptParams {
 	performanceMetrics: PerformanceMetrics;
 	marketIntelligence: string;
 	currentTime: string;
+	/** Strategy variant - determines which prompt set to use */
+	variant?: VariantId;
+	/** Per-symbol action counts for session limit tracking */
+	symbolActionCounts?: Map<string, number>;
 }
 
 /**
@@ -31,6 +40,7 @@ interface TradingPromptParams {
 export function buildTradingPrompts(params: TradingPromptParams): {
 	systemPrompt: string;
 	userPrompt: string;
+	variantId: VariantId;
 } {
 	const {
 		account,
@@ -40,7 +50,14 @@ export function buildTradingPrompts(params: TradingPromptParams): {
 		performanceMetrics,
 		marketIntelligence,
 		currentTime,
+		variant = DEFAULT_VARIANT,
+		symbolActionCounts,
 	} = params;
+
+	// Get variant-specific prompts
+	const variantConfig = getVariantConfig(variant);
+	const SYSTEM_PROMPT = variantConfig.systemPrompt;
+	const USER_PROMPT = variantConfig.userPrompt;
 
 	const exposureRatio =
 		portfolio.totalValue > 0
@@ -51,6 +68,19 @@ export function buildTradingPrompts(params: TradingPromptParams): {
 		: "0.0";
 	const availableCashLabel = formatUsd(portfolio.availableCash);
 
+	// Calculate risk to equity percentage for prompts that use it
+	const riskToEquityPct =
+		portfolio.totalValue > 0 && exposureSummary.totalRiskUsd > 0
+			? ((exposureSummary.totalRiskUsd / portfolio.totalValue) * 100).toFixed(2)
+			: "0.00";
+
+	// TODO: Re-enable symbol action counts later
+	// Build symbol action count string from actual counts
+	// const symbolActionCount = SUPPORTED_MARKETS.map((symbol) => {
+	// 	const count = symbolActionCounts?.get(symbol) ?? 0;
+	// 	return `${symbol}: ${count}`;
+	// }).join(", ");
+
 	const userPrompt = USER_PROMPT.replaceAll(
 		"{{INVOKATION_TIMES}}",
 		account.invocationCount.toString(),
@@ -59,6 +89,8 @@ export function buildTradingPrompts(params: TradingPromptParams): {
 		.replaceAll("{{TOTAL_MINUTES}}", account.totalMinutes.toString())
 		.replaceAll("{{AVAILABLE_CASH}}", availableCashLabel)
 		.replaceAll("{{EXPOSURE_TO_EQUITY_PCT}}", exposurePercentLabel)
+		.replaceAll("{{RISK_TO_EQUITY_PCT}}", riskToEquityPct)
+		// .replaceAll("{{SYMBOL_ACTION_COUNT}}", symbolActionCount)
 		.replaceAll("{{MARKET_INTELLIGENCE}}", marketIntelligence)
 		.replaceAll(
 			"{{PORTFOLIO_SNAPSHOT}}",
@@ -86,6 +118,7 @@ export function buildTradingPrompts(params: TradingPromptParams): {
 	return {
 		systemPrompt: SYSTEM_PROMPT,
 		userPrompt,
+		variantId: variant,
 	};
 }
 

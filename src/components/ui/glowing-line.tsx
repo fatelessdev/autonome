@@ -1,5 +1,4 @@
 ﻿import NumberFlow from "@number-flow/react";
-import { TrendingUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
 	Area,
@@ -12,9 +11,9 @@ import {
 	XAxis,
 	YAxis,
 } from "recharts";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { type ChartConfig, ChartContainer } from "@/components/ui/chart";
+import { useVariant, VARIANT_TABS } from "@/components/variant-context";
 import { cn } from "@/core/lib/utils";
 import { getModelInfo } from "@/shared/models/modelConfig";
 
@@ -259,6 +258,12 @@ export function GlowingLineChart({
 	onHoverLine,
 	compact = false,
 }: GlowingLineChartProps) {
+	const { selectedVariant } = useVariant();
+	const variantLabel = useMemo(() => {
+		const tab = VARIANT_TABS.find((item) => item.id === selectedVariant);
+		return tab?.label ?? "Aggregate Index";
+	}, [selectedVariant]);
+
 	const [internalHoveredLine, setInternalHoveredLine] = useState<string | null>(
 		null,
 	);
@@ -309,14 +314,31 @@ export function GlowingLineChart({
 					}
 				}
 			}
-			// Round to nice boundaries with padding
-			const minBound = Math.floor(minVal / 25) * 25 - 25;
-			const maxBound = Math.ceil(maxVal / 25) * 25 + 25;
-			const step = Math.max(25, Math.ceil((maxBound - minBound) / 6 / 25) * 25);
+
+			// Fixed step size of 20% (matching USD's 2k step logic)
+			const STEP = 20;
+			const DEFAULT_MIN = -20;
+			const DEFAULT_MAX = 20;
+
+			// Start with default bounds (-20%, 0, 20%)
+			// Unlock lower bound in 20% increments when data goes below
+			// Unlock upper bound in 20% increments when data goes above
+			let minBound = DEFAULT_MIN;
+			while (minVal < minBound) {
+				minBound -= STEP;
+			}
+
+			let maxBound = DEFAULT_MAX;
+			while (maxVal > maxBound) {
+				maxBound += STEP;
+			}
+
+			// Generate ticks at 20% intervals
 			const ticks: number[] = [];
-			for (let t = minBound; t <= maxBound; t += step) {
+			for (let t = minBound; t <= maxBound; t += STEP) {
 				ticks.push(t);
 			}
+
 			return {
 				domain: [minBound, maxBound] as [number, number],
 				ticks,
@@ -370,8 +392,8 @@ export function GlowingLineChart({
 	const chartMargins = useMemo(
 		() =>
 			compact
-				? ({ left: 0, right: 72, top: 16, bottom: 16 } as const)
-				: ({ left: 10, right: 120, top: 20, bottom: 20 } as const),
+				? ({ left: 0, right: 64, top: 16, bottom: 16 } as const)
+				: ({ left: 0, right: 110, top: 20, bottom: 20 } as const),
 		[compact],
 	);
 
@@ -402,115 +424,94 @@ export function GlowingLineChart({
 
 	return (
 		<div className="flex h-full flex-col">
-			<div className="border-b px-4 py-2 sm:px-6">
+			<div className="px-3 py-2 sm:py-3 sm:px-6">
 				<div
 					className={cn(
 						"flex w-full items-center justify-between gap-3",
 						compact ? "gap-2" : undefined,
 					)}
 				>
-					{/* $ and % buttons - stacked on mobile, horizontal on desktop */}
-					<div className={cn("flex gap-1.5", compact ? "flex-col" : "flex-row")}>
-						<Button
-							aria-pressed={valueMode === "usd"}
-							className={cn(
-								"text-xs font-medium",
-								compact ? "h-7 w-10" : "h-8 w-12 sm:w-auto sm:px-3",
-							)}
-							onClick={() => onValueModeChange?.("usd")}
-							onKeyDown={(e) => {
-								if (e.key === "Enter" || e.key === " ") {
-									onValueModeChange?.("usd");
-								}
-							}}
-							type="button"
-							variant={valueMode === "usd" ? "default" : "outline"}
-						>
-							$
-						</Button>
-						<Button
-							aria-pressed={valueMode === "percent"}
-							className={cn(
-								"text-xs font-medium",
-								compact ? "h-7 w-10" : "h-8 w-12 sm:w-auto sm:px-3",
-							)}
-							onClick={() => onValueModeChange?.("percent")}
-							onKeyDown={(e) => {
-								if (e.key === "Enter" || e.key === " ") {
-									onValueModeChange?.("percent");
-								}
-							}}
-							type="button"
-							variant={valueMode === "percent" ? "default" : "outline"}
-						>
-							%
-						</Button>
-					</div>
-					{/* Account value text - center */}
-					<div className="flex flex-1 flex-col items-center text-center">
-						<div className="flex items-center justify-center gap-2">
-							<h2 className={cn(
-								"font-semibold uppercase tracking-wider",
-								"text-sm sm:text-base"
-							)}>
-								TOTAL ACCOUNT VALUE
-							</h2>
-							<Badge
-								className="border-none bg-green-500/10 text-green-500 transition-colors hover:bg-green-500/20"
-								variant="outline"
+					{/* $ and % buttons - desktop only */}
+					{!compact ? (
+						<div className="flex gap-1.5">
+							<Button
+								aria-pressed={valueMode === "usd"}
+								className="h-8 w-12 text-xs font-medium sm:w-auto sm:px-3"
+								onClick={() => onValueModeChange?.("usd")}
+								onKeyDown={(e) => {
+									if (e.key === "Enter" || e.key === " ") {
+										onValueModeChange?.("usd");
+									}
+								}}
+								type="button"
+								variant={valueMode === "usd" ? "default" : "outline"}
 							>
-								<TrendingUp className={cn("mr-1", compact ? "h-3 w-3" : "h-3.5 w-3.5")} />
-								<span className={cn("font-semibold", compact ? "text-[10px]" : "text-xs sm:text-sm")}>Live</span>
-							</Badge>
+								$
+							</Button>
+							<Button
+								aria-pressed={valueMode === "percent"}
+								className="h-8 w-12 text-xs font-medium sm:w-auto sm:px-3"
+								onClick={() => onValueModeChange?.("percent")}
+								onKeyDown={(e) => {
+									if (e.key === "Enter" || e.key === " ") {
+										onValueModeChange?.("percent");
+									}
+								}}
+								type="button"
+								variant={valueMode === "percent" ? "default" : "outline"}
+							>
+								%
+							</Button>
 						</div>
-						<p className={cn(
-							"mt-1 text-muted-foreground",
-							"text-[10px] sm:text-xs"
-						)}>
-							Real-time model equity tracking
-						</p>
-					</div>
-					{/* ALL and 72H buttons - stacked on mobile, horizontal on desktop */}
-					<div className={cn("flex gap-2", compact ? "flex-col" : "flex-row")}>
-						<Button
-							aria-pressed={timeFilter === "all"}
-							className={cn(
-								"text-xs font-medium",
-								compact ? "h-7 w-10" : "h-8 w-16 sm:w-auto sm:px-3",
-							)}
-							onClick={() => onTimeFilterChange?.("all")}
-							onKeyDown={(e) => {
-								if (e.key === "Enter" || e.key === " ") {
-									onTimeFilterChange?.("all");
-								}
-							}}
-							type="button"
-							variant={timeFilter === "all" ? "default" : "outline"}
-						>
-							ALL
-						</Button>
-						<Button
-							aria-pressed={timeFilter === "72h"}
-							className={cn(
-								"text-xs font-medium",
-								compact ? "h-7 w-10" : "h-8 w-16 sm:w-auto sm:px-3",
-							)}
-							onClick={() => onTimeFilterChange?.("72h")}
-							onKeyDown={(e) => {
-								if (e.key === "Enter" || e.key === " ") {
-									onTimeFilterChange?.("72h");
-								}
-							}}
-							type="button"
-							variant={timeFilter === "72h" ? "default" : "outline"}
-						>
-							72H
-						</Button>
-					</div>
+					) : null}
+						{/* Account value text - center */}
+						<div className="flex flex-1 items-center justify-center text-center">
+							<h2
+								className={cn(
+									"font-semibold uppercase tracking-wider",
+									"text-sm sm:text-base",
+								)}
+							>
+								{variantLabel} / TOTAL ACCOUNT VALUE
+							</h2>
+						</div>
+					{/* ALL and 72H buttons - desktop only */}
+					{!compact ? (
+						<div className="flex gap-2">
+							<Button
+								aria-pressed={timeFilter === "all"}
+								className="h-8 w-16 text-xs font-medium sm:w-auto sm:px-3"
+								onClick={() => onTimeFilterChange?.("all")}
+								onKeyDown={(e) => {
+									if (e.key === "Enter" || e.key === " ") {
+										onTimeFilterChange?.("all");
+									}
+								}}
+								type="button"
+								variant={timeFilter === "all" ? "default" : "outline"}
+							>
+								ALL
+							</Button>
+							<Button
+								aria-pressed={timeFilter === "72h"}
+								className="h-8 w-16 text-xs font-medium sm:w-auto sm:px-3"
+								onClick={() => onTimeFilterChange?.("72h")}
+								onKeyDown={(e) => {
+									if (e.key === "Enter" || e.key === " ") {
+										onTimeFilterChange?.("72h");
+									}
+								}}
+								type="button"
+								variant={timeFilter === "72h" ? "default" : "outline"}
+							>
+								72H
+							</Button>
+						</div>
+					) : null}
 				</div>
 			</div>
 			<div
-				className={cn("min-h-0 flex-1 pb-0 pt-4", compact ? "px-4" : "px-6")}
+				className={cn("min-h-0 flex-1 pb-0 pt-4", compact ? "px-3" : "px-4")}
 			>
 				<ChartContainer config={chartConfig} className="h-full w-full">
 					<ComposedChart
@@ -608,8 +609,6 @@ export function GlowingLineChart({
 						/>
 						{/* Area fills for gradient below lines */}
 						{prioritizedKeys.map((key) => {
-							const originalKey = seriesMeta[key]?.originalKey ?? key;
-							const modelInfo = getModelInfo(originalKey);
 							const isHovered = hoveredLine === key;
 							const isDimmed = Boolean(hoveredLine && hoveredLine !== key);
 

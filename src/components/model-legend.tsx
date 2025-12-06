@@ -108,11 +108,11 @@ export default function ModelLegend({
 
 	return (
 		<div
-			className={cn("border-t px-4 py-4 sm:px-6", compact ? "pb-5" : undefined)}
+			className={cn("border-t py-1 sm:py-2.5")}
 		>
 			<div
 				className={cn(
-					"flex gap-3 overflow-x-auto overflow-y-visible pb-2 pt-1 pl-1 scrollbar-hide",
+					"flex gap-3 overflow-x-auto overflow-y-visible pb-2 pt-1 px-4 sm:px-4 scrollbar-hide",
 					compact ? "gap-2" : undefined,
 				)}
 				style={{
@@ -199,10 +199,10 @@ export default function ModelLegend({
 										style={{ backgroundColor: color }}
 									/>
 								)}
-								<span className="font-medium text-center">{label}</span>
+								<span className="font-medium text-center text-xs sm:text-sm">{label}</span>
 							</div>
 							<div
-								className="mt-1 text-xs tabular-nums text-muted-foreground"
+								className="mt-1 text-[10px] sm:text-xs tabular-nums text-muted-foreground"
 								style={{ opacity: isDimmed ? 0.4 : 1 }}
 							>
 								{typeof displayValue === "number" && !isPercent ? (

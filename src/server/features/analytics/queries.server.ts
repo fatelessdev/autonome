@@ -163,6 +163,7 @@ export async function getAllModelsWithFailureCounts(): Promise<
 	Array<{
 		id: string;
 		name: string;
+		variant: string;
 		failedWorkflowCount: number;
 		failedToolCallCount: number;
 		invocationCount: number;
@@ -172,6 +173,7 @@ export async function getAllModelsWithFailureCounts(): Promise<
 		.select({
 			id: models.id,
 			name: models.name,
+			variant: models.variant,
 			failedWorkflowCount: models.failedWorkflowCount,
 			failedToolCallCount: models.failedToolCallCount,
 			invocationCount: models.invocationCount,
@@ -197,17 +199,25 @@ function computeMaxDrawdown(values: number[]): number {
 
 /**
  * Get leaderboard data for all models within a time window
+ * @param window - Time window to calculate stats for
+ * @param variantFilter - Optional variant to filter by (e.g., "OG", "Minimal")
  */
 export async function getLeaderboardData(
 	window: LeaderboardWindow,
+	variantFilter?: string,
 ): Promise<LeaderboardEntry[]> {
 	const cutoffMs = Date.now() - WINDOW_MS[window];
 	const cutoffDate = new Date(cutoffMs);
 
-	// Get all models
-	const allModels = await db
-		.select({ id: models.id, name: models.name })
-		.from(models);
+	// Get all models, optionally filtered by variant
+	const allModels = variantFilter
+		? await db
+				.select({ id: models.id, name: models.name, variant: models.variant })
+				.from(models)
+				.where(eq(models.variant, variantFilter as "OG" | "Minimal" | "Verbose" | "AGI"))
+		: await db
+				.select({ id: models.id, name: models.name, variant: models.variant })
+				.from(models);
 
 	if (allModels.length === 0) return [];
 
@@ -253,6 +263,7 @@ export async function getLeaderboardData(
 			entries.push({
 				modelId: model.id,
 				modelName: model.name,
+				variant: model.variant,
 				pnlPercent: 0,
 				pnlAbsolute: 0,
 				maxDrawdown: 0,
@@ -274,6 +285,7 @@ export async function getLeaderboardData(
 		entries.push({
 			modelId: model.id,
 			modelName: model.name,
+			variant: model.variant,
 			pnlPercent,
 			pnlAbsolute,
 			maxDrawdown,
@@ -343,11 +355,16 @@ function isInvocationFailure(
 /**
  * Get failure statistics for all models - computed dynamically from invocations
  */
-export async function getModelFailureStats(): Promise<ModelFailureStats[]> {
+export async function getModelFailureStats(
+	variantFilter?: "OG" | "Minimal" | "Verbose" | "AGI",
+): Promise<ModelFailureStats[]> {
 	// Get all models
-	const allModels = await db
-		.select({ id: models.id, name: models.name })
-		.from(models);
+	const modelQuery = db.select({ id: models.id, name: models.name, variant: models.variant }).from(models);
+	const allModels = await (
+		variantFilter
+			? modelQuery.where(eq(models.variant, variantFilter))
+			: modelQuery
+	);
 
 	if (allModels.length === 0) return [];
 
@@ -415,6 +432,7 @@ export async function getModelFailureStats(): Promise<ModelFailureStats[]> {
 		return {
 			modelId: model.id,
 			modelName: model.name,
+			variant: model.variant,
 			failedWorkflowCount: modelStats.workflow,
 			failedToolCallCount: modelStats.toolCall,
 			invocationCount: modelStats.total,
@@ -429,9 +447,12 @@ export async function getModelFailureStats(): Promise<ModelFailureStats[]> {
 /**
  * Get recent failure entries with tool call details
  */
-export async function getRecentFailures(limit = 50): Promise<FailureEntry[]> {
+export async function getRecentFailures(
+	limit = 50,
+	variantFilter?: "OG" | "Minimal" | "Verbose" | "AGI",
+): Promise<FailureEntry[]> {
 	// First, get all invocations with their model info
-	const invocationRows = await db
+	const invocationQuery = db
 		.select({
 			id: invocations.id,
 			modelId: invocations.modelId,
@@ -441,7 +462,13 @@ export async function getRecentFailures(limit = 50): Promise<FailureEntry[]> {
 			createdAt: invocations.createdAt,
 		})
 		.from(invocations)
-		.innerJoin(models, eq(invocations.modelId, models.id))
+		.innerJoin(models, eq(invocations.modelId, models.id));
+
+	const invocationRows = await (
+		variantFilter
+			? invocationQuery.where(eq(models.variant, variantFilter))
+			: invocationQuery
+	)
 		.orderBy(desc(invocations.createdAt))
 		.limit(limit * 2); // Get more to filter for failures
 

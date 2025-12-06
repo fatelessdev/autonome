@@ -14,6 +14,7 @@ import type {
 	ModelOption,
 } from "@/components/trades-sidebar/types";
 import { useTradingDashboardData } from "@/components/trades-sidebar/use-trading-dashboard-data";
+import { useVariant } from "@/components/variant-context";
 import { getModelInfo } from "@/shared/models/modelConfig";
 
 let customEasePromise: Promise<void> | null = null;
@@ -51,18 +52,27 @@ type TradesSidebarProps = {
 
 type FilterValue = "all" | string;
 
+const normalizeModelKey = (value: string | null | undefined) =>
+	typeof value === "string" && value.trim().length > 0
+		? value
+				.trim()
+				.toLowerCase()
+				.replace(/[^a-z0-9]+/g, "-")
+				.replace(/^-+|-+$/g, "")
+		: "";
+
 const matchesFilter = (
-	filter: FilterValue,
+	filterMatchers: string[] | null,
 	...candidates: Array<string | null | undefined>
 ) => {
-	if (filter === "all") {
+	if (!filterMatchers || filterMatchers.length === 0) {
 		return true;
 	}
 	return candidates.some((candidate) => {
-		if (typeof candidate !== "string" || candidate.trim().length === 0) {
-			return false;
-		}
-		return candidate === filter;
+		const normalizedCandidate = normalizeModelKey(candidate);
+		return normalizedCandidate
+			? filterMatchers.includes(normalizedCandidate)
+			: false;
 	});
 };
 
@@ -78,11 +88,42 @@ export default function TradesSidebar({
 	const isAnimating = useRef(false);
 	const hasAnimatedOnce = useRef(false);
 
+	const { selectedVariant } = useVariant();
+
 	const { trades, conversations, positions, modelOptions, loading } =
 		useTradingDashboardData();
 
+	const filterOptions = useMemo(() => {
+		if (selectedVariant === "all") {
+			return modelOptions;
+		}
+
+		return modelOptions.filter((option) =>
+			option.variants?.includes(selectedVariant) ?? true,
+		);
+	}, [modelOptions, selectedVariant]);
+
 	const collapsedWidth = isMobile ? "0px" : COLLAPSED_WIDTH;
 	const targetWidth = isExpanded ? EXPANDED_WIDTH : collapsedWidth;
+
+	const modelOptionsLookup = useMemo(() => {
+		const lookup = new Map<string, ModelOption>();
+		filterOptions.forEach((option) => lookup.set(option.id, option));
+		return lookup;
+	}, [filterOptions]);
+
+	const selectedOption = filter === "all" ? null : modelOptionsLookup.get(filter);
+	const selectedModelLabel =
+		filter === "all"
+			? "All Models"
+			: (selectedOption?.label ?? getModelInfo(filter).label);
+	const filterMatchers = useMemo(
+		() =>
+			filter === "all"
+				? null
+				: (selectedOption?.matchers ?? [normalizeModelKey(filter)].filter(Boolean)),
+		[selectedOption?.matchers, filter],
+	);
 
 	// GSAP animation effect - only animate after first render
 	useEffect(() => {
@@ -127,52 +168,73 @@ export default function TradesSidebar({
 	}, [targetWidth]);
 
 	const filteredTrades = useMemo(() => {
-		if (filter === "all") return trades;
-		return trades.filter((trade) =>
-			matchesFilter(
-				filter,
-				trade.modelId,
-				trade.modelKey,
-				trade.modelRouterName,
-				trade.modelName,
-			),
-		);
-	}, [filter, trades]);
+		let result = trades;
+		// First filter by variant (from header tabs)
+		if (selectedVariant !== "all") {
+			result = result.filter((trade) => trade.modelVariant === selectedVariant);
+		}
+		// Then filter by model
+		if (filterMatchers) {
+			result = result.filter((trade) =>
+				matchesFilter(
+					filterMatchers,
+					trade.modelId,
+					trade.modelKey,
+					trade.modelRouterName,
+					trade.modelName,
+				),
+			);
+		}
+		return result;
+	}, [filterMatchers, trades, selectedVariant]);
 
 	const filteredConversations = useMemo(() => {
-		if (filter === "all") return conversations;
-		return conversations.filter((conversation) =>
-			matchesFilter(
-				filter,
-				conversation.modelId,
-				conversation.modelLogo,
-				conversation.modelName,
-			),
-		);
-	}, [conversations, filter]);
+		let result = conversations;
+		// First filter by variant (from header tabs)
+		if (selectedVariant !== "all") {
+			result = result.filter((conversation) => conversation.modelVariant === selectedVariant);
+		}
+		// Then filter by model
+		if (filterMatchers) {
+			result = result.filter((conversation) =>
+				matchesFilter(
+					filterMatchers,
+					conversation.modelId,
+					conversation.modelLogo,
+					conversation.modelName,
+				),
+			);
+		}
+		return result;
+	}, [conversations, filterMatchers, selectedVariant]);
 
 	const filteredPositions = useMemo(() => {
-		if (filter === "all") return positions;
-		return positions.filter((positionGroup) =>
-			matchesFilter(
-				filter,
-				positionGroup.modelId,
-				positionGroup.modelLogo,
-				positionGroup.modelName,
-			),
-		);
-	}, [filter, positions]);
+		let result = positions;
+		// First filter by variant (from header tabs)
+		if (selectedVariant !== "all") {
+			result = result.filter((positionGroup) => positionGroup.modelVariant === selectedVariant);
+		}
+		// Then filter by model
+		if (filterMatchers) {
+			result = result.filter((positionGroup) =>
+				matchesFilter(
+					filterMatchers,
+					positionGroup.modelId,
+					positionGroup.modelLogo,
+					positionGroup.modelName,
+				),
+			);
+		}
+		return result;
+	}, [filterMatchers, positions, selectedVariant]);
 
-	const modelOptionsLookup = useMemo(() => {
-		const lookup = new Map<string, ModelOption>();
-		modelOptions.forEach((option) => lookup.set(option.id, option));
-		return lookup;
-	}, [modelOptions]);
-
-	const selectedModelLabel =
-		filter === "all"
-			? "All Models"
-			: (modelOptionsLookup.get(filter)?.label ?? getModelInfo(filter).label);
+	useEffect(() => {
+		if (filter === "all") return;
+		if (filterOptions.some((option) => option.id === filter)) {
+			return;
+		}
+		setFilter("all");
+	}, [filter, filterOptions]);
 
 	const effectiveLoading = loading;
 	const isInitialLoading = loading && modelOptions.length === 0;
@@ -182,7 +244,7 @@ export default function TradesSidebar({
 			selectedLabel={selectedModelLabel}
 			filter={filter}
 			onFilterChange={setFilter}
-			options={modelOptions}
+			options={filterOptions}
 			metaLabel={metaLabel}
 			isLoading={isInitialLoading}
 		/>

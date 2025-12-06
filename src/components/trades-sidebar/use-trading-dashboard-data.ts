@@ -110,6 +110,15 @@ function buildModelOptions(
 ): ModelOption[] {
 	const map = new Map<string, ModelOption>();
 
+	const normalizeKey = (value: string | null | undefined) =>
+		typeof value === "string"
+			? value
+					.trim()
+					.toLowerCase()
+					.replace(/[^a-z0-9]+/g, "-")
+					.replace(/^-+|-+$/g, "")
+			: "";
+
 	const register = (
 		modelId: string,
 		identity: {
@@ -118,43 +127,72 @@ function buildModelOptions(
 			modelLogo?: string | null;
 			modelRouterName?: string | null;
 		},
+		modelVariant?: Trade["modelVariant"],
 	) => {
 		if (!modelId) return;
-		const normalizedId = modelId.trim().toLowerCase();
-		if (!normalizedId) return;
-
 		const info = resolveModelIdentity(identity);
-		const existing = map.get(normalizedId);
+		const label = info.label || identity.modelName || modelId;
+		const normalizedLabel = normalizeKey(label);
+		if (!normalizedLabel) return;
 
-		map.set(normalizedId, {
-			id: modelId,
-			label:
-				info.label || existing?.label || identity.modelName || modelId,
+		const existing = map.get(normalizedLabel);
+		const matchers = new Set(existing?.matchers ?? []);
+		[modelId, label, identity.modelName, identity.modelKey, identity.modelRouterName]
+			.filter((candidate): candidate is string => Boolean(candidate))
+			.forEach((candidate) => {
+				const normalized = normalizeKey(candidate);
+				if (normalized) {
+					matchers.add(normalized);
+				}
+			});
+
+		const variants = new Set(existing?.variants ?? []);
+		if (modelVariant) {
+			variants.add(modelVariant);
+		}
+
+		map.set(normalizedLabel, {
+			id: normalizedLabel,
+			label,
 			logo: info.logo || existing?.logo || "",
 			color: info.color || existing?.color || "#888888",
+			matchers: Array.from(matchers),
+			variants: Array.from(variants),
 		});
 	};
 
 	for (const trade of trades) {
-		register(trade.modelId, {
-			modelKey: trade.modelKey,
-			modelName: trade.modelName,
-			modelRouterName: trade.modelRouterName,
-		});
+		register(
+			trade.modelId,
+			{
+				modelKey: trade.modelKey,
+				modelName: trade.modelName,
+				modelRouterName: trade.modelRouterName,
+			},
+			trade.modelVariant,
+		);
 	}
 
 	for (const conversation of conversations) {
-		register(conversation.modelId, {
-			modelLogo: conversation.modelLogo,
-			modelName: conversation.modelName,
-		});
+		register(
+			conversation.modelId,
+			{
+				modelLogo: conversation.modelLogo,
+				modelName: conversation.modelName,
+			},
+			conversation.modelVariant,
+		);
 	}
 
 	for (const group of positions) {
-		register(group.modelId, {
-			modelLogo: group.modelLogo,
-			modelName: group.modelName,
-		});
+		register(
+			group.modelId,
+			{
+				modelLogo: group.modelLogo,
+				modelName: group.modelName,
+			},
+			group.modelVariant,
+		);
 	}
 
 	return Array.from(map.values());

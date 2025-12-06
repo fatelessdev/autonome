@@ -59,6 +59,11 @@ function normalizeTrades(payload: TradesResponse): Trade[] {
 				id,
 				modelId,
 				modelName: typeof record.modelName === "string" ? record.modelName : "",
+				modelVariant:
+					typeof record.modelVariant === "string" &&
+					["OG", "Minimal", "Verbose", "AGI"].includes(record.modelVariant)
+						? (record.modelVariant as "OG" | "Minimal" | "Verbose" | "AGI")
+						: undefined,
 				modelRouterName:
 					typeof record.modelRouterName === "string"
 						? record.modelRouterName
@@ -184,6 +189,11 @@ function normalizePositions(payload: PositionsResponse): ModelPositions[] {
 			return {
 				modelId,
 				modelName,
+				modelVariant:
+					typeof record.modelVariant === "string" &&
+					["OG", "Minimal", "Verbose", "AGI"].includes(record.modelVariant)
+						? (record.modelVariant as "OG" | "Minimal" | "Verbose" | "AGI")
+						: undefined,
 				modelLogo:
 					typeof record.modelLogo === "string" ? record.modelLogo : modelName,
 				positions,
@@ -268,6 +278,11 @@ function normalizeConversations(
 				modelId,
 				modelName:
 					typeof record.modelName === "string" ? record.modelName : "Unknown",
+				modelVariant:
+					typeof record.modelVariant === "string" &&
+					["OG", "Minimal", "Verbose", "AGI"].includes(record.modelVariant)
+						? (record.modelVariant as "OG" | "Minimal" | "Verbose" | "AGI")
+						: undefined,
 				modelLogo:
 					typeof record.modelLogo === "string"
 						? record.modelLogo
@@ -336,6 +351,7 @@ async function fetchConversations(): Promise<Conversation[]> {
 		id: conv.id,
 		modelId: conv.modelId,
 		modelName: conv.modelName || "Unknown Model",
+		modelVariant: conv.modelVariant || undefined,
 		modelLogo: conv.modelLogo || "unknown-model",
 		response: conv.response || "",
 		timestamp: conv.timestamp,

@@ -22,6 +22,7 @@ import {
 const OverallStatsSchema = z.object({
 	modelId: z.string(),
 	modelName: z.string(),
+	variant: z.string().optional(),
 	accountValue: z.number(),
 	returnPercent: z.number(),
 	totalPnl: z.number(),
@@ -35,6 +36,7 @@ const OverallStatsSchema = z.object({
 const AdvancedStatsSchema = z.object({
 	modelId: z.string(),
 	modelName: z.string(),
+	variant: z.string().optional(),
 	accountValue: z.number(),
 	avgTradeSize: z.number(),
 	medianTradeSize: z.number(),
@@ -56,8 +58,11 @@ const AdvancedStatsSchema = z.object({
 	failureRate: z.number(),
 });
 
+const VariantFilterSchema = z.enum(["all", "OG", "Minimal", "Verbose", "AGI"]).default("all");
+
 const GetAllModelsStatsInputSchema = z.object({
 	mode: z.enum(["overall", "advanced"]).default("overall"),
+	variant: VariantFilterSchema,
 });
 
 const GetAllModelsStatsOutputSchema = z.object({
@@ -68,6 +73,7 @@ const GetAllModelsStatsOutputSchema = z.object({
 const LeaderboardEntrySchema = z.object({
 	modelId: z.string(),
 	modelName: z.string(),
+	variant: z.string(),
 	pnlPercent: z.number(),
 	pnlAbsolute: z.number(),
 	maxDrawdown: z.number(),
@@ -78,6 +84,7 @@ const LeaderboardEntrySchema = z.object({
 const GetLeaderboardInputSchema = z.object({
 	window: z.enum(["24h", "7d", "30d"]).default("7d"),
 	sortBy: z.enum(["pnlPercent", "pnlAbsolute", "maxDrawdown"]).default("pnlPercent"),
+	variant: VariantFilterSchema,
 });
 
 const GetLeaderboardOutputSchema = z.object({
@@ -119,6 +126,7 @@ const FailureEntrySchema = z.object({
 const ModelFailureStatsSchema = z.object({
 	modelId: z.string(),
 	modelName: z.string(),
+	variant: z.string(),
 	failedWorkflowCount: z.number(),
 	failedToolCallCount: z.number(),
 	invocationCount: z.number(),
@@ -127,6 +135,7 @@ const ModelFailureStatsSchema = z.object({
 
 const GetFailuresInputSchema = z.object({
 	limit: z.number().min(1).max(100).default(50),
+	variant: VariantFilterSchema,
 });
 
 const GetFailuresOutputSchema = z.object({
@@ -141,8 +150,14 @@ export const getModelStats = os
 	.output(GetAllModelsStatsOutputSchema)
 	.handler(async ({ input }) => {
 		return Sentry.startSpan({ name: "analytics.getModelStats" }, async () => {
-			const { mode } = input;
-			const modelsData = await getAllModelsWithFailureCounts();
+			const { mode, variant } = input;
+			let modelsData = await getAllModelsWithFailureCounts();
+			
+			// Filter by variant if not "all"
+			if (variant !== "all") {
+				modelsData = modelsData.filter((m) => m.variant === variant);
+			}
+			
 			const modelIds = modelsData.map((model) => model.id);
 			const [tradesByModel, accountValues] = await Promise.all([
 				getClosedTradesForModels(modelIds),
@@ -158,6 +173,7 @@ export const getModelStats = os
 						model.name,
 						trades,
 						accountValue,
+						model.variant,
 					);
 				});
 				return { overall: overallStats };
@@ -176,6 +192,7 @@ export const getModelStats = os
 						failedToolCallCount: model.failedToolCallCount,
 						invocationCount: model.invocationCount,
 					},
+					model.variant,
 				);
 			});
 			return { advanced: advancedStats };
@@ -187,8 +204,8 @@ export const getLeaderboard = os
 	.output(GetLeaderboardOutputSchema)
 	.handler(async ({ input }) => {
 		return Sentry.startSpan({ name: "analytics.getLeaderboard" }, async () => {
-			const { window, sortBy } = input;
-			const entries = await getLeaderboardData(window);
+			const { window, sortBy, variant } = input;
+			const entries = await getLeaderboardData(window, variant === "all" ? undefined : variant);
 
 			// Sort entries
 			const sorted = [...entries].sort((a, b) => {
@@ -211,10 +228,11 @@ export const getFailures = os
 	.output(GetFailuresOutputSchema)
 	.handler(async ({ input }) => {
 		return Sentry.startSpan({ name: "analytics.getFailures" }, async () => {
-			const { limit } = input;
+			const { limit, variant } = input;
+			const variantFilter = variant === "all" ? undefined : variant;
 			const [failures, modelStats] = await Promise.all([
-				getRecentFailures(limit),
-				getModelFailureStats(),
+				getRecentFailures(limit, variantFilter),
+				getModelFailureStats(variantFilter),
 			]);
 			return { failures, modelStats };
 		});

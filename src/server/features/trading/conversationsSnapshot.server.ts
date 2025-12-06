@@ -1,4 +1,7 @@
+import { and, desc, eq, inArray } from "drizzle-orm";
+
 import { db } from "@/db";
+import { invocations, models } from "@/db/schema";
 import { parseTradingToolCallMetadata } from "@/server/features/trading/tradingDecisions";
 import { safeJsonParse } from "@/utils/json";
 
@@ -6,6 +9,7 @@ export type ConversationSnapshot = {
 	id: string;
 	modelId: string;
 	modelName: string;
+	modelVariant?: "OG" | "Minimal" | "Verbose" | "AGI";
 	modelLogo: string;
 	response: string | null;
 	responsePayload: unknown;
@@ -50,33 +54,53 @@ function isAutoTriggeredInvocation(
 }
 
 export async function fetchConversationSnapshots(
-	limit = 100,
+	limitPerVariant = 100,
 ): Promise<ConversationSnapshot[]> {
-	const invocationsWithRelations = await db.query.invocations.findMany({
-		with: {
-			model: {
-				columns: {
-					id: true,
-					name: true,
-					openRouterModelName: true,
+	// Fetch 100 invocations per variant to ensure fair representation
+	const variants = ["OG", "Minimal", "Verbose", "AGI"] as const;
+
+	const variantQueries = variants.map((variant) =>
+		db.query.invocations.findMany({
+			where: inArray(
+				invocations.modelId,
+				db
+					.select({ id: models.id })
+					.from(models)
+					.where(eq(models.variant, variant)),
+			),
+			with: {
+				model: {
+					columns: {
+						id: true,
+						name: true,
+						variant: true,
+						openRouterModelName: true,
+					},
+				},
+				toolCalls: {
+					columns: {
+						id: true,
+						metadata: true,
+						toolCallType: true,
+						createdAt: true,
+					},
+					orderBy: (toolCall, { desc: orderDesc }) =>
+						orderDesc(toolCall.createdAt),
+					limit: 50,
 				},
 			},
-			toolCalls: {
-				columns: {
-					id: true,
-					metadata: true,
-					toolCallType: true,
-					createdAt: true,
-				},
-				orderBy: (toolCall, { desc: orderDesc }) =>
-					orderDesc(toolCall.createdAt),
-				limit: 50,
-			},
-		},
-		orderBy: (invocation, { desc: orderDesc }) =>
-			orderDesc(invocation.createdAt),
-		limit,
-	});
+			orderBy: (invocation, { desc: orderDesc }) =>
+				orderDesc(invocation.createdAt),
+			limit: limitPerVariant,
+		}),
+	);
+
+	const variantResults = await Promise.all(variantQueries);
+	const invocationsWithRelations = variantResults
+		.flat()
+		.sort(
+			(a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+		);
 
 	// Filter out invocations that only contain auto-triggered closes
 	const filtered = invocationsWithRelations.filter(
@@ -87,6 +111,7 @@ export async function fetchConversationSnapshots(
 		id: invocation.id,
 		modelId: invocation.modelId,
 		modelName: invocation.model?.name ?? "Unknown Model",
+		modelVariant: invocation.model?.variant ?? undefined,
 		modelLogo: invocation.model?.openRouterModelName ?? "unknown-model",
 		response: invocation.response,
 		responsePayload: invocation.responsePayload,

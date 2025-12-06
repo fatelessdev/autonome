@@ -17,14 +17,12 @@ import { generateObject } from "ai";
 import { z } from "zod";
 
 import { env } from "@/env";
-import { MARKETS } from "@/core/shared/markets/marketMetadata";
 import { getModelProvider } from "@/core/shared/models/modelConfig";
 import type { PortfolioSnapshot } from "@/server/features/trading/getPortfolio";
 import type { EnrichedOpenPosition } from "@/server/features/trading/openPositionEnrichment";
 import { createPosition, type PositionRequest } from "@/server/features/trading/createPosition";
 import type { Account } from "@/server/features/trading/accounts";
-import { formatMarketSnapshots } from "@/server/features/trading/marketData";
-import { marketSnapshotsQuery } from "@/server/features/trading/marketData.server";
+import { getSharedMarketIntelligence } from "@/server/features/trading/marketIntelligenceCache";
 import { portfolioQuery } from "@/server/features/trading/getPortfolio.server";
 import { openPositionsQuery } from "@/server/features/trading/openPositions.server";
 import { enrichOpenPositions } from "@/server/features/trading/openPositionEnrichment";
@@ -520,18 +518,11 @@ export async function runConsensusWorkflow(
 
 	const openPositions = enrichOpenPositions(openPositionsRaw, new Map());
 
-	// Fetch market data
-	const marketUniverse = Object.entries(MARKETS).map(([symbol, meta]) => ({
-		symbol,
-		marketId: meta.marketId,
-	}));
-
+	// Fetch shared market data (cached across all models in the same cycle)
 	let marketIntelligence = "Market data unavailable.";
 	try {
-		const snapshots = await queryClient.fetchQuery(
-			marketSnapshotsQuery(marketUniverse),
-		);
-		marketIntelligence = formatMarketSnapshots(snapshots);
+		const { formatted } = await getSharedMarketIntelligence();
+		marketIntelligence = formatted;
 	} catch (error) {
 		console.error("[Consensus] Failed to fetch market data", error);
 	}

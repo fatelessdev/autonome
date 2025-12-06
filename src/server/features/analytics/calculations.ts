@@ -33,6 +33,7 @@ export function calculateOverallStats(
 	modelName: string,
 	trades: ClosedTradeData[],
 	currentAccountValue: number,
+	variant?: string,
 ): OverallStats {
 	const tradesCount = trades.length;
 
@@ -40,6 +41,7 @@ export function calculateOverallStats(
 		return {
 			modelId,
 			modelName,
+			variant,
 			accountValue: currentAccountValue,
 			returnPercent: calculateReturnPercent(currentAccountValue),
 			totalPnl: 0,
@@ -68,6 +70,7 @@ export function calculateOverallStats(
 	return {
 		modelId,
 		modelName,
+		variant,
 		accountValue: currentAccountValue,
 		returnPercent,
 		totalPnl,
@@ -92,6 +95,7 @@ export function calculateAdvancedStats(
 		failedToolCallCount: number;
 		invocationCount: number;
 	},
+	variant?: string,
 ): AdvancedStats {
 	const defaultFailureMetrics = {
 		failedWorkflowCount: failureMetrics?.failedWorkflowCount ?? 0,
@@ -110,6 +114,7 @@ export function calculateAdvancedStats(
 		return {
 			modelId,
 			modelName,
+			variant,
 			accountValue: currentAccountValue,
 			avgTradeSize: 0,
 			medianTradeSize: 0,
@@ -175,6 +180,7 @@ export function calculateAdvancedStats(
 	return {
 		modelId,
 		modelName,
+		variant,
 		accountValue: currentAccountValue,
 		avgTradeSize,
 		medianTradeSize,
