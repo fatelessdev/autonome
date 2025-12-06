@@ -14,6 +14,7 @@ import {
 	buildOpenPositionsSection,
 	buildPerformanceOverview,
 	buildPortfolioSnapshotSection,
+	calculateExposureToEquityPct,
 	formatUsd,
 } from "@/server/features/trading/promptSections";
 import { SUPPORTED_MARKETS } from "@/core/shared/markets/marketMetadata";
@@ -59,13 +60,11 @@ export function buildTradingPrompts(params: TradingPromptParams): {
 	const SYSTEM_PROMPT = variantConfig.systemPrompt;
 	const USER_PROMPT = variantConfig.userPrompt;
 
-	const exposureRatio =
-		portfolio.totalValue > 0
-			? (exposureSummary.totalNotional / portfolio.totalValue) * 100
-			: 0;
-	const exposurePercentLabel = Number.isFinite(exposureRatio)
-		? exposureRatio.toFixed(1)
-		: "0.0";
+	const exposureRatio = calculateExposureToEquityPct(portfolio, exposureSummary);
+	const exposurePercentLabel =
+		exposureRatio != null && Number.isFinite(exposureRatio)
+			? exposureRatio.toFixed(1)
+			: "0.0";
 	const availableCashLabel = formatUsd(portfolio.availableCash);
 
 	// Calculate risk to equity percentage for prompts that use it

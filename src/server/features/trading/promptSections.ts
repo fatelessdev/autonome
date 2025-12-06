@@ -7,6 +7,21 @@ import type {
 import { toNumeric } from "@/server/features/trading/openPositionEnrichment";
 import type { PerformanceMetrics } from "@/server/features/trading/performanceMetrics";
 
+/**
+ * Calculate exposure to equity as the percentage of equity that is actually deployed.
+ * Uses cash utilization (equity - available cash) instead of raw notional to avoid
+ * leverage-inflated percentages.
+ */
+export function calculateExposureToEquityPct(
+	portfolio: PortfolioSnapshot,
+	_exposure: ExposureSummary,
+): number | null {
+	if (!(portfolio.totalValue > 0)) return null;
+	const deployedEquity = Math.max(portfolio.totalValue - portfolio.availableCash, 0);
+	const pct = (deployedEquity / portfolio.totalValue) * 100;
+	return Number.isFinite(pct) ? pct : null;
+}
+
 function formatUsd(
 	value: number | string | null | undefined,
 	digits = 2,
@@ -110,10 +125,7 @@ export function buildPortfolioSnapshotSection({
 		portfolio.totalValue > 0
 			? 1 - portfolio.availableCash / portfolio.totalValue
 			: null;
-	const exposurePct =
-		portfolio.totalValue > 0 && exposureSummary.totalNotional > 0
-			? (exposureSummary.totalNotional / portfolio.totalValue) * 100
-			: null;
+	const exposurePct = calculateExposureToEquityPct(portfolio, exposureSummary);
 
 	const lines = [
 		`portfolio_value: ${formatUsd(portfolio.totalValue)}`,
@@ -156,10 +168,7 @@ export function buildPerformanceOverview({
 }): string {
 	const exposure = exposureSummary;
 	const netExposure = exposure.longExposure - exposure.shortExposure;
-	const exposureRatio =
-		portfolio.totalValue > 0
-			? (exposure.totalNotional / portfolio.totalValue) * 100
-			: null;
+	const exposureRatio = calculateExposureToEquityPct(portfolio, exposureSummary);
 	const grossRiskRatio =
 		portfolio.totalValue > 0 && exposure.totalRiskUsd > 0
 			? (exposure.totalRiskUsd / portfolio.totalValue) * 100

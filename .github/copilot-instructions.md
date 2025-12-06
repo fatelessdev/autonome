@@ -100,6 +100,7 @@ const { data } = useQuery(orpc.trading.getPositions.queryOptions({ input: {} }))
 - Shared market price fetching now exposed via `useMarketPrices` (in `marketQueries`); reuse instead of duplicating queries.
 - Failures analytics are variant-filterable end-to-end (oRPC `getFailures` accepts `variant`).
 - Dashboard UX: crypto tracker has desktop dropdown + mobile pill selector; performance graph shows active variant badge and hides filters on mobile.
+- Exposure prompts now use deployed equity (total value minus available cash) via `calculateExposureToEquityPct` to avoid leverage-inflated percentages.
 
 ## Code Style (Biome)
 

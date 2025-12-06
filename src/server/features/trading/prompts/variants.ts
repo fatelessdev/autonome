@@ -57,7 +57,7 @@ export const VARIANTS: Record<VariantId, VariantConfig> = {
 		description: "Original balanced strategy with clear decision framework",
 		systemPrompt: SYSTEM_PROMPT_OG,
 		userPrompt: USER_PROMPT_OG,
-		temperature: 0.7,
+		temperature: 0,
 		color: "#22c55e", // green-500
 	},
 	Minimal: {
@@ -66,7 +66,7 @@ export const VARIANTS: Record<VariantId, VariantConfig> = {
 		description: "Concise prompts focusing on hygiene and discipline",
 		systemPrompt: SYSTEM_PROMPT_MINIMAL,
 		userPrompt: USER_PROMPT_MINIMAL,
-		temperature: 0.5,
+		temperature: 0,
 		color: "#3b82f6", // blue-500
 	},
 	Verbose: {
@@ -75,7 +75,7 @@ export const VARIANTS: Record<VariantId, VariantConfig> = {
 		description: "Detailed instructions with frontier intelligence approach",
 		systemPrompt: SYSTEM_PROMPT_VERBOSE,
 		userPrompt: USER_PROMPT_VERBOSE,
-		temperature: 0.6,
+		temperature: 0,
 		color: "#a855f7", // purple-500
 	},
 	AGI: {
@@ -84,7 +84,7 @@ export const VARIANTS: Record<VariantId, VariantConfig> = {
 		description: "Full autonomy with minimal constraints - ApexTrader mode",
 		systemPrompt: SYSTEM_PROMPT_AGI,
 		userPrompt: USER_PROMPT_AGI,
-		temperature: 0.8,
+		temperature: 0,
 		color: "#f59e0b", // amber-500
 	},
 };
