@@ -190,7 +190,7 @@ export async function runTradeWorkflow(account: Account) {
 	};
 
 	// Create the agent
-	const { agent, resetStepCounter } = createTradeAgent({
+	const { agent } = createTradeAgent({
 		account,
 		systemPrompt: enrichedPrompt.systemPrompt,
 		toolContext,
@@ -210,7 +210,6 @@ export async function runTradeWorkflow(account: Account) {
 
 			try {
 				// Reset step counter and telemetry for each retry attempt
-				resetStepCounter();
 				capturedStepTelemetry.length = 0;
 				const result = await agent.generate({
 					prompt: enrichedPrompt.userPrompt,

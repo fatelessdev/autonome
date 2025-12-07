@@ -57,9 +57,6 @@ Trade with conviction.`;
 export const USER_PROMPT = `Session: {{TOTAL_MINUTES}} min | Invocations: {{INVOKATION_TIMES}} | {{CURRENT_TIME}} IST
 Cash: {{AVAILABLE_CASH}} | Exposure: {{EXPOSURE_TO_EQUITY_PCT}}% | Portfolio Risk: {{RISK_TO_EQUITY_PCT}}%
 
-// == SYMBOL ACTIONS (New Positions Only) ==
-// {{SYMBOL_ACTION_COUNT}}
-
 == MARKET DATA ==
 {{MARKET_INTELLIGENCE}}
 *Arrays: oldest → newest. Current = last element.*

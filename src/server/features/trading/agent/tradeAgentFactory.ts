@@ -9,14 +9,12 @@ import { Output, ToolLoopAgent, stepCountIs, hasToolCall } from "ai";
 import * as Sentry from "@sentry/react";
 
 import { env } from "@/env";
-import { SUPPORTED_MARKETS } from "@/core/shared/markets/marketMetadata";
 import type { Account } from "@/server/features/trading/accounts";
 import type { StepTelemetry } from "@/server/features/trading/invocationResponse";
 import { getModelProvider } from "@/shared/models/modelConfig";
 
 import { agentOutputSchema, callOptionsSchema } from "./schemas";
 import { createTradingTools, type ToolContext } from "./tools";
-import { MAX_ACTIONS_PER_SYMBOL } from "./tools/types";
 
 /**
  * Configuration for creating a trade agent
@@ -219,16 +217,8 @@ export function createTradeAgent(config: TradeAgentConfig) {
 		tools: createTradingTools(toolContext),
 	});
 
-	/**
-	 * Reset step counter for retry attempts
-	 */
-	const resetStepCounter = () => {
-		currentStepNumber = 0;
-	};
-
 	return {
 		agent,
-		resetStepCounter,
 	};
 }
 

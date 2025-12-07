@@ -89,10 +89,6 @@ Session: {{TOTAL_MINUTES}} min | Invocations: {{INVOKATION_TIMES}} | {{CURRENT_T
 
 Cash: {{AVAILABLE_CASH}} | Exposure: {{EXPOSURE_TO_EQUITY_PCT}}%
 
-// == SYMBOL ACTIONS THIS SESSION ==
-// {{SYMBOL_ACTION_COUNT}}
-// *Format: BTC: X, ETH: X, SOL: X, ZEC: X, HYPE: X*
-
 == MARKET DATA ==
 {{MARKET_INTELLIGENCE}}
 

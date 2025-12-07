@@ -63,7 +63,7 @@ Cash: {{AVAILABLE_CASH}} | Exposure: {{EXPOSURE_TO_EQUITY_PCT}}%
 
 == PERFORMANCE ==
 {{PERFORMANCE_OVERVIEW}}
-p
+
 Analyze the data above and take action.`;
 
 /**

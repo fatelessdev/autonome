@@ -210,7 +210,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		if (typeof window === "undefined") {
 			const { bootstrapSchedulers } = await import(
 				"@/server/schedulers/bootstrap"
-			);
+		);
 			await bootstrapSchedulers();
 		}
 	},
