@@ -42,6 +42,8 @@ const MODEL_DEFINITIONS = [
 	"moonshotai/kimi-k2-instruct-0905",
 	"qwen/qwen3-next-80b-a3b-thinking",
 	"qwen/qwen3-235b-a22b",
+	"mistralai/mistral-large-3-675b-instruct-2512",
+	"qwen/qwen3-coder-480b-a35b-instruct"
 ];
 
 /**

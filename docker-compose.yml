@@ -17,6 +17,32 @@ services:
       timeout: 5s
       retries: 5
 
+  migrate:
+    image: smoggyowo/autonome:latest
+    container_name: autonome-migrate
+    restart: "no"
+    env_file:
+      - .env.docker
+    environment:
+      DATABASE_URL: postgresql://autonome:autonome_secret@localhost:5432/autonome
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["bun", "run", "db:push"]
+
+  seed:
+    image: smoggyowo/autonome:latest
+    container_name: autonome-seed
+    restart: "no"
+    env_file:
+      - .env.docker
+    environment:
+      DATABASE_URL: postgresql://autonome:autonome_secret@localhost:5432/autonome
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: ["bun", "run", "scripts/seed.ts"]
+
   app:
     image: smoggyowo/autonome:latest
     container_name: autonome
@@ -24,10 +50,10 @@ services:
     env_file:
       - .env.docker
     environment:
-      DATABASE_URL: postgresql://autonome:autonome_secret@db:5432/autonome
+      DATABASE_URL: postgresql://autonome:autonome_secret@localhost:5432/autonome
     depends_on:
-      db:
-        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
     ports:
       - "3000:3000"
     volumes:
@@ -39,35 +65,6 @@ services:
       start_period: 10s
       retries: 3
 
-  migrate:
-    image: smoggyowo/autonome:latest
-    container_name: autonome-migrate
-    env_file:
-      - .env.docker
-    environment:
-      DATABASE_URL: postgresql://autonome:autonome_secret@db:5432/autonome
-    depends_on:
-      db:
-        condition: service_healthy
-    command: ["bun", "run", "db:push"]
-    profiles:
-      - migrate
-
-  seed:
-    image: smoggyowo/autonome:latest
-    container_name: autonome-seed
-    env_file:
-      - .env.docker
-    environment:
-      DATABASE_URL: postgresql://autonome:autonome_secret@db:5432/autonome
-    depends_on:
-      db:
-        condition: service_healthy
-    command: ["bun", "run", "scripts/seed.ts"]
-    profiles:
-      - seed
-
 volumes:
   postgres_data:
   autonome_logs:
-

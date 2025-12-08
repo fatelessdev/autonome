@@ -34,7 +34,7 @@ ARG VITE_APP_TITLE=Autonome
 
 # Set environment variables for build
 # Use placeholder values that satisfy validation but won't be used at runtime
-ENV DATABASE_URL=postgresql://autonome:autonome_secret@db:5432/autonome
+ENV DATABASE_URL=postgresql://autonome:autonome_secret@localhost:5432/autonome
 ENV NIM_API_KEY=placeholder_nim_key
 ENV OPENROUTER_API_KEY=placeholder_openrouter_key
 ENV MISTRAL_API_KEY=placeholder_mistral_key
@@ -67,6 +67,14 @@ RUN groupadd --system --gid 1001 nodejs && \
 # .output/public/ contains static assets, .output/server/ contains the server
 COPY --from=builder --chown=bunjs:nodejs /app/.output ./.output
 COPY --from=builder --chown=bunjs:nodejs /app/package.json ./package.json
+
+# Copy migration and seed related files
+COPY --from=builder --chown=bunjs:nodejs /app/drizzle ./drizzle
+COPY --from=builder --chown=bunjs:nodejs /app/drizzle.config.ts ./drizzle.config.ts
+COPY --from=builder --chown=bunjs:nodejs /app/scripts ./scripts
+COPY --from=builder --chown=bunjs:nodejs /app/src/db ./src/db
+COPY --from=builder --chown=bunjs:nodejs /app/src/env.ts ./src/env.ts
+COPY --from=builder --chown=bunjs:nodejs /app/tsconfig.json ./tsconfig.json
 
 # Install only production dependencies
 COPY --from=builder /app/node_modules ./node_modules

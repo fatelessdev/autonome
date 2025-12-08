@@ -98,6 +98,12 @@ export const MODEL_INFO: Record<string, ModelInfoEntry> = {
 		label: "Kimi K2 Instruct",
 		provider: "nim",
 	},
+	"mistral-large-3-675b-instruct-2512": {
+		logo: "/models/mistral.png",
+		color: "#FF8301",
+		label: "Mistral Large 3 675B",
+		provider: "nim",
+	},
 };
 
 export type ModelInfo = ModelInfoEntry & { provider?: ModelProvider };
