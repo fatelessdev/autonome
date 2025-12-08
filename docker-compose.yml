@@ -24,7 +24,7 @@ services:
     env_file:
       - .env.docker
     environment:
-      DATABASE_URL: postgresql://autonome:autonome_secret@localhost:5432/autonome
+      DATABASE_URL: postgresql://autonome:autonome_secret@db:5432/autonome
     depends_on:
       db:
         condition: service_healthy
@@ -37,7 +37,7 @@ services:
     env_file:
       - .env.docker
     environment:
-      DATABASE_URL: postgresql://autonome:autonome_secret@localhost:5432/autonome
+      DATABASE_URL: postgresql://autonome:autonome_secret@db:5432/autonome
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -50,7 +50,7 @@ services:
     env_file:
       - .env.docker
     environment:
-      DATABASE_URL: postgresql://autonome:autonome_secret@localhost:5432/autonome
+      DATABASE_URL: postgresql://autonome:autonome_secret@db:5432/autonome
     depends_on:
       seed:
         condition: service_completed_successfully
