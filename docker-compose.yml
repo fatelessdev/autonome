@@ -1,10 +1,33 @@
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: autonome-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: autonome
+      POSTGRES_PASSWORD: autonome_secret
+      POSTGRES_DB: autonome
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U autonome -d autonome"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   app:
     image: smoggyowo/autonome:latest
     container_name: autonome
     restart: unless-stopped
     env_file:
       - .env.docker
+    environment:
+      DATABASE_URL: postgresql://autonome:autonome_secret@db:5432/autonome
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "3000:3000"
     volumes:
@@ -15,3 +38,20 @@ services:
       timeout: 10s
       start_period: 10s
       retries: 3
+
+  seed:
+    image: smoggyowo/autonome:latest
+    container_name: autonome-seed
+    env_file:
+      - .env.docker
+    environment:
+      DATABASE_URL: postgresql://autonome:autonome_secret@db:5432/autonome
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["bun", "run", "scripts/seed.ts"]
+    profiles:
+      - seed
+
+volumes:
+  postgres_data:

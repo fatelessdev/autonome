@@ -34,7 +34,7 @@ ARG VITE_APP_TITLE=Autonome
 
 # Set environment variables for build
 # Use placeholder values that satisfy validation but won't be used at runtime
-ENV DATABASE_URL=postgresql://placeholder:placeholder@localhost:5432/placeholder
+ENV DATABASE_URL=postgresql://autonome:autonome_secret@db:5432/autonome
 ENV NIM_API_KEY=placeholder_nim_key
 ENV OPENROUTER_API_KEY=placeholder_openrouter_key
 ENV MISTRAL_API_KEY=placeholder_mistral_key
@@ -60,8 +60,8 @@ FROM oven/bun:latest AS runner
 WORKDIR /app
 
 # Create non-root user for security
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 bunjs
+RUN groupadd --system --gid 1001 nodejs && \
+    useradd --system --uid 1001 --gid nodejs bunjs
 
 # Copy built output from builder stage (Nitro outputs to .output/)
 # .output/public/ contains static assets, .output/server/ contains the server
