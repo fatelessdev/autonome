@@ -2,6 +2,31 @@
 Autonome is an AI-powered autonomous cryptocurrency trading platform built with TanStack Start, featuring real-time portfolio analytics, multi AI integration, and a sophisticated trading simulator. The platform supports both live trading (via Lighter API) and simulated trading modes, with comprehensive position management, risk controls, and real-time data visualization.
 TanStack Start + React 19 + oRPC + PostgreSQL/Drizzle + AI SDK v6 + Tailwind v4 + Bun + shadcn/ui.
 
+
+## Team culture
+
+To accomplish this, the team has a shared culture and sense of identity that
+drives how they build products. You'll be expected to contribute to this, and
+the work you do is critical in helping us drive toward our goals.
+
+### Build less, ship more
+
+It's really important we solve the right problems, than solve lots of problems.
+Rather than try to build the most complex feature that covers all cases, we
+strive to build precisely the right amount of software to solve the problem
+we're currently facing. We're ok with leaving work for "future us" rather than
+today. This maxim hopefully prevents us from over engineering solutions that our
+3-person development team can't maintain.
+
+### General Rules
+- Early development, no users. No backwards compatibility concerns. Do things RIGHT: clean,
+organized, zero tech debt. Never create compatibility shims.
+- WE NEVER WANT WORKAROUNDS. we always want FULL implementations that are long term
+suistainable for many >1000 users. so dont come up with half baked solutions
+- Important: Do not remove, hide, or rename any existing features or UI options (even
+temporarily) unless I explicitly ask for it. If something isn't fully wired yet, keep the UX
+surface intact and stub/annotate it instead of deleting it.
+
 ## Critical Rules
 
 1. **Package manager**: Use ONLY `bun` - never npm/pnpm
