@@ -143,7 +143,7 @@ type TradeRecord = {
 export async function fetchTrades(): Promise<TradeRecord[]> {
 	// Fetch 100 closed orders per variant to ensure fair representation
 	// This avoids one active variant dominating the trades list
-	const variants = ["OG", "Minimal", "Verbose", "AGI"] as const;
+	const variants = ["Situational", "Minimal", "Guardian", "Max"] as const;
 	const LIMIT_PER_VARIANT = 100;
 
 	const variantQueries = variants.map((variant) =>
@@ -193,7 +193,7 @@ export async function fetchTrades(): Promise<TradeRecord[]> {
 			modelId: order.modelId,
 			modelName: order.model?.name ?? "Unknown",
 			modelRouterName: order.model?.openRouterModelName ?? null,
-			modelVariant: order.model?.variant ?? "OG",
+			modelVariant: order.model?.variant ?? "Situational",
 			symbol: order.symbol,
 			side: order.side,
 			quantity,

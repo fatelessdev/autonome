@@ -237,10 +237,10 @@ function getOverallColumns(showVariant: boolean): ColumnDef<OverallStats>[] {
 				return (
 					<span className={cn(
 						"px-2 py-0.5 rounded text-xs font-medium",
-						variant === "OG" && "bg-green-500/20 text-green-500",
-						variant === "Minimal" && "bg-blue-500/20 text-blue-500",
-						variant === "Verbose" && "bg-purple-500/20 text-purple-500",
-						variant === "AGI" && "bg-amber-500/20 text-amber-500",
+						variant === "Situational" && "bg-green-500/20 text-green-600",
+						variant === "Minimal" && "bg-amber-500/20 text-amber-600",
+						variant === "Guardian" && "bg-purple-500/20 text-purple-600",
+						variant === "Max" && "bg-blue-500/20 text-blue-600",
 					)}>
 						{variant}
 					</span>
@@ -373,10 +373,10 @@ function getAdvancedColumns(showVariant: boolean): ColumnDef<AdvancedStats>[] {
 				return (
 					<span className={cn(
 						"px-2 py-0.5 rounded text-xs font-medium",
-						variant === "OG" && "bg-green-500/20 text-green-500",
-						variant === "Minimal" && "bg-blue-500/20 text-blue-500",
-						variant === "Verbose" && "bg-purple-500/20 text-purple-500",
-						variant === "AGI" && "bg-amber-500/20 text-amber-500",
+						variant === "Situational" && "bg-green-500/20 text-green-600",
+						variant === "Minimal" && "bg-amber-500/20 text-amber-600",
+						variant === "Guardian" && "bg-purple-500/20 text-purple-600",
+						variant === "Max" && "bg-blue-500/20 text-blue-600",
 					)}>
 						{variant}
 					</span>

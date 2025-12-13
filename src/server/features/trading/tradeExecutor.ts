@@ -30,6 +30,7 @@ import {
 import { openPositionsQuery } from "@/server/features/trading/openPositions.server";
 import { calculatePerformanceMetrics } from "@/server/features/trading/performanceMetrics";
 import { buildTradingPrompts } from "@/server/features/trading/promptBuilder";
+import { buildCompetitionSnapshot } from "@/server/features/trading/competitionSnapshot";
 import type { TradingDecisionWithContext } from "@/server/features/trading/tradingDecisions";
 import {
 	type VariantId,
@@ -124,6 +125,12 @@ export async function runTradeWorkflow(account: Account) {
 	const variantId = account.variant ?? DEFAULT_VARIANT;
 	const variantConfig = getVariantConfig(variantId);
 
+	// Leaderboard context (variant-scoped)
+	const competitionSnapshot = await buildCompetitionSnapshot({
+		modelId: account.id,
+		variant: variantId,
+	});
+
 	// Build prompts
 	const enrichedPrompt = buildTradingPrompts({
 		account,
@@ -135,6 +142,7 @@ export async function runTradeWorkflow(account: Account) {
 		currentTime,
 		variant: variantId,
 		symbolActionCounts,
+		competition: competitionSnapshot,
 	});
 
 	// Create tool context for shared state
@@ -184,6 +192,7 @@ export async function runTradeWorkflow(account: Account) {
 			currentTime,
 			variant: variantId,
 			symbolActionCounts, // Include current action counts
+			competition: competitionSnapshot,
 		});
 
 		return freshPrompt.userPrompt;

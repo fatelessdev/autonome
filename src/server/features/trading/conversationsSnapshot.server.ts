@@ -9,7 +9,7 @@ export type ConversationSnapshot = {
 	id: string;
 	modelId: string;
 	modelName: string;
-	modelVariant?: "OG" | "Minimal" | "Verbose" | "AGI";
+	modelVariant?: "Situational" | "Minimal" | "Guardian" | "Max";
 	modelLogo: string;
 	response: string | null;
 	responsePayload: unknown;
@@ -57,7 +57,7 @@ export async function fetchConversationSnapshots(
 	limitPerVariant = 100,
 ): Promise<ConversationSnapshot[]> {
 	// Fetch 100 invocations per variant to ensure fair representation
-	const variants = ["OG", "Minimal", "Verbose", "AGI"] as const;
+	const variants = ["Situational", "Minimal", "Guardian", "Max"] as const;
 
 	const variantQueries = variants.map((variant) =>
 		db.query.invocations.findMany({

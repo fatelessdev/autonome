@@ -6,7 +6,7 @@
  * This script will:
  * 1. Truncate all tables (cascade)
  * 2. Insert the predefined AI models into the Models table
- *    - Each model gets 4 rows, one per variant (OG, Minimal, Verbose, AGI)
+ *    - Each model gets 4 rows, one per variant (Situational, Minimal, Guardian, Max)
  */
 
 import { config } from "dotenv";
@@ -31,19 +31,14 @@ const pool = new Pool({ connectionString: DATABASE_URL });
 const db = drizzle(pool);
 
 // All variants to create for each model
-const VARIANTS = ["OG", "Minimal", "Verbose", "AGI"] as const;
+const VARIANTS = ["Situational", "Minimal", "Guardian", "Max"] as const;
 
 // Model definitions - openRouterModelName
 const MODEL_DEFINITIONS = [
-	"deepseek-ai/deepseek-r1-0528",
 	"deepseek-ai/deepseek-v3.1-terminus",
-	"openai/gpt-oss-120b",
 	"minimaxai/minimax-m2",
-	"moonshotai/kimi-k2-instruct-0905",
-	"qwen/qwen3-next-80b-a3b-thinking",
-	"qwen/qwen3-235b-a22b",
-	"mistralai/mistral-large-3-675b-instruct-2512",
-	"qwen/qwen3-coder-480b-a35b-instruct"
+	"moonshotai/kimi-k2-thinking",
+	"kwaipilot/kat-coder-pro:free"
 ];
 
 /**

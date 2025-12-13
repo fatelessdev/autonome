@@ -7,27 +7,27 @@
  */
 
 import {
-	SYSTEM_PROMPT as SYSTEM_PROMPT_OG,
-	USER_PROMPT as USER_PROMPT_OG,
+	SYSTEM_PROMPT as SYSTEM_PROMPT_SITUATIONAL,
+	USER_PROMPT as USER_PROMPT_SITUATIONAL,
 } from "./prompt1";
 import {
 	SYSTEM_PROMPT as SYSTEM_PROMPT_MINIMAL,
 	USER_PROMPT as USER_PROMPT_MINIMAL,
 } from "./prompt2";
 import {
-	SYSTEM_PROMPT as SYSTEM_PROMPT_VERBOSE,
-	USER_PROMPT as USER_PROMPT_VERBOSE,
+	SYSTEM_PROMPT as SYSTEM_PROMPT_GUARDIAN,
+	USER_PROMPT as USER_PROMPT_GUARDIAN,
 } from "./prompt3";
 import {
-	SYSTEM_PROMPT as SYSTEM_PROMPT_AGI,
-	USER_PROMPT as USER_PROMPT_AGI,
+	SYSTEM_PROMPT as SYSTEM_PROMPT_MAX,
+	USER_PROMPT as USER_PROMPT_MAX,
 } from "./prompt4";
 
 // ==========================================
 // Types
 // ==========================================
 
-export type VariantId = "OG" | "Minimal" | "Verbose" | "AGI";
+export type VariantId = "Situational" | "Minimal" | "Guardian" | "Max";
 
 export interface VariantConfig {
 	/** Unique variant identifier */
@@ -46,44 +46,45 @@ export interface VariantConfig {
 	color: string;
 }
 
+
 // ==========================================
 // Variant Configurations
 // ==========================================
 
 export const VARIANTS: Record<VariantId, VariantConfig> = {
-	OG: {
-		id: "OG",
-		label: "OG",
-		description: "Original balanced strategy with clear decision framework",
-		systemPrompt: SYSTEM_PROMPT_OG,
-		userPrompt: USER_PROMPT_OG,
+	Situational: {
+		id: "Situational",
+		label: "Situational Awareness",
+		description: "Leaderboard-aware attack/defend posture with adaptive risk",
+		systemPrompt: SYSTEM_PROMPT_SITUATIONAL,
+		userPrompt: USER_PROMPT_SITUATIONAL,
 		temperature: 0,
 		color: "#22c55e", // green-500
 	},
 	Minimal: {
 		id: "Minimal",
-		label: "Minimal",
-		description: "Concise prompts focusing on hygiene and discipline",
+		label: "Minimal Discipline",
+		description: "Concise hygiene-first prompts",
 		systemPrompt: SYSTEM_PROMPT_MINIMAL,
 		userPrompt: USER_PROMPT_MINIMAL,
 		temperature: 0,
 		color: "#3b82f6", // blue-500
 	},
-	Verbose: {
-		id: "Verbose",
-		label: "Verbose",
-		description: "Detailed instructions with frontier intelligence approach",
-		systemPrompt: SYSTEM_PROMPT_VERBOSE,
-		userPrompt: USER_PROMPT_VERBOSE,
+	Guardian: {
+		id: "Guardian",
+		label: "Guardian (Survival)",
+		description: "Survival-first frontier intelligence with drawdown brakes",
+		systemPrompt: SYSTEM_PROMPT_GUARDIAN,
+		userPrompt: USER_PROMPT_GUARDIAN,
 		temperature: 0,
 		color: "#a855f7", // purple-500
 	},
-	AGI: {
-		id: "AGI",
-		label: "AGI",
-		description: "Full autonomy with minimal constraints - ApexTrader mode",
-		systemPrompt: SYSTEM_PROMPT_AGI,
-		userPrompt: USER_PROMPT_AGI,
+	Max: {
+		id: "Max",
+		label: "Max Leverage",
+		description: "ApexTrader max-leverage mode with tight risk discipline",
+		systemPrompt: SYSTEM_PROMPT_MAX,
+		userPrompt: USER_PROMPT_MAX,
 		temperature: 0,
 		color: "#f59e0b", // amber-500
 	},
@@ -92,7 +93,12 @@ export const VARIANTS: Record<VariantId, VariantConfig> = {
 /**
  * All variant IDs in display order
  */
-export const VARIANT_IDS: VariantId[] = ["OG", "Minimal", "Verbose", "AGI"];
+export const VARIANT_IDS: VariantId[] = [
+	"Situational",
+	"Minimal",
+	"Guardian",
+	"Max",
+];
 
 /**
  * Get variant config by ID
@@ -115,4 +121,4 @@ export function getAllVariants(): VariantConfig[] {
 /**
  * Default variant for backward compatibility
  */
-export const DEFAULT_VARIANT: VariantId = "OG";
+export const DEFAULT_VARIANT: VariantId = "Situational";

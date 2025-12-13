@@ -89,10 +89,6 @@ export function VariantSelectorDesktop({
 								color: item.color || TEXT_COLOR_FALLBACK,
 							}}
 						>
-							<span
-								className="h-4 w-4 rounded-sm border"
-								style={{ backgroundColor: item.color, borderColor: item.color }}
-							/>
 							<span>{item.label}</span>
 						</DropdownMenuItem>
 					);

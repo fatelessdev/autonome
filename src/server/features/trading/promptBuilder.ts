@@ -10,6 +10,7 @@ import {
 	DEFAULT_VARIANT,
 	getVariantConfig,
 } from "@/server/features/trading/prompts/variants";
+import type { CompetitionSnapshot } from "@/server/features/trading/competitionSnapshot";
 import {
 	buildOpenPositionsSection,
 	buildPerformanceOverview,
@@ -31,6 +32,8 @@ interface TradingPromptParams {
 	variant?: VariantId;
 	/** Per-symbol action counts for session limit tracking */
 	symbolActionCounts?: Map<string, number>;
+	/** Leaderboard context */
+	competition?: CompetitionSnapshot;
 }
 
 /**
@@ -53,6 +56,7 @@ export function buildTradingPrompts(params: TradingPromptParams): {
 		currentTime,
 		variant = DEFAULT_VARIANT,
 		symbolActionCounts,
+		competition,
 	} = params;
 
 	// Get variant-specific prompts
@@ -112,6 +116,14 @@ export function buildTradingPrompts(params: TradingPromptParams): {
 				openPositions,
 				exposureSummary,
 			}),
+		)
+		.replaceAll(
+			"{{COMPETITION_STANDINGS}}",
+			competition?.standings ?? "No leaderboard data",
+		)
+		.replaceAll(
+			"{{COMPETITION_PNL_DELTA}}",
+			competition?.pnlDeltaToLeader ?? "N/A",
 		);
 
 	return {

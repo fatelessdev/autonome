@@ -92,10 +92,10 @@ export const MODEL_INFO: Record<string, ModelInfoEntry> = {
 		label: "GPT-OSS 120B",
 		provider: "nim",
 	},
-	"kimi-k2-instruct-0905": {
+	"kimi-k2-thinking": {
 		logo: "/models/kimi.png",
-		color: "#6B5CE7",
-		label: "Kimi K2 Instruct",
+		color: "#343333",
+		label: "Kimi K2 Thinking",
 		provider: "nim",
 	},
 	"mistral-large-3-675b-instruct-2512": {

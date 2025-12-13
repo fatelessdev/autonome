@@ -243,7 +243,12 @@ export const getPortfolioHistory = os
 											: "",
 									variant:
 										typeof entry.model.variant === "string" &&
-										["OG", "Minimal", "Verbose", "AGI"].includes(entry.model.variant)
+										[
+											"Situational",
+											"Minimal",
+											"Guardian",
+											"Max",
+										].includes(entry.model.variant)
 											? entry.model.variant
 											: undefined,
 									openRouterModelName:

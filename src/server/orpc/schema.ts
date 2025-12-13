@@ -13,7 +13,9 @@ export const TradeSchema = z.object({
 	id: z.string(),
 	modelId: z.string(),
 	modelName: z.string(),
-	modelVariant: z.enum(["OG", "Minimal", "Verbose", "AGI"]).optional(),
+	modelVariant: z
+		.enum(["Situational", "Minimal", "Guardian", "Max"])
+		.optional(),
 	modelRouterName: z.string().optional(),
 	modelKey: z.string().optional(),
 	side: z.enum(["long", "short"]),
@@ -63,7 +65,9 @@ export const PositionSchema = z.object({
 export const AccountPositionsSchema = z.object({
 	modelId: z.string(),
 	modelName: z.string(),
-	modelVariant: z.enum(["OG", "Minimal", "Verbose", "AGI"]).optional(),
+	modelVariant: z
+		.enum(["Situational", "Minimal", "Guardian", "Max"])
+		.optional(),
 	modelLogo: z.string().optional(),
 	positions: z.array(PositionSchema),
 	totalUnrealizedPnl: z.number().optional(),
@@ -101,7 +105,9 @@ export const PortfolioSnapshotSchema = z.object({
 	model: z
 		.object({
 			name: z.string(),
-			variant: z.enum(["OG", "Minimal", "Verbose", "AGI"]).optional(),
+			variant: z
+				.enum(["Situational", "Minimal", "Guardian", "Max"])
+				.optional(),
 			openRouterModelName: z.string().optional(),
 		})
 		.optional(),
@@ -127,7 +133,9 @@ export const InvocationSchema = z.object({
 	id: z.string(),
 	modelId: z.string(),
 	modelName: z.string(),
-	modelVariant: z.enum(["OG", "Minimal", "Verbose", "AGI"]).optional(),
+	modelVariant: z
+		.enum(["Situational", "Minimal", "Guardian", "Max"])
+		.optional(),
 	modelLogo: z.string(),
 	response: z.string().nullable(),
 	responsePayload: z.any().optional(),

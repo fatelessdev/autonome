@@ -61,8 +61,8 @@ function normalizeTrades(payload: TradesResponse): Trade[] {
 				modelName: typeof record.modelName === "string" ? record.modelName : "",
 				modelVariant:
 					typeof record.modelVariant === "string" &&
-					["OG", "Minimal", "Verbose", "AGI"].includes(record.modelVariant)
-						? (record.modelVariant as "OG" | "Minimal" | "Verbose" | "AGI")
+					["Situational", "Minimal", "Guardian", "Max"].includes(record.modelVariant)
+						? (record.modelVariant as "Situational" | "Minimal" | "Guardian" | "Max")
 						: undefined,
 				modelRouterName:
 					typeof record.modelRouterName === "string"
@@ -191,8 +191,8 @@ function normalizePositions(payload: PositionsResponse): ModelPositions[] {
 				modelName,
 				modelVariant:
 					typeof record.modelVariant === "string" &&
-					["OG", "Minimal", "Verbose", "AGI"].includes(record.modelVariant)
-						? (record.modelVariant as "OG" | "Minimal" | "Verbose" | "AGI")
+					["Situational", "Minimal", "Guardian", "Max"].includes(record.modelVariant)
+						? (record.modelVariant as "Situational" | "Minimal" | "Guardian" | "Max")
 						: undefined,
 				modelLogo:
 					typeof record.modelLogo === "string" ? record.modelLogo : modelName,
@@ -280,8 +280,8 @@ function normalizeConversations(
 					typeof record.modelName === "string" ? record.modelName : "Unknown",
 				modelVariant:
 					typeof record.modelVariant === "string" &&
-					["OG", "Minimal", "Verbose", "AGI"].includes(record.modelVariant)
-						? (record.modelVariant as "OG" | "Minimal" | "Verbose" | "AGI")
+					["Situational", "Minimal", "Guardian", "Max"].includes(record.modelVariant)
+						? (record.modelVariant as "Situational" | "Minimal" | "Guardian" | "Max")
 						: undefined,
 				modelLogo:
 					typeof record.modelLogo === "string"

@@ -23,6 +23,8 @@ const WINDOW_MS: Record<LeaderboardWindow, number> = {
 	"30d": 30 * 24 * 60 * 60 * 1000,
 };
 
+type VariantFilter = "Situational" | "Minimal" | "Guardian" | "Max";
+
 /**
  * Fetch closed trades for multiple models and group them
  */
@@ -159,17 +161,19 @@ export async function getModelAccountValue(modelId: string): Promise<number> {
 /**
  * Get all models with their failure counts
  */
-export async function getAllModelsWithFailureCounts(): Promise<
+export async function getAllModelsWithFailureCounts(
+	variantFilter?: VariantFilter,
+): Promise<
 	Array<{
 		id: string;
 		name: string;
-		variant: string;
+		variant: "Situational" | "Minimal" | "Guardian" | "Max";
 		failedWorkflowCount: number;
 		failedToolCallCount: number;
 		invocationCount: number;
 	}>
 > {
-	return db
+	const baseQuery = db
 		.select({
 			id: models.id,
 			name: models.name,
@@ -179,6 +183,9 @@ export async function getAllModelsWithFailureCounts(): Promise<
 			invocationCount: models.invocationCount,
 		})
 		.from(models);
+
+	if (!variantFilter) return baseQuery;
+	return baseQuery.where(eq(models.variant, variantFilter));
 }
 
 /**
@@ -200,28 +207,23 @@ function computeMaxDrawdown(values: number[]): number {
 /**
  * Get leaderboard data for all models within a time window
  * @param window - Time window to calculate stats for
- * @param variantFilter - Optional variant to filter by (e.g., "OG", "Minimal")
+ * @param variantFilter - Optional variant to filter by (e.g., "Situational", "Minimal")
  */
 export async function getLeaderboardData(
 	window: LeaderboardWindow,
-	variantFilter?: string,
+	variantFilter?: VariantFilter,
 ): Promise<LeaderboardEntry[]> {
 	const cutoffMs = Date.now() - WINDOW_MS[window];
 	const cutoffDate = new Date(cutoffMs);
 
-	// Get all models, optionally filtered by variant
-	const allModels = variantFilter
-		? await db
-				.select({ id: models.id, name: models.name, variant: models.variant })
-				.from(models)
-				.where(eq(models.variant, variantFilter as "OG" | "Minimal" | "Verbose" | "AGI"))
-		: await db
-				.select({ id: models.id, name: models.name, variant: models.variant })
-				.from(models);
+	const filteredModels = await db
+		.select({ id: models.id, name: models.name, variant: models.variant })
+		.from(models)
+		.where(variantFilter ? eq(models.variant, variantFilter) : undefined);
 
-	if (allModels.length === 0) return [];
+	if (filteredModels.length === 0) return [];
 
-	const modelIds = allModels.map((m) => m.id);
+	const modelIds = filteredModels.map((m) => m.id);
 
 	// Get portfolio history within window for all models
 	const portfolioRows = await db
@@ -256,7 +258,7 @@ export async function getLeaderboardData(
 
 	// Calculate metrics for each model
 	const entries: LeaderboardEntry[] = [];
-	for (const model of allModels) {
+	for (const model of filteredModels) {
 		const points = byModel.get(model.id) ?? [];
 		if (points.length < 2) {
 			// Not enough data in window
@@ -356,7 +358,7 @@ function isInvocationFailure(
  * Get failure statistics for all models - computed dynamically from invocations
  */
 export async function getModelFailureStats(
-	variantFilter?: "OG" | "Minimal" | "Verbose" | "AGI",
+	variantFilter?: VariantFilter,
 ): Promise<ModelFailureStats[]> {
 	// Get all models
 	const modelQuery = db.select({ id: models.id, name: models.name, variant: models.variant }).from(models);
@@ -449,7 +451,7 @@ export async function getModelFailureStats(
  */
 export async function getRecentFailures(
 	limit = 50,
-	variantFilter?: "OG" | "Minimal" | "Verbose" | "AGI",
+	variantFilter?: VariantFilter,
 ): Promise<FailureEntry[]> {
 	// First, get all invocations with their model info
 	const invocationQuery = db

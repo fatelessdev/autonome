@@ -251,7 +251,7 @@ export function exportLeaderboardToExcel(
 	const wb = XLSX.utils.book_new();
 
 	// Add a sheet for each variant (OG, Minimal, Verbose, AGI)
-	const variants = ["OG", "Minimal", "Verbose", "AGI"];
+	const variants = ["Situational", "Minimal", "Guardian", "Max"];
 	for (const variant of variants) {
 		const data = variantData.find((d) => d.variant === variant);
 		if (data && data.entries.length > 0) {

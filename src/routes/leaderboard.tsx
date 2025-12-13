@@ -59,7 +59,7 @@ function LeaderboardRoute() {
 	);
 
 	// Queries for all variants (used for export)
-	const variants = ["OG", "Minimal", "Verbose", "AGI"] as const;
+	const variants = ["Situational", "Minimal", "Guardian", "Max"] as const;
 	const variantQueries = useQueries({
 		queries: variants.map((variant) =>
 			orpc.analytics.getLeaderboard.queryOptions({
@@ -317,10 +317,10 @@ function LeaderboardRoute() {
 														<TableCell className="px-4 py-3">
 															<span className={cn(
 																"px-2 py-0.5 rounded text-xs font-medium",
-																entry.variant === "OG" && "bg-green-500/20 text-green-500",
-																entry.variant === "Minimal" && "bg-blue-500/20 text-blue-500",
-																entry.variant === "Verbose" && "bg-purple-500/20 text-purple-500",
-																entry.variant === "AGI" && "bg-amber-500/20 text-amber-500",
+																entry.variant === "Situational" && "bg-green-500/20 text-green-600",
+																entry.variant === "Minimal" && "bg-amber-500/20 text-amber-600",
+																entry.variant === "Guardian" && "bg-purple-500/20 text-purple-600",
+																entry.variant === "Max" && "bg-blue-500/20 text-blue-600",
 															)}>
 																{entry.variant}
 															</span>

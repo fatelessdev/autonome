@@ -14,7 +14,12 @@ import {
 
 // ==================== Schema Definitions ====================
 
-const VariantIdSchema = z.enum(["OG", "Minimal", "Verbose", "AGI"]);
+const VariantIdSchema = z.enum([
+	"Situational",
+	"Minimal",
+	"Guardian",
+	"Max",
+]);
 
 const VariantSchema = z.object({
 	id: VariantIdSchema,

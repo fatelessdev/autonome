@@ -27,7 +27,7 @@ export type PortfolioHistoryEntry = {
 	updatedAt: string;
 	model: {
 		name: string;
-		variant?: "OG" | "Minimal" | "Verbose" | "AGI";
+		variant?: "Situational" | "Minimal" | "Guardian" | "Max";
 		openRouterModelName: string;
 	};
 };
@@ -189,9 +189,9 @@ function normalizePortfolioHistory(
 
 			const modelRecord = model as Record<string, unknown>;
 			const variant = typeof modelRecord.variant === "string" &&
-				["OG", "Minimal", "Verbose", "AGI"].includes(modelRecord.variant)
-				? (modelRecord.variant as "OG" | "Minimal" | "Verbose" | "AGI")
-				: undefined;
+				["Situational", "Minimal", "Guardian", "Max"].includes(modelRecord.variant)
+					? (modelRecord.variant as "Situational" | "Minimal" | "Guardian" | "Max")
+					: undefined;
 			return {
 				id,
 				modelId,
@@ -271,7 +271,7 @@ export type VariantHistoryPoint = {
 };
 
 export type VariantHistoryEntry = {
-	variantId: "OG" | "Minimal" | "Verbose" | "AGI";
+	variantId: "Situational" | "Minimal" | "Guardian" | "Max";
 	label: string;
 	color: string;
 	history: VariantHistoryPoint[];

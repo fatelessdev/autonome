@@ -58,7 +58,9 @@ const AdvancedStatsSchema = z.object({
 	failureRate: z.number(),
 });
 
-const VariantFilterSchema = z.enum(["all", "OG", "Minimal", "Verbose", "AGI"]).default("all");
+const VariantFilterSchema = z
+	.enum(["all", "Situational", "Minimal", "Guardian", "Max"])
+	.default("all");
 
 const GetAllModelsStatsInputSchema = z.object({
 	mode: z.enum(["overall", "advanced"]).default("overall"),
