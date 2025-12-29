@@ -1,5 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 import ModelLegend from "@/components/model-legend";
 import type { ChartConfig } from "@/components/ui/chart";
 import { GlowingLineChart } from "@/components/ui/glowing-line";
@@ -26,21 +26,45 @@ export default function PerformanceGraph() {
 	});
 
 	const { selectedVariant } = useVariant();
+	const queryClient = useQueryClient();
+
+	// Server-side variant filtering - pass variant to query
+	const variantParam = selectedVariant === "all" ? undefined : selectedVariant as "Situational" | "Minimal" | "Guardian" | "Max";
 
 	const {
 		data: portfolioData,
 		isPending,
 		isError,
-	} = useQuery(PORTFOLIO_QUERIES.history());
+	} = useQuery(PORTFOLIO_QUERIES.history(variantParam));
 
-	// Filter by variant when not "all"
-	const filteredPortfolioData = useMemo(() => {
-		if (!portfolioData || selectedVariant === "all") return portfolioData;
-		return portfolioData.filter((entry: PortfolioHistoryEntry) => entry.model?.variant === selectedVariant);
-	}, [portfolioData, selectedVariant]);
+	// Subscribe to portfolio SSE events for real-time updates
+	useEffect(() => {
+		const source = new EventSource("/api/events/portfolio");
+
+		source.onmessage = (event) => {
+			try {
+				const payload = JSON.parse(event.data);
+				// SSE stream sends the data payload directly (not wrapped in event object)
+				// Invalidate query when snapshots were created (or on any valid payload)
+				if (payload && (payload.snapshotsCreated > 0 || payload.lastUpdatedAt)) {
+					void queryClient.invalidateQueries({ queryKey: ["portfolio", "history"] });
+				}
+			} catch (error) {
+				console.error("[Portfolio SSE] Failed to parse payload", error);
+			}
+		};
+
+		source.onerror = (error) => {
+			console.error("[Portfolio SSE] Stream error", error);
+		};
+
+		return () => {
+			source.close();
+		};
+	}, [queryClient]);
 
 	const { chartData, chartConfig, seriesMeta } = useMemo(() => {
-		if (!filteredPortfolioData || filteredPortfolioData.length === 0) {
+		if (!portfolioData || portfolioData.length === 0) {
 			return {
 				chartData: [] as DataPoint[],
 				chartConfig: {} as ChartConfig,
@@ -49,8 +73,8 @@ export default function PerformanceGraph() {
 		}
 		// Average values across variants when showing all variants (aggregate mode)
 		const shouldAverage = selectedVariant === "all";
-		return buildChartArtifacts(filteredPortfolioData, shouldAverage);
-	}, [filteredPortfolioData, selectedVariant]);
+		return buildChartArtifacts(portfolioData, shouldAverage);
+	}, [portfolioData, selectedVariant]);
 
 	const filteredData = useMemo(
 		() => filterByTime(chartData, timeFilter),
@@ -160,7 +184,9 @@ function buildChartArtifacts(
 	const modelNames = Array.from(
 		new Set(points.map((point) => point.name)),
 	).filter(Boolean);
-	const tolerance = calculateBucketTolerance(points.map((point) => point.t));
+
+	// Use adaptive tolerance based on total data volume
+	const tolerance = calculateAdaptiveBucketTolerance(points.length);
 
 	const usedKeys = new Set<string>();
 	const nameToSeriesKey = new Map<string, string>();
@@ -261,19 +287,27 @@ function buildChartArtifacts(
 	return { chartData: rows, chartConfig, seriesMeta };
 }
 
-function calculateBucketTolerance(timestamps: number[]): number {
-	if (timestamps.length < 2) {
-		return 30_000;
-	}
+/**
+ * Calculate adaptive bucket tolerance based on data volume.
+ * As data grows, increase the time interval between rendered points:
+ * - < 500 points: 1 minute intervals (show all detail)
+ * - 500-2000 points: 5 minute intervals
+ * - 2000-5000 points: 15 minute intervals
+ * - 5000-10000 points: 1 hour intervals
+ * - > 10000 points: 12 hour intervals
+ */
+function calculateAdaptiveBucketTolerance(dataCount: number): number {
+	const ONE_MINUTE = 60_000;
+	const FIVE_MINUTES = 5 * ONE_MINUTE;
+	const FIFTEEN_MINUTES = 15 * ONE_MINUTE;
+	const ONE_HOUR = 60 * ONE_MINUTE;
+	const TWELVE_HOURS = 12 * ONE_HOUR;
 
-	const gaps: number[] = [];
-	for (let i = 1; i < timestamps.length; i += 1) {
-		gaps.push(timestamps[i] - timestamps[i - 1]);
-	}
-
-	gaps.sort((a, b) => a - b);
-	const medianGap = gaps[Math.floor(gaps.length / 2)] || 60_000;
-	return Math.min(30_000, Math.max(2_000, Math.floor(medianGap * 0.5)));
+	if (dataCount < 500) return ONE_MINUTE;
+	if (dataCount < 2000) return FIVE_MINUTES;
+	if (dataCount < 5000) return FIFTEEN_MINUTES;
+	if (dataCount < 10000) return ONE_HOUR;
+	return TWELVE_HOURS;
 }
 
 function filterByTime(data: DataPoint[], filter: "all" | "72h"): DataPoint[] {

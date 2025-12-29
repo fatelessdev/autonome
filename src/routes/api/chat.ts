@@ -1,13 +1,14 @@
 import "@/polyfill";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { mistral, type MistralLanguageModelOptions } from "@ai-sdk/mistral";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { convertToModelMessages, ToolLoopAgent, stepCountIs } from "ai";
 import { createFileRoute } from "@tanstack/react-router";
 
+import { env } from "@/env";
 import { SQL_ASSISTANT_PROMPT } from "@/server/chat/sqlPrompt";
 import { tools } from "@/server/chat/tools";
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
-import { env } from "@/env";
+
 // Primary model for initial analysis and tool orchestration
 const primaryModel = mistral("codestral-latest");
 
@@ -51,7 +52,7 @@ async function handleChat({ request }: { request: Request }) {
 
 		const sqlAgent = new ToolLoopAgent({
 			// model: primaryModel,
-			model: openrouter('kwaipilot/kat-coder-pro:free'),
+			model: openrouter("xiaomi/mimo-v2-flash:free"),
 			instructions: SQL_ASSISTANT_PROMPT,
 			// instructions: "You are an helpful assistant",
 			providerOptions: {
@@ -64,14 +65,17 @@ async function handleChat({ request }: { request: Request }) {
 				mistral: {
 					parallelToolCalls: true,
 				} satisfies MistralLanguageModelOptions,
-			nim: {
-					chat_template_kwargs: { thinking: false }
+				nim: {
+					chat_template_kwargs: { thinking: false },
 				},
 				openrouter: {
 					reasoning: {
-						effort: 'high',
+						effort: "low",
 						exclude: false, // Set true to hide thinking from final output
-					}
+					},
+                    plugins: [
+                        { id: 'response-healing' }
+                    ]
 				},
 			},
 			tools,

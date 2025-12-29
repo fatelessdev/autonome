@@ -15,13 +15,6 @@ import { Route as ChatRouteImport } from './routes/chat'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
-import { Route as ApiSplatRouteImport } from './routes/api/$'
-import { Route as ApiRpcSplatRouteImport } from './routes/api/rpc.$'
-import { Route as ApiEventsWorkflowRouteImport } from './routes/api/events/workflow'
-import { Route as ApiEventsTradingRouteImport } from './routes/api/events/trading'
-import { Route as ApiEventsTradesRouteImport } from './routes/api/events/trades'
-import { Route as ApiEventsPositionsRouteImport } from './routes/api/events/positions'
-import { Route as ApiEventsConversationsRouteImport } from './routes/api/events/conversations'
 
 const LeaderboardRoute = LeaderboardRouteImport.update({
   id: '/leaderboard',
@@ -53,41 +46,6 @@ const ApiChatRoute = ApiChatRouteImport.update({
   path: '/api/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSplatRoute = ApiSplatRouteImport.update({
-  id: '/api/$',
-  path: '/api/$',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiRpcSplatRoute = ApiRpcSplatRouteImport.update({
-  id: '/api/rpc/$',
-  path: '/api/rpc/$',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiEventsWorkflowRoute = ApiEventsWorkflowRouteImport.update({
-  id: '/api/events/workflow',
-  path: '/api/events/workflow',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiEventsTradingRoute = ApiEventsTradingRouteImport.update({
-  id: '/api/events/trading',
-  path: '/api/events/trading',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiEventsTradesRoute = ApiEventsTradesRouteImport.update({
-  id: '/api/events/trades',
-  path: '/api/events/trades',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiEventsPositionsRoute = ApiEventsPositionsRouteImport.update({
-  id: '/api/events/positions',
-  path: '/api/events/positions',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiEventsConversationsRoute = ApiEventsConversationsRouteImport.update({
-  id: '/api/events/conversations',
-  path: '/api/events/conversations',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -95,14 +53,7 @@ export interface FileRoutesByFullPath {
   '/chat': typeof ChatRoute
   '/failures': typeof FailuresRoute
   '/leaderboard': typeof LeaderboardRoute
-  '/api/$': typeof ApiSplatRoute
   '/api/chat': typeof ApiChatRoute
-  '/api/events/conversations': typeof ApiEventsConversationsRoute
-  '/api/events/positions': typeof ApiEventsPositionsRoute
-  '/api/events/trades': typeof ApiEventsTradesRoute
-  '/api/events/trading': typeof ApiEventsTradingRoute
-  '/api/events/workflow': typeof ApiEventsWorkflowRoute
-  '/api/rpc/$': typeof ApiRpcSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -110,14 +61,7 @@ export interface FileRoutesByTo {
   '/chat': typeof ChatRoute
   '/failures': typeof FailuresRoute
   '/leaderboard': typeof LeaderboardRoute
-  '/api/$': typeof ApiSplatRoute
   '/api/chat': typeof ApiChatRoute
-  '/api/events/conversations': typeof ApiEventsConversationsRoute
-  '/api/events/positions': typeof ApiEventsPositionsRoute
-  '/api/events/trades': typeof ApiEventsTradesRoute
-  '/api/events/trading': typeof ApiEventsTradingRoute
-  '/api/events/workflow': typeof ApiEventsWorkflowRoute
-  '/api/rpc/$': typeof ApiRpcSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -126,14 +70,7 @@ export interface FileRoutesById {
   '/chat': typeof ChatRoute
   '/failures': typeof FailuresRoute
   '/leaderboard': typeof LeaderboardRoute
-  '/api/$': typeof ApiSplatRoute
   '/api/chat': typeof ApiChatRoute
-  '/api/events/conversations': typeof ApiEventsConversationsRoute
-  '/api/events/positions': typeof ApiEventsPositionsRoute
-  '/api/events/trades': typeof ApiEventsTradesRoute
-  '/api/events/trading': typeof ApiEventsTradingRoute
-  '/api/events/workflow': typeof ApiEventsWorkflowRoute
-  '/api/rpc/$': typeof ApiRpcSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -143,29 +80,9 @@ export interface FileRouteTypes {
     | '/chat'
     | '/failures'
     | '/leaderboard'
-    | '/api/$'
     | '/api/chat'
-    | '/api/events/conversations'
-    | '/api/events/positions'
-    | '/api/events/trades'
-    | '/api/events/trading'
-    | '/api/events/workflow'
-    | '/api/rpc/$'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/analytics'
-    | '/chat'
-    | '/failures'
-    | '/leaderboard'
-    | '/api/$'
-    | '/api/chat'
-    | '/api/events/conversations'
-    | '/api/events/positions'
-    | '/api/events/trades'
-    | '/api/events/trading'
-    | '/api/events/workflow'
-    | '/api/rpc/$'
+  to: '/' | '/analytics' | '/chat' | '/failures' | '/leaderboard' | '/api/chat'
   id:
     | '__root__'
     | '/'
@@ -173,14 +90,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/failures'
     | '/leaderboard'
-    | '/api/$'
     | '/api/chat'
-    | '/api/events/conversations'
-    | '/api/events/positions'
-    | '/api/events/trades'
-    | '/api/events/trading'
-    | '/api/events/workflow'
-    | '/api/rpc/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -189,14 +99,7 @@ export interface RootRouteChildren {
   ChatRoute: typeof ChatRoute
   FailuresRoute: typeof FailuresRoute
   LeaderboardRoute: typeof LeaderboardRoute
-  ApiSplatRoute: typeof ApiSplatRoute
   ApiChatRoute: typeof ApiChatRoute
-  ApiEventsConversationsRoute: typeof ApiEventsConversationsRoute
-  ApiEventsPositionsRoute: typeof ApiEventsPositionsRoute
-  ApiEventsTradesRoute: typeof ApiEventsTradesRoute
-  ApiEventsTradingRoute: typeof ApiEventsTradingRoute
-  ApiEventsWorkflowRoute: typeof ApiEventsWorkflowRoute
-  ApiRpcSplatRoute: typeof ApiRpcSplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -243,55 +146,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiChatRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/$': {
-      id: '/api/$'
-      path: '/api/$'
-      fullPath: '/api/$'
-      preLoaderRoute: typeof ApiSplatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/rpc/$': {
-      id: '/api/rpc/$'
-      path: '/api/rpc/$'
-      fullPath: '/api/rpc/$'
-      preLoaderRoute: typeof ApiRpcSplatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/events/workflow': {
-      id: '/api/events/workflow'
-      path: '/api/events/workflow'
-      fullPath: '/api/events/workflow'
-      preLoaderRoute: typeof ApiEventsWorkflowRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/events/trading': {
-      id: '/api/events/trading'
-      path: '/api/events/trading'
-      fullPath: '/api/events/trading'
-      preLoaderRoute: typeof ApiEventsTradingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/events/trades': {
-      id: '/api/events/trades'
-      path: '/api/events/trades'
-      fullPath: '/api/events/trades'
-      preLoaderRoute: typeof ApiEventsTradesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/events/positions': {
-      id: '/api/events/positions'
-      path: '/api/events/positions'
-      fullPath: '/api/events/positions'
-      preLoaderRoute: typeof ApiEventsPositionsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/events/conversations': {
-      id: '/api/events/conversations'
-      path: '/api/events/conversations'
-      fullPath: '/api/events/conversations'
-      preLoaderRoute: typeof ApiEventsConversationsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -301,14 +155,7 @@ const rootRouteChildren: RootRouteChildren = {
   ChatRoute: ChatRoute,
   FailuresRoute: FailuresRoute,
   LeaderboardRoute: LeaderboardRoute,
-  ApiSplatRoute: ApiSplatRoute,
   ApiChatRoute: ApiChatRoute,
-  ApiEventsConversationsRoute: ApiEventsConversationsRoute,
-  ApiEventsPositionsRoute: ApiEventsPositionsRoute,
-  ApiEventsTradesRoute: ApiEventsTradesRoute,
-  ApiEventsTradingRoute: ApiEventsTradingRoute,
-  ApiEventsWorkflowRoute: ApiEventsWorkflowRoute,
-  ApiRpcSplatRoute: ApiRpcSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -3,6 +3,7 @@ import "@/polyfill";
 import { os } from "@orpc/server";
 import * as Sentry from "@sentry/react";
 import { z } from "zod";
+import type { QueryFunctionContext } from "@tanstack/react-query";
 
 import {
 	invocationsQuery,
@@ -10,6 +11,13 @@ import {
 } from "@/server/features/trading/queries.server";
 import { MODEL_INFO } from "@/shared/models/modelConfig";
 import { InvocationsResponseSchema, ModelsResponseSchema } from "../schema";
+
+// Minimal context for direct queryFn calls
+const minimalQueryContext = {
+	queryKey: [] as readonly unknown[],
+	signal: new AbortController().signal,
+	meta: undefined,
+} satisfies QueryFunctionContext;
 
 // ==================== Models ====================
 
@@ -19,7 +27,7 @@ export const getModels = os
 	.handler(async () => {
 		return Sentry.startSpan({ name: "getModels" }, async () => {
 			try {
-				const models = await modelsListQuery().queryFn({} as any);
+				const models = await modelsListQuery().queryFn(minimalQueryContext);
 				return { models };
 			} catch (error) {
 				console.error("Failed to fetch models", error);
@@ -46,7 +54,7 @@ export const getInvocations = os
 	.handler(async () => {
 		return Sentry.startSpan({ name: "getInvocations" }, async () => {
 			try {
-				const conversations = await invocationsQuery().queryFn({} as any);
+				const conversations = await invocationsQuery().queryFn(minimalQueryContext);
 				return { conversations };
 			} catch (error) {
 				console.error("Error fetching invocations", error);

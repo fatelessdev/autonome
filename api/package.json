@@ -1,0 +1,7 @@
+{
+	"name": "@autonome/api",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"description": "Standalone Hono API server for Autonome. Run from project root using 'bun run dev:api'."
+}

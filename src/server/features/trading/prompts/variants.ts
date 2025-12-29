@@ -73,7 +73,7 @@ export const VARIANTS: Record<VariantId, VariantConfig> = {
 	Guardian: {
 		id: "Guardian",
 		label: "Guardian (Survival)",
-		description: "Survival-first frontier intelligence with drawdown brakes",
+		description: "Monk Mode survival: do nothing by default, strict drawdown brakes",
 		systemPrompt: SYSTEM_PROMPT_GUARDIAN,
 		userPrompt: USER_PROMPT_GUARDIAN,
 		temperature: 0,
@@ -82,7 +82,7 @@ export const VARIANTS: Record<VariantId, VariantConfig> = {
 	Max: {
 		id: "Max",
 		label: "Max Leverage",
-		description: "ApexTrader max-leverage mode with tight risk discipline",
+		description: "ApexTrader 10x leverage with tight risk discipline",
 		systemPrompt: SYSTEM_PROMPT_MAX,
 		userPrompt: USER_PROMPT_MAX,
 		temperature: 0,

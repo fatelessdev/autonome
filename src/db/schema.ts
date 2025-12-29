@@ -98,12 +98,16 @@ export const portfolioSize = pgTable(
 				onDelete: "restrict",
 				onUpdate: "cascade",
 			}),
-		netPortfolio: text("netPortfolio").notNull(),
+		netPortfolio: numeric("netPortfolio", { precision: 18, scale: 2 }).notNull(),
 		createdAt: timestamp("createdAt").defaultNow().notNull(),
 		updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 	},
 	(table) => ({
 		modelIdx: index("PortfolioSize_modelId_idx").on(table.modelId),
+		// Composite index for efficient time-range queries per model
+		modelCreatedAtIdx: index("PortfolioSize_modelId_createdAt_idx").on(table.modelId, table.createdAt),
+		// Standalone index for time-based pruning/aggregation
+		createdAtIdx: index("PortfolioSize_createdAt_idx").on(table.createdAt),
 	}),
 );
 

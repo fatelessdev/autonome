@@ -140,13 +140,21 @@ type TradeRecord = {
 	timestamp: string;
 };
 
-export async function fetchTrades(): Promise<TradeRecord[]> {
-	// Fetch 100 closed orders per variant to ensure fair representation
-	// This avoids one active variant dominating the trades list
-	const variants = ["Situational", "Minimal", "Guardian", "Max"] as const;
-	const LIMIT_PER_VARIANT = 100;
+export type FetchTradesOptions = {
+	variant?: "Situational" | "Minimal" | "Guardian" | "Max";
+	limit?: number;
+};
 
-	const variantQueries = variants.map((variant) =>
+export async function fetchTrades(options?: FetchTradesOptions): Promise<TradeRecord[]> {
+	const { variant, limit = 100 } = options ?? {};
+
+	// If a specific variant is requested, fetch only for that variant
+	const variants = variant
+		? [variant]
+		: (["Situational", "Minimal", "Guardian", "Max"] as const);
+	const LIMIT_PER_VARIANT = Math.ceil(limit / variants.length);
+
+	const variantQueries = variants.map((v) =>
 		db.query.orders.findMany({
 			where: and(
 				eq(orders.status, "CLOSED"),
@@ -155,7 +163,7 @@ export async function fetchTrades(): Promise<TradeRecord[]> {
 					db
 						.select({ id: models.id })
 						.from(models)
-						.where(eq(models.variant, variant)),
+						.where(eq(models.variant, v)),
 				),
 			),
 			with: {
@@ -215,7 +223,7 @@ export async function fetchTrades(): Promise<TradeRecord[]> {
 export const tradesQuery = () =>
 	queryOptions({
 		queryKey: ["trades"],
-		queryFn: fetchTrades,
+		queryFn: () => fetchTrades(),
 		staleTime: 15_000, // 15 seconds
 		gcTime: 2 * 60_000, // 2 minutes
 	});
@@ -263,21 +271,41 @@ async function reconcilePositionsWithLive(
 	}
 }
 
-export async function fetchPositions() {
+export type FetchPositionsOptions = {
+	variant?: "Situational" | "Minimal" | "Guardian" | "Max";
+};
+
+export async function fetchPositions(options?: FetchPositionsOptions) {
+	const { variant } = options ?? {};
+
 	try {
-		// Fetch all models
-		const dbModels = await db
-			.select({
-				id: models.id,
-				name: models.name,
-				modelLogo: models.openRouterModelName,
-				variant: models.variant,
-				lighterApiKey: models.lighterApiKey,
-				accountIndex: models.accountIndex,
-				invocationCount: models.invocationCount,
-				totalMinutes: models.totalMinutes,
-			})
-			.from(models);
+		// Fetch models - filter by variant if specified
+		const dbModels = variant
+			? await db
+					.select({
+						id: models.id,
+						name: models.name,
+						modelLogo: models.openRouterModelName,
+						variant: models.variant,
+						lighterApiKey: models.lighterApiKey,
+						accountIndex: models.accountIndex,
+						invocationCount: models.invocationCount,
+						totalMinutes: models.totalMinutes,
+					})
+					.from(models)
+					.where(eq(models.variant, variant))
+			: await db
+					.select({
+						id: models.id,
+						name: models.name,
+						modelLogo: models.openRouterModelName,
+						variant: models.variant,
+						lighterApiKey: models.lighterApiKey,
+						accountIndex: models.accountIndex,
+						invocationCount: models.invocationCount,
+						totalMinutes: models.totalMinutes,
+					})
+					.from(models);
 
 		// Get full simulator snapshots - this is the single source of truth for all position data
 		// Using snapshots ensures UI shows exact same values as the model prompt
@@ -514,7 +542,7 @@ export async function fetchPositions() {
 export const positionsQuery = () =>
 	queryOptions({
 		queryKey: ["positions"],
-		queryFn: fetchPositions,
+		queryFn: () => fetchPositions(),
 		staleTime: 15_000, // 15 seconds
 		gcTime: 2 * 60_000, // 2 minutes
 		refetchInterval: 30_000, // Auto-refresh every 30 seconds
@@ -524,32 +552,28 @@ export const positionsQuery = () =>
 // PORTFOLIO HISTORY
 // ==========================================
 
-export async function fetchPortfolioHistory() {
-	const entries = await db.query.portfolioSize.findMany({
-		with: {
-			model: {
-				columns: {
-					name: true,
-					variant: true,
-					openRouterModelName: true,
-				},
-			},
-		},
-		orderBy: (row, { asc: ascHelper }) => ascHelper(row.createdAt),
+import {
+	getPortfolioHistoryWithResolution,
+	downsampleForChart,
+} from "@/server/features/portfolio/retentionService";
+
+export type PortfolioHistoryOptions = {
+	variant?: string;
+	startDate?: Date;
+	endDate?: Date;
+	maxPoints?: number;
+};
+
+export async function fetchPortfolioHistory(options?: PortfolioHistoryOptions) {
+	const entries = await getPortfolioHistoryWithResolution({
+		variant: options?.variant,
+		startDate: options?.startDate,
+		endDate: options?.endDate,
+		maxPoints: options?.maxPoints ?? 2000,
 	});
 
-	return entries.map((entry) => ({
-		id: entry.id,
-		modelId: entry.modelId,
-		netPortfolio: entry.netPortfolio,
-		createdAt: entry.createdAt.toISOString(),
-		updatedAt: entry.updatedAt.toISOString(),
-		model: {
-			name: entry.model?.name ?? "Unknown Model",
-			variant: entry.model?.variant ?? undefined,
-			openRouterModelName: entry.model?.openRouterModelName ?? "unknown-model",
-		},
-	}));
+	// Apply client-side downsampling for chart performance
+	return downsampleForChart(entries, 500);
 }
 
 /**
@@ -559,7 +583,7 @@ export async function fetchPortfolioHistory() {
 export const portfolioHistoryQuery = () =>
 	queryOptions({
 		queryKey: ["portfolio-history"],
-		queryFn: fetchPortfolioHistory,
+		queryFn: () => fetchPortfolioHistory(),
 		staleTime: 60_000, // 1 minute
 		gcTime: 10 * 60_000, // 10 minutes
 	});

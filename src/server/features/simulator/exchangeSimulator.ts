@@ -1,5 +1,3 @@
-//@ts-nocheck
-
 import { orderApi } from "@/server/integrations/lighter";
 import { ToolCallType } from "@/server/db/tradingRepository";
 import {
@@ -30,7 +28,19 @@ import type {
 import { emitAllDataChanged } from "@/server/events/workflowEvents";
 import { MARKETS } from "@/shared/markets/marketMetadata";
 
+// ============================================================================
+// Types
+// ============================================================================
+
 type SimulatorEventType = MarketEvent["type"];
+
+interface PlaceOrderOptions {
+	skipValidation?: boolean;
+}
+
+interface ClosePositionsOptions {
+	autoTrigger?: "STOP" | "TARGET";
+}
 
 class SimpleEmitter {
 	private readonly listeners = new Map<
@@ -409,7 +419,9 @@ export class ExchangeSimulator {
 	}
 
 	async placeOrder(
-		request: SimulatedOrderRequest, accountId: string, p0: { skipValidation: boolean; },
+		request: SimulatedOrderRequest,
+		accountId: string,
+		options?: PlaceOrderOptions,
 	): Promise<SimulatedOrderResult> {
 		const symbol = normalizeSymbol(request.symbol);
 		const market = this.markets.get(symbol);
@@ -434,25 +446,28 @@ export class ExchangeSimulator {
 			return { ...execution, symbol, side: request.side, type: request.type };
 		}
 
-		if (
-			!account.hasSufficientCash(
-				symbol,
-				request.side,
-				execution,
-				request.leverage,
-			)
-		) {
-			return {
-				fills: [],
-				averagePrice: 0,
-				totalQuantity: 0,
-				totalFees: 0,
-				status: "rejected",
-				reason: "insufficient available cash",
-				symbol,
-				side: request.side,
-				type: request.type,
-			};
+		// Skip validation if explicitly requested (e.g., for auto-closes)
+		if (!options?.skipValidation) {
+			if (
+				!account.hasSufficientCash(
+					symbol,
+					request.side,
+					execution,
+					request.leverage,
+				)
+			) {
+				return {
+					fills: [],
+					averagePrice: 0,
+					totalQuantity: 0,
+					totalFees: 0,
+					status: "rejected",
+					reason: "insufficient available cash",
+					symbol,
+					side: request.side,
+					type: request.type,
+				};
+			}
 		}
 
 		account.applyExecution(symbol, request.side, execution, request.leverage);
@@ -514,7 +529,7 @@ export class ExchangeSimulator {
 	async closePositions(
 		symbols: string[],
 		accountId: string,
-		options?: { autoTrigger?: "STOP" | "TARGET" },
+		options?: ClosePositionsOptions,
 	): Promise<Record<string, SimulatedOrderResult>> {
 		const outcomes: Record<string, SimulatedOrderResult> = {};
 
@@ -538,6 +553,7 @@ export class ExchangeSimulator {
 			const result = await this.placeOrder(
 				{ symbol, side, quantity, type: "market" },
 				accountId,
+				{ skipValidation: true },
 			);
 			outcomes[symbolRaw] = result;
 			const account = this.accounts.get(accountId);

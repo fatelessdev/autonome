@@ -35,10 +35,14 @@ const VARIANTS = ["Situational", "Minimal", "Guardian", "Max"] as const;
 
 // Model definitions - openRouterModelName
 const MODEL_DEFINITIONS = [
-	"deepseek-ai/deepseek-v3.1-terminus",
+	"deepseek-ai/deepseek-v3.2",
 	"minimaxai/minimax-m2",
 	"moonshotai/kimi-k2-thinking",
-	"kwaipilot/kat-coder-pro:free"
+	// "xiaomi/mimo-v2-flash:free",
+	// "kwaipilot/kat-coder-pro:free",
+	
+	// "mistralai/mistral-large-3-675b-instruct-2512"
+
 ];
 
 /**

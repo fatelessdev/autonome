@@ -49,6 +49,17 @@ export function createTradeAgent(config: TradeAgentConfig) {
 		headers: {
 			Authorization: `Bearer ${env.NIM_API_KEY}`,
 		},
+		// fetch: async (url, options) => {
+		// 	if (options.method === 'POST' && options.body) {
+		// 		const body = JSON.parse(options.body as string);
+
+		// 		// INJECT YOUR CUSTOM PARAMETERS HERE
+		// 		body.chat_template_kwargs = { thinking: true };
+
+		// 		options.body = JSON.stringify(body);
+		// 	}
+		// 	return fetch(url, options);
+		// },
 	});
 
 	const openrouter = createOpenRouter({
@@ -95,6 +106,7 @@ export function createTradeAgent(config: TradeAgentConfig) {
 				"gpt-oss",
 				"qwen3-next",
 				"deepseek-r1",
+				"mistral-large-3-675b-instruct-2512"
 			];
 			const requiresAutoToolChoice = autoToolModels.some((id) =>
 				modelId.includes(id),
@@ -104,12 +116,12 @@ export function createTradeAgent(config: TradeAgentConfig) {
 				...settings,
 				...(requiresAutoToolChoice && { toolChoice: "auto" as const }),
 				providerOptions: {
-					openrouter: {
-						reasoning: {
-							effort: options?.reasoningEffort ?? "high",
-							exclude: false,
-						},
-					},
+					// openrouter: {
+					// 	reasoning: {
+					// 		effort: options?.reasoningEffort ?? "high",
+					// 		exclude: false,
+					// 	},
+					// },
 				},
 			};
 		},
@@ -212,7 +224,7 @@ export function createTradeAgent(config: TradeAgentConfig) {
 		},
 		// Structured output schema - only for OpenRouter models that support it
 		// NIM models don't support structuredOutputs, so we rely on tool calls only
-		...(outputConfig && { output: outputConfig }),
+		// ...(outputConfig && { output: outputConfig }),
 		// Create tools with shared context
 		tools: createTradingTools(toolContext),
 	});

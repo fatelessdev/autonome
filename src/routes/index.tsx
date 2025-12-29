@@ -6,34 +6,11 @@ import PerformanceGraph from "@/components/performance-graph";
 import TradesSidebar from "@/components/trades-sidebar";
 import { VariantSelector } from "@/components/variant-selector";
 import { useVariant } from "@/components/variant-context";
-import { SUPPORTED_MARKETS } from "@/core/shared/markets/marketMetadata";
-import {
-	MARKET_QUERIES,
-	PORTFOLIO_QUERIES,
-} from "@/core/shared/markets/marketQueries";
-import { DASHBOARD_QUERIES } from "@/core/shared/trading/dashboardQueries";
 import { useBoolean } from "@/hooks/useBoolean";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 
-const DASHBOARD_PREFETCHES = [
-	DASHBOARD_QUERIES.trades(),
-	DASHBOARD_QUERIES.positions(),
-	DASHBOARD_QUERIES.conversations(),
-] as const;
-
 export const Route = createFileRoute("/")({
 	component: DashboardRoute,
-	loader: async ({ context }) => {
-		const { queryClient } = context;
-
-		await Promise.all([
-			queryClient.ensureQueryData(PORTFOLIO_QUERIES.history()),
-			queryClient.ensureQueryData(MARKET_QUERIES.prices(SUPPORTED_MARKETS)),
-			...DASHBOARD_PREFETCHES.map((options) =>
-				queryClient.ensureQueryData(options),
-			),
-		]);
-	},
 });
 
 function DashboardRoute() {

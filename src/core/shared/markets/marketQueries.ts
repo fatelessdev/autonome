@@ -46,7 +46,7 @@ const MARKET_QUERY_KEYS = {
 } as const;
 
 const PORTFOLIO_QUERY_KEYS = {
-	history: () => ["portfolio", "history"] as const,
+	history: (variant?: string) => ["portfolio", "history", variant ?? "all"] as const,
 } as const;
 
 function normalizeMarketPrice(
@@ -160,62 +160,72 @@ function normalizePortfolioHistory(
 		return [];
 	}
 
-	return raw
-		.map((entry) => {
-			if (!entry || typeof entry !== "object") return null;
-			const record = entry as Record<string, unknown>;
-			const id = typeof record.id === "string" ? record.id : null;
-			const modelId =
-				typeof record.modelId === "string" ? record.modelId : null;
-			const netPortfolio =
-				typeof record.netPortfolio === "string" ? record.netPortfolio : null;
-			const createdAt =
-				typeof record.createdAt === "string" ? record.createdAt : null;
-			const updatedAt =
-				typeof record.updatedAt === "string" ? record.updatedAt : null;
-			const model =
-				record.model && typeof record.model === "object" ? record.model : null;
+	const entries: PortfolioHistoryEntry[] = [];
 
-			if (
-				!id ||
-				!modelId ||
-				!netPortfolio ||
-				!createdAt ||
-				!updatedAt ||
-				!model
-			) {
-				return null;
-			}
+	for (const entry of raw) {
+		if (!entry || typeof entry !== "object") continue;
+		const record = entry as Record<string, unknown>;
+		const id = typeof record.id === "string" ? record.id : null;
+		const modelId =
+			typeof record.modelId === "string" ? record.modelId : null;
+		const netPortfolio =
+			typeof record.netPortfolio === "string" ? record.netPortfolio : null;
+		const createdAt =
+			typeof record.createdAt === "string" ? record.createdAt : null;
+		const updatedAt =
+			typeof record.updatedAt === "string" ? record.updatedAt : null;
+		const model =
+			record.model && typeof record.model === "object" ? record.model : null;
 
-			const modelRecord = model as Record<string, unknown>;
-			const variant = typeof modelRecord.variant === "string" &&
-				["Situational", "Minimal", "Guardian", "Max"].includes(modelRecord.variant)
-					? (modelRecord.variant as "Situational" | "Minimal" | "Guardian" | "Max")
-					: undefined;
-			return {
-				id,
-				modelId,
-				netPortfolio,
-				createdAt,
-				updatedAt,
-				model: {
-					name:
-						typeof modelRecord.name === "string"
-							? modelRecord.name
-							: "Unknown Model",
-					variant,
-					openRouterModelName:
-						typeof modelRecord.openRouterModelName === "string"
-							? modelRecord.openRouterModelName
-							: "unknown-model",
-				},
-			} satisfies PortfolioHistoryEntry;
-		})
-		.filter((entry): entry is PortfolioHistoryEntry => Boolean(entry));
+		if (
+			!id ||
+			!modelId ||
+			!netPortfolio ||
+			!createdAt ||
+			!updatedAt ||
+			!model
+		) {
+			continue;
+		}
+
+		const modelRecord = model as Record<string, unknown>;
+		const variant = typeof modelRecord.variant === "string" &&
+			["Situational", "Minimal", "Guardian", "Max"].includes(modelRecord.variant)
+				? (modelRecord.variant as "Situational" | "Minimal" | "Guardian" | "Max")
+				: undefined;
+
+		entries.push({
+			id,
+			modelId,
+			netPortfolio,
+			createdAt,
+			updatedAt,
+			model: {
+				name:
+					typeof modelRecord.name === "string"
+						? modelRecord.name
+						: "Unknown Model",
+				variant,
+				openRouterModelName:
+					typeof modelRecord.openRouterModelName === "string"
+						? modelRecord.openRouterModelName
+						: "unknown-model",
+			},
+		});
+	}
+
+	return entries;
 }
 
-async function requestPortfolioHistory() {
-	const data = await orpc.trading.getPortfolioHistory.call({});
+async function requestPortfolioHistory(variant?: "Situational" | "Minimal" | "Guardian" | "Max") {
+	// When fetching aggregate (all variants), request more points since they're spread across all model-variant combinations
+	// With 7 models × 4 variants = 28 combinations, we need ~4x more points to maintain the same time resolution
+	const maxPoints = variant ? 2000 : 8000;
+	
+	const data = await orpc.trading.getPortfolioHistory.call({
+		variant,
+		maxPoints,
+	});
 	// Transform the data to match the expected format
 	const transformedData = data.map((entry) => ({
 		...entry,
@@ -228,23 +238,23 @@ async function requestPortfolioHistory() {
 	return normalizePortfolioHistory({ history: transformedData });
 }
 
-export const portfolioHistoryQueryOptions = () =>
+export const portfolioHistoryQueryOptions = (variant?: "Situational" | "Minimal" | "Guardian" | "Max") =>
 	queryOptions({
-		queryKey: PORTFOLIO_QUERY_KEYS.history(),
-		queryFn: requestPortfolioHistory,
+		queryKey: PORTFOLIO_QUERY_KEYS.history(variant),
+		queryFn: () => requestPortfolioHistory(variant),
 		staleTime: 3 * 60_000,
 		gcTime: 15 * 60_000,
 		refetchInterval: 3 * 60_000,
 	});
 
-export async function prefetchPortfolioHistory(queryClient: QueryClient) {
-	return queryClient.ensureQueryData(portfolioHistoryQueryOptions());
+export async function prefetchPortfolioHistory(queryClient: QueryClient, variant?: "Situational" | "Minimal" | "Guardian" | "Max") {
+	return queryClient.ensureQueryData(portfolioHistoryQueryOptions(variant));
 }
 
 export function createPortfolioHistoryUpdater(queryClient: QueryClient) {
-	return (payload: PortfolioHistoryResponse) => {
+	return (payload: PortfolioHistoryResponse, variant?: string) => {
 		const normalized = normalizePortfolioHistory(payload);
-		queryClient.setQueryData(PORTFOLIO_QUERY_KEYS.history(), normalized);
+		queryClient.setQueryData(PORTFOLIO_QUERY_KEYS.history(variant), normalized);
 		return normalized;
 	};
 }

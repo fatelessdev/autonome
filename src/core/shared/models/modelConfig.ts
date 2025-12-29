@@ -14,35 +14,23 @@ export const MODEL_INFO: Record<string, ModelInfoEntry> = {
 		label: "DeepSeek V3.1 Terminus",
 		provider: "nim",
 	},
-	"deepseek-v3.1": {
+	"deepseek-v3.2": {
 		logo: "/models/deepseek.png",
 		color: "#4D6BFE",
-		label: "DeepSeek V3.1",
+		label: "DeepSeek V3.2",
 		provider: "nim",
-	},
-	"deepseek-r1t2-chimera": {
-		logo: "/models/deepseek.png",
-		color: "#4D6BFE",
-		label: "DeepSeek R1T2 Chimera",
-		provider: "openrouter",
-	},
-	"deepseek-r1-0528": {
-		logo: "/models/deepseek.png",
-		color: "#4D6BFE",
-		label: "DeepSeek R1 0528",
-		provider: "nim",
-	},
-	"claude-sonnet-4.5": {
-		logo: "/models/claude.png",
-		color: "#FF6B35",
-		label: "Claude Sonnet 4.5",
-		provider: "openrouter",
 	},
 	"kat-coder-pro": {
 		logo: "/models/kwaipilot.png",
 		color: "#31DAF3",
 		label: "Kat Coder Pro",
 		provider: "openrouter",
+	},
+	"mimo-v2-flash": {
+		logo: "/models/mimo.png",
+		color: "#FF6900",
+		label: "Mimo V2 Flash",
+		provider: "openrouter"
 	},
 	"grok-4.1-fast": {
 		logo: "/models/grok.webp",
@@ -55,24 +43,6 @@ export const MODEL_INFO: Record<string, ModelInfoEntry> = {
 		color: "#8B5CF6",
 		label: "Qwen3 Max",
 		provider: "openrouter",
-	},
-	"qwen3-235b-a22b": {
-		logo: "/models/qwen.png",
-		color: "#8B5CF6",
-		label: "Qwen3 235B",
-		provider: "nim",
-	},
-	"qwen3-coder-480b-a35b-instruct": {
-		logo: "/models/qwen.png",
-		color: "#8B5CF6",
-		label: "Qwen3 Coder 480B",
-		provider: "nim",
-	},
-	"qwen3-next-80b-a3b-thinking": {
-		logo: "/models/qwen.png",
-		color: "#8B5CF6",
-		label: "Qwen3 Next 80B",
-		provider: "nim",
 	},
 	"glm-4.5-air": {
 		logo: "/models/glm.svg",

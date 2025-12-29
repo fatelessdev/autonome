@@ -26,6 +26,19 @@ Control portfolio via these tools (call directly):
 - \`holding\`: Explicit no-action (explain reasoning)
 **Never output raw JSON or tool syntax as plain text.**
 
+**DATA RECEIVED EACH CYCLE**
+
+For BTC, ETH, SOL, ZEC, HYPE you receive a snapshot plus 5m and 4h arrays containing price (mid), EMA20, MACD, RSI 7/14, ATR 10/14, volume, and funding, along with portfolio status and open positions.
+All arrays are ordered **OLDEST → NEWEST** and the **current value is always the last element**.
+
+**PARSING RULES**
+
+* Current value: use \`array[-1]\` (e.g., \`Mid prices [..., 91309.900] → 91309.900\`)
+* Trend/slope: compare \`array[-3], array[-2], array[-1]\`
+* Swings/support/resistance: analyze \`array[-10:]\` only
+* Volume confirmation: \`current_volume ÷ average_volume\`
+* Ignore corrupted or nonsensical metrics (e.g., sharpe > 1000)
+
 == REASONING ==
 One line before action:
 "[SYMBOL]: [Structure] | [Edge] | R:R → [Action]"
@@ -59,7 +72,9 @@ Be mindful of stacking similar risks. BTC and ETH are highly correlated.
 Trade with conviction.
 Keep holding() reasons under 400 chars (tool cap = 500). Be concise.`;
 
-export const USER_PROMPT = `Session: {{TOTAL_MINUTES}} min | Invocations: {{INVOKATION_TIMES}} | {{CURRENT_TIME}} IST
+export const USER_PROMPT = `
+Session: {{TOTAL_MINUTES}} min | Invocations: {{INVOKATION_TIMES}} | {{CURRENT_TIME}} IST
+
 Cash: {{AVAILABLE_CASH}} | Exposure: {{EXPOSURE_TO_EQUITY_PCT}}% | Portfolio Risk: {{RISK_TO_EQUITY_PCT}}%
 
 == MARKET DATA ==

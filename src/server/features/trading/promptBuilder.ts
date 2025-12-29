@@ -18,7 +18,6 @@ import {
 	calculateExposureToEquityPct,
 	formatUsd,
 } from "@/server/features/trading/promptSections";
-import { SUPPORTED_MARKETS } from "@/core/shared/markets/marketMetadata";
 
 interface TradingPromptParams {
 	account: Account;
@@ -55,7 +54,7 @@ export function buildTradingPrompts(params: TradingPromptParams): {
 		marketIntelligence,
 		currentTime,
 		variant = DEFAULT_VARIANT,
-		symbolActionCounts,
+		symbolActionCounts: _symbolActionCounts,
 		competition,
 	} = params;
 
@@ -124,7 +123,12 @@ export function buildTradingPrompts(params: TradingPromptParams): {
 		.replaceAll(
 			"{{COMPETITION_PNL_DELTA}}",
 			competition?.pnlDeltaToLeader ?? "N/A",
-		);
+		)
+		.replaceAll(
+			"{{COMPETITION_OPEN_POSITIONS}}",
+			competition?.openPositionsSummary ?? "No peer position data",
+		)
+		;
 
 	return {
 		systemPrompt: SYSTEM_PROMPT,
