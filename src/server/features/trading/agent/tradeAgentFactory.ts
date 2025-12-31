@@ -127,56 +127,42 @@ export function createTradeAgent(config: TradeAgentConfig) {
 		},
 		// Re-fetch portfolio data and update the user prompt before each step
 		// This ensures the agent sees current cash/exposure/positions after tool calls
-		// prepareStep: async ({ stepNumber, messages }) => {
-		// 	// TODO: Re-enable symbol limit tool restriction later
-		// 	// Check if all symbols have hit their per-session action limit
-		// 	// If so, restrict to only holding and updateExitPlan tools
-		// 	// const allSymbolsAtLimit = SUPPORTED_MARKETS.every((symbol) => {
-		// 	// 	const count = toolContext.symbolActionCounts.get(symbol) ?? 0;
-		// 	// 	return count >= MAX_ACTIONS_PER_SYMBOL;
-		// 	// });
+		prepareStep: async ({ stepNumber, messages }) => {
+			// Base result (no tool restrictions - using prompt-based hysteresis instead)
+			const baseResult: {
+				messages?: typeof messages;
+			} = {};
 
-		// 	// Base result with potential tool restrictions
-		// 	const baseResult: {
-		// 		messages?: typeof messages;
-		// 		activeTools?: string[];
-		// 	} = {};
+			// Only rebuild prompt after the first step (when there have been tool calls)
+			if (stepNumber === 0 || !rebuildUserPrompt) {
+				return baseResult;
+			}
 
-		// 	// if (allSymbolsAtLimit) {
-		// 	// 	// Only allow holding and updateExitPlan when all symbols are at limit
-		// 	// 	baseResult.activeTools = ["holding", "updateExitPlan"];
-		// 	// }
+			try {
+				const freshUserPrompt = await rebuildUserPrompt();
 
-		// 	// Only rebuild prompt after the first step (when there have been tool calls)
-		// 	if (stepNumber === 0 || !rebuildUserPrompt) {
-		// 		return baseResult;
-		// 	}
+				// Find and update the first user message with fresh data
+				// This ensures the agent sees current portfolio state
+				const updatedMessages = messages.map((msg, index) => {
+					// Find the first user message (initial prompt) and update it
+					if (msg.role === "user" && index === 0) {
+						return {
+							...msg,
+							content: freshUserPrompt,
+						};
+					}
+					return msg;
+				});
 
-		// 	try {
-		// 		const freshUserPrompt = await rebuildUserPrompt();
-
-		// 		// Find and update the last user message with fresh data
-		// 		// We need to rebuild the messages array with the updated prompt
-		// 		const updatedMessages = messages.map((msg, index) => {
-		// 			// Find the first user message (initial prompt) and update it
-		// 			if (msg.role === "user" && index === 0) {
-		// 				return {
-		// 					...msg,
-		// 					content: freshUserPrompt,
-		// 				};
-		// 			}
-		// 			return msg;
-		// 		});
-
-		// 		return { ...baseResult, messages: updatedMessages };
-		// 	} catch (error) {
-		// 		console.warn(
-		// 			`[TradeAgent] Failed to refresh prompt for step ${stepNumber}:`,
-		// 			error,
-		// 		);
-		// 		return baseResult;
-		// 	}
-		// },
+				return { ...baseResult, messages: updatedMessages };
+			} catch (error) {
+				console.warn(
+					`[TradeAgent] Failed to refresh prompt for step ${stepNumber}:`,
+					error,
+				);
+				return baseResult;
+			}
+		},
 		// Per-step telemetry for cost tracking and debugging
 		onStepFinish: ({ toolCalls, usage }) => {
 			currentStepNumber++;

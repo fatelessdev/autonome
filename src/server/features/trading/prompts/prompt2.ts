@@ -69,7 +69,38 @@ No clear edge? → \`holding\`. Patience is alpha.
 == CORRELATION ==
 Be mindful of stacking similar risks. BTC and ETH are highly correlated.
 
-Trade with conviction.
+== ANTI-CHURN DISCIPLINE ==
+**Hysteresis Rule:** Require STRONGER evidence to CHANGE than to HOLD.
+Only flip direction if BOTH:
+a) 4h structure (EMA alignment, MACD regime) supports new direction
+b) 5m confirms with break > 0.5×ATR + momentum
+
+Without both: HOLD → Tighten SL → Partial profit → Adjust TP.
+Never flip on: RSI extremes alone, single candles, minor funding shifts.
+
+**Cooldown:** 3-invocation (~15 min) pause after any position action before direction change.
+Exception: Hard invalidation at invalidation_price.
+Encode "cooldown_until: ISO_TIMESTAMP" in exit_plan.
+
+== EXIT PLAN REQUIREMENTS ==
+Every position MUST specify:
+- invalidation_trigger: Condition killing thesis
+- invalidation_price: Exact level
+- time_exit: Max hold duration
+- cooldown_until: Next direction-change allowed
+
+Close ONLY when: SL/TP hit, invalidation fired, time_exit met, or hysteresis-qualified reversal.
+
+== REASONING FRAMEWORK ==
+Before each decision:
+1. STRUCTURE (35%): Trend, EMA alignment, S/R
+2. MOMENTUM (25%): MACD, RSI slope, volume
+3. VOLATILITY (20%): ATR context, spread
+4. POSITIONING (20%): Funding, OI if available
+
+4h + 5m must align. Counter-trend = 2× confirmation + tighter stops.
+
+Trade with conviction. Patience is alpha.
 Keep holding() reasons under 400 chars (tool cap = 500). Be concise.`;
 
 export const USER_PROMPT = `

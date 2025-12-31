@@ -126,7 +126,7 @@ export function ThemeToggleButton2({ className }: ThemeToggleButton2Props) {
 			onClick={handleToggle}
 			aria-label="Toggle theme"
 			className={cn(
-				"group relative inline-flex items-center justify-center rounded-full transition-all duration-300",
+				"group relative inline-flex h-9 w-9 items-center justify-center border border-border/50 bg-background/50 hover:bg-muted/50 transition-all duration-300",
 				className,
 			)}
 		>
@@ -136,7 +136,7 @@ export function ThemeToggleButton2({ className }: ThemeToggleButton2Props) {
 				fill="currentColor"
 				strokeLinecap="round"
 				viewBox="0 0 32 32"
-				className="h-7 w-7 transition-colors duration-300"
+				className="h-5 w-5 transition-colors duration-300"
 			>
 				<clipPath id={clipPathId}>
 					<motion.path
