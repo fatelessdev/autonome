@@ -2,6 +2,6 @@ export {
 	candlestickApi,
 	fundingApi,
 	orderApi,
-	serverConfiguration,
-	httpLibrary,
+	accountApi,
+	apiClient,
 } from "./client";

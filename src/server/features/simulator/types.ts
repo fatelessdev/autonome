@@ -1,5 +1,3 @@
-import type { SimpleOrder } from "@/lighter/generated/index";
-
 export type TradingMode = "live" | "simulated";
 
 export type OrderSide = "buy" | "sell";
@@ -98,13 +96,6 @@ export interface AccountSnapshot {
 	positions: PositionSummary[];
 	totalRealizedPnl: number;
 	totalUnrealizedPnl: number;
-}
-
-export interface OrderBookSource {
-	totalAsks: number;
-	totalBids: number;
-	asks: SimpleOrder[];
-	bids: SimpleOrder[];
 }
 
 export interface AccountEventPayload {

@@ -6,12 +6,7 @@ import {
 import { ExchangeSimulator } from "@/server/features/simulator/exchangeSimulator";
 import type { PositionSummary } from "@/server/features/simulator/types";
 import type { TradingSignal } from "@/server/features/trading/tradingDecisions";
-import {
-	AccountApi,
-	ApiKeyAuthentication,
-	IsomorphicFetchHttpLibrary,
-	ServerConfiguration,
-} from "@/lighter/generated/index";
+import { ApiClient, AccountApi } from "@reservoir0x/lighter-ts-sdk";
 
 export interface ExitPlanSummary {
 	target: number | null;
@@ -114,22 +109,20 @@ export async function getOpenPositions(
 		return loadSimulatorPositions(accountId);
 	}
 
-	const accountApi = new AccountApi({
-		baseServer: new ServerConfiguration(BASE_URL, {}),
-		httpApi: new IsomorphicFetchHttpLibrary(),
-		middleware: [],
-		authMethods: {
-			apiKey: new ApiKeyAuthentication(apiKey),
-		},
-	});
+	// Use new SDK's ApiClient and AccountApi
+	const apiClient = new ApiClient({ host: BASE_URL });
+	const accountApi = new AccountApi(apiClient);
 
 	try {
-		const currentOpenOrders = await accountApi.accountWithHttpInfo(
-			"index",
-			accountIndex,
-		);
-	
-		const positions = currentOpenOrders.data.accounts[0]?.positions ?? [];
+		const accountData = await accountApi.getAccount({
+			by: "index",
+			value: accountIndex,
+		});
+
+		// Response is wrapped in { code, total, accounts } structure
+		const accounts = (accountData as any).accounts ?? [];
+		const account = accounts[0];
+		const positions = account?.positions ?? [];
 
 		if (options.fallbackToSimulator && (!positions || positions.length === 0)) {
 			const simulatorPositions = await loadSimulatorPositions(accountId);
@@ -137,29 +130,30 @@ export async function getOpenPositions(
 				console.warn(
 					`[Positions] Using simulator snapshot for account ${resolveAccountId(accountId)} because exchange returned no positions.`,
 				);
+				await apiClient.close();
 				return simulatorPositions;
 			}
 		}
 
-		return positions.map((accountPosition) => {
+		const result = positions.map((accountPosition: any) => {
 			const quantity = toNumber(accountPosition.position) ?? 0;
-			const entryPrice = toNumber(accountPosition.avgEntryPrice);
-			const positionValue = toNumber(accountPosition.positionValue);
+			const entryPrice = toNumber(accountPosition.avg_entry_price ?? accountPosition.avgEntryPrice);
+			const positionValue = toNumber(accountPosition.position_value ?? accountPosition.positionValue);
 			const markPrice =
 				positionValue != null && quantity !== 0
 					? positionValue / Math.abs(quantity)
-					: toNumber(accountPosition.avgEntryPrice);
+					: entryPrice;
 
 			return {
 				symbol: accountPosition.symbol,
 				position: accountPosition.position,
 				quantity,
 				sign: accountPosition.sign === 1 ? "LONG" : "SHORT",
-				unrealizedPnl: accountPosition.unrealizedPnl,
-				realizedPnl: accountPosition.realizedPnl,
-				liquidationPrice: accountPosition.liquidationPrice,
+				unrealizedPnl: accountPosition.unrealized_pnl ?? accountPosition.unrealizedPnl ?? "0",
+				realizedPnl: accountPosition.realized_pnl ?? accountPosition.realizedPnl ?? "0",
+				liquidationPrice: accountPosition.liquidation_price ?? accountPosition.liquidationPrice ?? null,
 				leverage: undefined,
-				notional: accountPosition.positionValue,
+				notional: accountPosition.position_value ?? accountPosition.positionValue ?? undefined,
 				entryPrice,
 				markPrice,
 				exitPlan: null,
@@ -169,7 +163,11 @@ export async function getOpenPositions(
 				decisionStatus: null,
 			};
 		});
+
+		await apiClient.close();
+		return result;
 	} catch (rawError) {
+		await apiClient.close();
 		const error =
 			rawError instanceof Error ? rawError : new Error(String(rawError));
 		if (options.fallbackToSimulator) {

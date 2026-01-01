@@ -4,41 +4,26 @@
  * All server-side code should import from this module to avoid creating
  * duplicate API client instances which would cause unnecessary API calls
  * and potential rate limiting.
+ *
+ * Migrated from lighter-sdk-ts to @reservoir0x/lighter-ts-sdk
  */
 import { BASE_URL } from "@/env";
 import {
+	ApiClient,
 	CandlestickApi,
 	FundingApi,
-	IsomorphicFetchHttpLibrary,
 	OrderApi,
-	ServerConfiguration,
-} from "@/lighter/generated/index";
+	AccountApi,
+} from "@reservoir0x/lighter-ts-sdk";
 
-// Shared configuration
-const serverConfiguration = new ServerConfiguration(BASE_URL, {});
-const httpLibrary = new IsomorphicFetchHttpLibrary();
+// Singleton API client
+const apiClient = new ApiClient({ host: BASE_URL });
 
 // Singleton API instances - all server code should use these
-export const candlestickApi = new CandlestickApi({
-	baseServer: serverConfiguration,
-	httpApi: httpLibrary,
-	middleware: [],
-	authMethods: {},
-});
-
-export const fundingApi = new FundingApi({
-	baseServer: serverConfiguration,
-	httpApi: httpLibrary,
-	middleware: [],
-	authMethods: {},
-});
-
-export const orderApi = new OrderApi({
-	baseServer: serverConfiguration,
-	httpApi: httpLibrary,
-	middleware: [],
-	authMethods: {},
-});
+export const candlestickApi = new CandlestickApi(apiClient);
+export const fundingApi = new FundingApi(apiClient);
+export const orderApi = new OrderApi(apiClient);
+export const accountApi = new AccountApi(apiClient);
 
 // Re-export types and utilities that may be needed
-export { BASE_URL, serverConfiguration, httpLibrary };
+export { apiClient, BASE_URL };

@@ -68,14 +68,13 @@ async function getLighterPrices(symbols: string[]) {
 			}
 
 			try {
-				const candles = await candlestickApi.candlesticks(
-					market.marketId,
-					"1m",
-					now - 1000 * 60 * 15,
-					now,
-					1,
-					false,
-				);
+				const candles = await candlestickApi.getCandlesticks({
+					market_id: market.marketId,
+					resolution: "1m",
+					start_timestamp: now - 1000 * 60 * 15,
+					end_timestamp: now,
+					count_back: 1,
+				});
 				const last = candles.candlesticks?.[candles.candlesticks.length - 1];
 				const price = normalizeNumber(last?.close);
 				return { symbol, price };

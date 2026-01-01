@@ -52,6 +52,7 @@
     "@radix-ui/react-use-controllable-state": "^1.2.2",
     "@react-spring/three": "^10.0.3",
     "@react-three/fiber": "^9.4.0",
+    "@reservoir0x/lighter-ts-sdk": "^1.0.7-alpha14",
     "@sentry/react": "^10.28.0",
     "@sentry/tanstackstart-react": "^10.22.0",
     "@shadergradient/react": "^2.4.5",
@@ -84,6 +85,7 @@
     "embla-carousel-react": "^8.6.0",
     "gsap": "^3.13.0",
     "highlight.js": "^11.11.1",
+    "hono": "^4.7.12",
     "lucide-react": "^0.553.0",
     "motion": "^12.23.24",
     "nanoid": "^5.1.6",
@@ -111,8 +113,7 @@
     "use-stick-to-bottom": "^1.1.1",
     "vite-tsconfig-paths": "^5.1.4",
     "xlsx": "^0.18.5",
-    "zod": "^4.1.11",
-    "hono": "^4.7.12"
+    "zod": "^4.1.11"
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.4",

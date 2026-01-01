@@ -1,4 +1,11 @@
-import type { Candlestick } from "@/lighter/generated/index";
+import type { Candlestick } from "@reservoir0x/lighter-ts-sdk/dist/types/api";
+
+// Helper to parse string values from new SDK to numbers
+const parseNum = (value: string | number): number => {
+	if (typeof value === "number") return value;
+	const parsed = parseFloat(value);
+	return Number.isFinite(parsed) ? parsed : 0;
+};
 
 export function getEma(prices: number[], period: number): number[] {
 	if (prices.length < period) {
@@ -44,15 +51,15 @@ export function getSma(prices: number[], period: number): number[] {
 }
 
 export function getMidPrices(candlesticks: Candlestick[]): number[] {
-	return candlesticks.map(({ open, close }) => (open + close) / 2);
+	return candlesticks.map(({ open, close }) => (parseNum(open) + parseNum(close)) / 2);
 }
 
 export function getCloses(candlesticks: Candlestick[]): number[] {
-	return candlesticks.map((candle) => candle.close);
+	return candlesticks.map((candle) => parseNum(candle.close));
 }
 
 export function getVolumes(candlesticks: Candlestick[]): number[] {
-	return candlesticks.map((candle) => candle.volume0 ?? 0);
+	return candlesticks.map((candle) => parseNum(candle.volume));
 }
 
 export function getMacd(prices: number[]): number[] {
@@ -112,11 +119,14 @@ export function getAtr(candlesticks: Candlestick[], period: number): number[] {
 	const trueRanges: number[] = [];
 	for (let i = 0; i < candlesticks.length; i++) {
 		const current = candlesticks[i];
+		const currentHigh = parseNum(current.high);
+		const currentLow = parseNum(current.low);
+		const currentClose = parseNum(current.close);
 		const prevClose =
-			i > 0 ? (candlesticks[i - 1]?.close ?? current.close) : current.close;
-		const highLow = current.high - current.low;
-		const highPrev = Math.abs(current.high - prevClose);
-		const lowPrev = Math.abs(current.low - prevClose);
+			i > 0 ? parseNum(candlesticks[i - 1]?.close ?? current.close) : currentClose;
+		const highLow = currentHigh - currentLow;
+		const highPrev = Math.abs(currentHigh - prevClose);
+		const lowPrev = Math.abs(currentLow - prevClose);
 		trueRanges.push(Math.max(highLow, highPrev, lowPrev));
 	}
 

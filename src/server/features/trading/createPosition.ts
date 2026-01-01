@@ -7,10 +7,12 @@ import {
 } from "@/env";
 import type { OrderSide } from "@/server/features/simulator/types";
 import type { Account } from "@/server/features/trading/accounts";
-import { SignerClient } from "@/server/features/trading/signerClient";
+import {
+	SignerClientFactory,
+	SignerClient,
+} from "@/server/features/trading/signerClient";
 import { MARKETS } from "@/shared/markets/marketMetadata";
 import { candlestickApi } from "@/server/integrations/lighter";
-import { NonceManagerType } from "../../../../lighter-sdk-ts/nonce_manager";
 import {
 	createOrder,
 	getOpenOrderBySymbol,
@@ -212,12 +214,12 @@ export async function createPosition(
 		return results;
 	}
 
-	const client = await SignerClient.create({
+	// Live trading mode - use SignerClient from new SDK
+	const client = await SignerClientFactory.create({
 		url: BASE_URL,
 		privateKey: account.apiKey,
 		apiKeyIndex: API_KEY_INDEX,
 		accountIndex: Number(account.accountIndex),
-		nonceManagementType: NonceManagerType.API,
 	});
 
 	const results: PositionResult[] = [];
@@ -252,14 +254,14 @@ export async function createPosition(
 				continue;
 			}
 
-			const candleStickData = await candlestickApi.candlesticks(
-				market.marketId,
-				"1m",
-				Date.now() - 1000 * 60 * 5,
-				Date.now(),
-				1,
-				false,
-			);
+			// Fetch latest price using new SDK API
+			const candleStickData = await candlestickApi.getCandlesticks({
+				market_id: market.marketId,
+				resolution: "1m",
+				start_timestamp: Date.now() - 1000 * 60 * 5,
+				end_timestamp: Date.now(),
+				count_back: 1,
+			});
 			const latestPrice =
 				candleStickData?.candlesticks?.[candleStickData.candlesticks.length - 1]
 					?.close;
@@ -276,24 +278,27 @@ export async function createPosition(
 				continue;
 			}
 
+			const latestPriceNum = parseFloat(latestPrice);
 			const directionIsLong = side === "LONG";
 			const orderQuantity = Math.abs(quantity);
-			// Execute order on exchange (response used for confirmation, not stored)
+
+			// Execute order on exchange using new SDK
 			await client.createOrder({
 				marketIndex: market.marketId,
 				clientOrderIndex: market.clientOrderIndex,
 				baseAmount: Math.round(orderQuantity * market.qtyDecimals),
 				price: Math.round(
-					(directionIsLong ? latestPrice * 1.01 : latestPrice * 0.99) *
+					(directionIsLong ? latestPriceNum * 1.01 : latestPriceNum * 0.99) *
 						market.priceDecimals,
 				),
 				isAsk: !directionIsLong,
 				orderType: SignerClient.ORDER_TYPE_MARKET,
 				timeInForce: SignerClient.ORDER_TIME_IN_FORCE_IMMEDIATE_OR_CANCEL,
-				reduceOnly: 0,
+				reduceOnly: false,
 				triggerPrice: SignerClient.NIL_TRIGGER_PRICE,
 				orderExpiry: SignerClient.DEFAULT_IOC_EXPIRY,
 			});
+
 			// Check for existing open order to scale into
 			try {
 				const existingOrder = await getOpenOrderBySymbol(
@@ -307,17 +312,17 @@ export async function createPosition(
 					const prevEntry = parseFloat(existingOrder.entryPrice);
 					const newQty = orderQuantity;
 					const prevNotional = prevEntry * prevQty;
-					const newNotional = latestPrice * newQty;
+					const newNotional = latestPriceNum * newQty;
 					const totalQty = prevQty + newQty;
 					const newAvgEntry =
 						totalQty !== 0
 							? (prevNotional + newNotional) / totalQty
-							: latestPrice;
+							: latestPriceNum;
 
 					const updatedOrder = await scaleIntoOrder({
 						orderId: existingOrder.id,
 						additionalQuantity: newQty.toString(),
-						newEntryPrice: latestPrice.toString(),
+						newEntryPrice: latestPriceNum.toString(),
 						newAvgEntryPrice: newAvgEntry.toString(),
 						exitPlan: {
 							stop: stopLoss ?? existingOrder.exitPlan?.stop ?? null,
@@ -347,7 +352,7 @@ export async function createPosition(
 						symbol: symbol.toUpperCase(),
 						side,
 						quantity: orderQuantity.toString(),
-						entryPrice: latestPrice.toString(),
+						entryPrice: latestPriceNum.toString(),
 						leverage: leverage?.toString() ?? null,
 						exitPlan: {
 							stop: stopLoss ?? null,
@@ -362,7 +367,7 @@ export async function createPosition(
 						side,
 						quantity,
 						leverage,
-						entryPrice: latestPrice,
+						entryPrice: latestPriceNum,
 						success: true,
 						orderId: dbOrder.id,
 					});
@@ -377,7 +382,7 @@ export async function createPosition(
 					side,
 					quantity,
 					leverage,
-					entryPrice: latestPrice,
+					entryPrice: latestPriceNum,
 					success: true,
 				});
 			}
@@ -394,6 +399,9 @@ export async function createPosition(
 			});
 		}
 	}
+
+	// Close the client when done
+	await client.close();
 
 	return results;
 }

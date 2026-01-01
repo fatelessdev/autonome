@@ -10,10 +10,12 @@ import {
 	getOpenPositions,
 	type OpenPositionSummary,
 } from "@/server/features/trading/openPositions";
-import { SignerClient } from "@/server/features/trading/signerClient";
+import {
+	SignerClientFactory,
+	SignerClient,
+} from "@/server/features/trading/signerClient";
 import { MARKETS } from "@/shared/markets/marketMetadata";
 import { candlestickApi } from "@/server/integrations/lighter";
-import { NonceManagerType } from "../../../../lighter-sdk-ts/nonce_manager";
 import {
 	closeOrder,
 	getOpenOrderBySymbol,
@@ -166,12 +168,12 @@ export async function closePosition(
 		return summaries;
 	}
 
-	const client = await SignerClient.create({
+	// Live trading mode - use SignerClient from new SDK
+	const client = await SignerClientFactory.create({
 		url: BASE_URL,
 		privateKey: account.apiKey,
 		apiKeyIndex: API_KEY_INDEX,
 		accountIndex: Number(account.accountIndex),
-		nonceManagementType: NonceManagerType.API,
 	});
 
 	const summaries: ClosedPositionSummary[] = [];
@@ -193,14 +195,14 @@ export async function closePosition(
 		}
 
 		try {
-			const candleStickData = await candlestickApi.candlesticks(
-				market.marketId,
-				"1m",
-				Date.now() - 1000 * 60 * 5,
-				Date.now(),
-				1,
-				false,
-			);
+			// Fetch latest price using new SDK API
+			const candleStickData = await candlestickApi.getCandlesticks({
+				market_id: market.marketId,
+				resolution: "1m",
+				start_timestamp: Date.now() - 1000 * 60 * 5,
+				end_timestamp: Date.now(),
+				count_back: 1,
+			});
 			const latestPrice =
 				candleStickData?.candlesticks?.[candleStickData.candlesticks.length - 1]
 					?.close;
@@ -211,27 +213,30 @@ export async function closePosition(
 				continue;
 			}
 
+			const latestPriceNum = parseFloat(latestPrice);
 			const closeSign = position.sign === "LONG" ? "SHORT" : "LONG";
 
 			const baseQuantity =
 				position.quantity ?? toNumber(position.position) ?? 0;
 
+			// Execute close order using new SDK
 			await client.createOrder({
 				marketIndex: market.marketId,
 				clientOrderIndex: market.clientOrderIndex,
 				baseAmount: Math.abs(baseQuantity) * market.qtyDecimals,
 				price:
-					(closeSign === "LONG" ? latestPrice * 1.01 : latestPrice * 0.99) *
-					market.priceDecimals,
+					(closeSign === "LONG"
+						? latestPriceNum * 1.01
+						: latestPriceNum * 0.99) * market.priceDecimals,
 				isAsk: closeSign !== "LONG",
 				orderType: SignerClient.ORDER_TYPE_MARKET,
 				timeInForce: SignerClient.ORDER_TIME_IN_FORCE_IMMEDIATE_OR_CANCEL,
-				reduceOnly: 0,
+				reduceOnly: false,
 				triggerPrice: SignerClient.NIL_TRIGGER_PRICE,
 				orderExpiry: SignerClient.DEFAULT_IOC_EXPIRY,
 			});
 
-			const summary = buildSummary(symbol, position, latestPrice, closedAtIso);
+			const summary = buildSummary(symbol, position, latestPriceNum, closedAtIso);
 			if (summary) {
 				summaries.push(summary);
 
@@ -241,7 +246,7 @@ export async function closePosition(
 					if (dbOrder) {
 						await closeOrder({
 							orderId: dbOrder.id,
-							exitPrice: latestPrice.toString(),
+							exitPrice: latestPriceNum.toString(),
 							realizedPnl: (summary.netPnl ?? 0).toString(),
 						});
 					} else {
@@ -260,6 +265,9 @@ export async function closePosition(
 			console.error(`Failed to close position for ${symbol}:`, err);
 		}
 	}
+
+	// Close the client when done
+	await client.close();
 
 	return summaries;
 }
