@@ -9,16 +9,20 @@
  * - Single global cache instance (survives HMR via globalThis)
  * - TTL-based expiration (default 2 minutes)
  * - Thread-safe fetch deduplication via in-flight promise tracking
+ * - Integrates TAAPI supplementary indicators for BTC/ETH
  */
 
 import { getMarketSnapshots, formatMarketSnapshots, type MarketSnapshot } from "./marketData";
 import { MARKETS } from "@/shared/markets/marketMetadata";
+import { taapiClient, type TaapiPreFetchResult } from "@/server/integrations/taapi";
+import { TAAPI_FREE_PLAN_SYMBOLS } from "@/server/integrations/taapi/types";
 
 const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
 
 interface CacheEntry {
 	snapshots: MarketSnapshot[];
 	formatted: string;
+	taapiData: Map<string, TaapiPreFetchResult>;
 	fetchedAt: number;
 }
 
@@ -35,6 +39,46 @@ if (typeof globalThis.__marketIntelligenceCache === "undefined") {
 }
 if (typeof globalThis.__marketIntelligenceFetchPromise === "undefined") {
 	globalThis.__marketIntelligenceFetchPromise = null;
+}
+
+/**
+ * Format TAAPI supplementary indicators for a symbol.
+ * Returns formatted string section or empty string if no data.
+ */
+function formatTaapiIndicators(
+	_symbol: string,
+	data: TaapiPreFetchResult | undefined,
+): string {
+	if (!data) return "";
+
+	const lines: string[] = [];
+	lines.push(`**Supplementary Indicators (1h, via TAAPI)**`);
+
+	if (data.bbands) {
+		lines.push(
+			`BBands(20): Upper=${data.bbands.valueUpperBand.toFixed(2)}, ` +
+			`Mid=${data.bbands.valueMiddleBand.toFixed(2)}, ` +
+			`Lower=${data.bbands.valueLowerBand.toFixed(2)}`
+		);
+	}
+
+	if (data.adx) {
+		const strength =
+			data.adx.value >= 25 ? "strong trend" :
+			data.adx.value >= 20 ? "moderate trend" : "weak/no trend";
+		lines.push(`ADX(14): ${data.adx.value.toFixed(1)} (${strength})`);
+	}
+
+	if (data.supertrend) {
+		lines.push(
+			`Supertrend(10): ${data.supertrend.value.toFixed(2)} → ${data.supertrend.valueAdvice.toUpperCase()}`
+		);
+	}
+
+	// If no indicators were added, return empty
+	if (lines.length === 1) return "";
+
+	return lines.join("\n");
 }
 
 /**
@@ -66,12 +110,50 @@ export async function getSharedMarketIntelligence(): Promise<{
 			marketId: meta.marketId,
 		}));
 
-		const snapshots = await getMarketSnapshots(marketUniverse);
-		const formatted = formatMarketSnapshots(snapshots);
+		// Fetch market snapshots and TAAPI data in parallel
+		const [snapshots, taapiData] = await Promise.all([
+			getMarketSnapshots(marketUniverse),
+			taapiClient.isConfigured()
+				? taapiClient.preFetchMultipleAssets([...TAAPI_FREE_PLAN_SYMBOLS], "1h")
+				: Promise.resolve(new Map<string, TaapiPreFetchResult>()),
+		]);
+
+		// Build formatted output with TAAPI data integrated
+		let formatted = formatMarketSnapshots(snapshots);
+
+		// Append TAAPI data for BTC/ETH if available
+		for (const symbol of TAAPI_FREE_PLAN_SYMBOLS) {
+			const taapiIndicators = taapiData.get(symbol);
+			if (taapiIndicators) {
+				const taapiSection = formatTaapiIndicators(symbol, taapiIndicators);
+				if (taapiSection) {
+					// Insert TAAPI section after the symbol's market data header
+					const marker = `### ${symbol} MARKET DATA`;
+					const markerIndex = formatted.indexOf(marker);
+					if (markerIndex !== -1) {
+						// Find the end of the first line (after the header)
+						const lineEnd = formatted.indexOf("\n", markerIndex);
+						if (lineEnd !== -1) {
+							// Insert TAAPI section before the series data
+							const higherTfMarker = "**Higher timeframe (4h";
+							const higherTfIndex = formatted.indexOf(higherTfMarker, markerIndex);
+							if (higherTfIndex !== -1) {
+								formatted =
+									formatted.slice(0, higherTfIndex) +
+									taapiSection +
+									"\n" +
+									formatted.slice(higherTfIndex);
+							}
+						}
+					}
+				}
+			}
+		}
 
 		const entry: CacheEntry = {
 			snapshots,
 			formatted,
+			taapiData,
 			fetchedAt: Date.now(),
 		};
 

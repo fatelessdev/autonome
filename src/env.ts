@@ -53,6 +53,9 @@ export const env = createEnv({
 		SIM_INITIAL_CAPITAL: z.coerce.number().default(10_000),
 		SIM_QUOTE_CURRENCY: z.string().default("USDT"),
 		SIM_REFRESH_INTERVAL_MS: z.coerce.number().default(10_000),
+
+		// TAAPI.io integration (optional for supplementary indicators)
+		TAAPI_API_KEY: z.string().optional(),
 	},
 
 	/**
@@ -98,3 +101,6 @@ export const DEFAULT_SIMULATOR_OPTIONS: ExchangeSimulatorOptions = {
 	quoteCurrency: env.SIM_QUOTE_CURRENCY,
 	refreshIntervalMs: env.SIM_REFRESH_INTERVAL_MS,
 };
+
+// TAAPI API key for supplementary indicators (optional)
+export const TAAPI_API_KEY = env.TAAPI_API_KEY;

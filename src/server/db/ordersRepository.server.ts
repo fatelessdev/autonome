@@ -21,7 +21,10 @@ export type CreateOrderParams = {
 		stop: number | null;
 		target: number | null;
 		invalidation: string | null;
+		invalidationPrice: number | null;
 		confidence: number | null;
+		timeExit: string | null;
+		cooldownUntil: string | null;
 	} | null;
 };
 
@@ -38,7 +41,10 @@ export type UpdateExitPlanParams = {
 		stop: number | null;
 		target: number | null;
 		invalidation: string | null;
+		invalidationPrice: number | null;
 		confidence: number | null;
+		timeExit: string | null;
+		cooldownUntil: string | null;
 	};
 };
 
@@ -51,8 +57,19 @@ export type ScaleOrderParams = {
 		stop: number | null;
 		target: number | null;
 		invalidation: string | null;
+		invalidationPrice: number | null;
 		confidence: number | null;
+		timeExit: string | null;
+		cooldownUntil: string | null;
 	} | null;
+};
+
+export type UpdateSlTpOrdersParams = {
+	orderId: string;
+	slOrderIndex?: string | null;
+	tpOrderIndex?: string | null;
+	slTriggerPrice?: string | null;
+	tpTriggerPrice?: string | null;
 };
 
 export type OrderWithModel = Order & {
@@ -149,7 +166,10 @@ export async function scaleIntoOrder(params: ScaleOrderParams): Promise<Order> {
 			stop: number | null;
 			target: number | null;
 			invalidation: string | null;
+			invalidationPrice: number | null;
 			confidence: number | null;
+			timeExit: string | null;
+			cooldownUntil: string | null;
 		} | null;
 	} = {
 		quantity: (
@@ -329,4 +349,96 @@ export async function closeOrdersByIds(
 	}
 
 	return results;
+}
+
+// ==========================================
+// SL/TP Order Management Functions
+// ==========================================
+
+/**
+ * Update SL/TP order indices and trigger prices for an order
+ * Used when placing real SL/TP orders on the exchange
+ */
+export async function updateSlTpOrders(
+	params: UpdateSlTpOrdersParams,
+): Promise<Order> {
+	const updateData: Record<string, unknown> = {
+		updatedAt: new Date(),
+	};
+
+	if (params.slOrderIndex !== undefined) {
+		updateData.slOrderIndex = params.slOrderIndex;
+	}
+	if (params.tpOrderIndex !== undefined) {
+		updateData.tpOrderIndex = params.tpOrderIndex;
+	}
+	if (params.slTriggerPrice !== undefined) {
+		updateData.slTriggerPrice = params.slTriggerPrice;
+	}
+	if (params.tpTriggerPrice !== undefined) {
+		updateData.tpTriggerPrice = params.tpTriggerPrice;
+	}
+
+	const [updated] = await db
+		.update(orders)
+		.set(updateData)
+		.where(eq(orders.id, params.orderId))
+		.returning();
+
+	return updated;
+}
+
+/**
+ * Get SL/TP order indices for an order
+ */
+export async function getSlTpOrders(
+	orderId: string,
+): Promise<{ slOrderIndex: string | null; tpOrderIndex: string | null } | null> {
+	const order = await db.query.orders.findFirst({
+		where: eq(orders.id, orderId),
+		columns: {
+			slOrderIndex: true,
+			tpOrderIndex: true,
+		},
+	});
+
+	if (!order) return null;
+
+	return {
+		slOrderIndex: order.slOrderIndex,
+		tpOrderIndex: order.tpOrderIndex,
+	};
+}
+
+/**
+ * Clear SL/TP order indices (after canceling orders on exchange)
+ */
+export async function clearSlTpOrders(orderId: string): Promise<Order> {
+	const [updated] = await db
+		.update(orders)
+		.set({
+			slOrderIndex: null,
+			tpOrderIndex: null,
+			slTriggerPrice: null,
+			tpTriggerPrice: null,
+			updatedAt: new Date(),
+		})
+		.where(eq(orders.id, orderId))
+		.returning();
+
+	return updated;
+}
+
+/**
+ * Get all open orders with SL/TP orders placed on exchange
+ * Used for monitoring and cleanup
+ */
+export async function getOrdersWithExchangeSlTp(): Promise<Order[]> {
+	const allOpen = await db.query.orders.findMany({
+		where: eq(orders.status, OrderStatus.OPEN),
+	});
+
+	return allOpen.filter(
+		(order) => order.slOrderIndex != null || order.tpOrderIndex != null,
+	);
 }

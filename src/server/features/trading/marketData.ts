@@ -1,11 +1,10 @@
-import type { Candlestick } from "@reservoir0x/lighter-ts-sdk/dist/types/api";
-import type { OrderBookDetailItem } from "@reservoir0x/lighter-ts-sdk/dist/api/order-api";
+import type { Candlestick, OrderBookDetail } from "@/lighter/generated/index";
 import {
 	candlestickApi,
 	fundingApi,
 	orderApi,
 } from "@/server/integrations/lighter";
-import { MARKETS } from "@/shared/markets/marketMetadata";
+import { FundingRateExchangeEnum } from "@/lighter/generated/index";
 import {
 	getAtr,
 	getCloses,
@@ -29,6 +28,7 @@ export interface MarketSeriesSnapshot {
 	timestamps: string[];
 	midPrices: number[];
 	ema20: number[];
+	ema50: number[];
 	macd: number[];
 	rsi7: number[];
 	rsi14: number[];
@@ -40,6 +40,7 @@ export interface MarketSeriesSnapshot {
 export interface MarketSnapshotLatest {
 	price: number | null;
 	ema20: number | null;
+	ema50: number | null;
 	macd: number | null;
 	rsi7: number | null;
 	rsi14: number | null;
@@ -112,6 +113,7 @@ const buildSeries = (
 	const volumes = getVolumes(candles);
 
 	const ema20 = safeSeries(() => getEma(midPrices, 20));
+	const ema50 = safeSeries(() => getEma(midPrices, 50));
 	const macd = safeSeries(() => getMacd(midPrices));
 	const rsi7 = safeSeries(() => getRsi(closes, 7));
 	const rsi14 = safeSeries(() => getRsi(closes, 14));
@@ -123,6 +125,7 @@ const buildSeries = (
 		timestamps: toIsoTimestamps(candles, SERIES_WINDOW),
 		midPrices: roundSeries(sliceLatest(midPrices, SERIES_WINDOW)),
 		ema20: roundSeries(sliceLatest(ema20, SERIES_WINDOW)),
+		ema50: roundSeries(sliceLatest(ema50, SERIES_WINDOW)),
 		macd: roundSeries(sliceLatest(macd, SERIES_WINDOW)),
 		rsi7: roundSeries(sliceLatest(rsi7, SERIES_WINDOW)),
 		rsi14: roundSeries(sliceLatest(rsi14, SERIES_WINDOW)),
@@ -143,27 +146,28 @@ const fetchCandles = async (
 			: 1000 * 60 * 60 * 4 * HIGHER_TIMEFRAME_LIMIT;
 	const limit = duration === "5m" ? INTRADAY_LIMIT : HIGHER_TIMEFRAME_LIMIT;
 
-	const response = await candlestickApi.getCandlesticks({
-		market_id: marketId,
-		resolution: duration,
-		start_timestamp: now - lookbackMs,
-		end_timestamp: now,
-		count_back: limit,
-	});
+	const response = await candlestickApi.candlesticks(
+		marketId,
+		duration,
+		now - lookbackMs,
+		now,
+		limit,
+		false,
+	);
 
 	return response.candlesticks ?? [];
 };
 
 const fetchFundingRates = async (): Promise<Map<string, number>> => {
 	try {
-		const response = await fundingApi.getFundingRates();
+		const response = await fundingApi.fundingRates();
 		const map = new Map<string, number>();
 
-		for (const entry of response.funding_rates ?? []) {
+		for (const entry of response.fundingRates ?? []) {
 			const symbol = normalizeSymbol(entry.symbol);
 			if (!symbol) continue;
 			const existing = map.get(symbol);
-			const isPreferred = entry.exchange === "lighter";
+			const isPreferred = entry.exchange === FundingRateExchangeEnum.Lighter;
 			if (existing === undefined || isPreferred) {
 				map.set(symbol, entry.rate);
 			}
@@ -177,18 +181,12 @@ const fetchFundingRates = async (): Promise<Map<string, number>> => {
 };
 
 const fetchOrderBookDetails = async (): Promise<
-	Map<string, OrderBookDetailItem>
+	Map<string, OrderBookDetail>
 > => {
 	try {
-		// Fetch order book details for all markets using the first market
-		// The API returns details for all markets in a single call
-		const firstMarket = Object.values(MARKETS)[0];
-		if (!firstMarket) {
-			return new Map();
-		}
-		const response = await orderApi.getOrderBookDetailsRaw(firstMarket.marketId);
-		const map = new Map<string, OrderBookDetailItem>();
-		for (const detail of response.order_book_details ?? []) {
+		const response = await orderApi.orderBookDetails();
+		const map = new Map<string, OrderBookDetail>();
+		for (const detail of response.orderBookDetails ?? []) {
 			const normalized = normalizeSymbol(detail.symbol);
 			if (!normalized) continue;
 			map.set(normalized, detail);
@@ -201,17 +199,17 @@ const fetchOrderBookDetails = async (): Promise<
 };
 
 const extractOpenInterestAverage = (
-	detail: OrderBookDetailItem | undefined,
+	detail: OrderBookDetail | undefined,
 ): number | null => {
-	if (!detail?.daily_chart) {
-		return detail?.open_interest ?? null;
+	if (!detail?.dailyChart) {
+		return detail?.openInterest ?? null;
 	}
 
-	const values = Object.values(detail.daily_chart).filter(
+	const values = Object.values(detail.dailyChart).filter(
 		(item): item is number => Number.isFinite(item),
 	);
 	if (!values.length) {
-		return detail?.open_interest ?? null;
+		return detail?.openInterest ?? null;
 	}
 	return values.reduce((sum, value) => sum + value, 0) / values.length;
 };
@@ -223,6 +221,7 @@ const buildLatestSnapshot = (
 	const price =
 		intraday.midPrices.at(-1) ?? higherTimeframe.midPrices.at(-1) ?? null;
 	const ema20 = intraday.ema20.at(-1) ?? higherTimeframe.ema20.at(-1) ?? null;
+	const ema50 = intraday.ema50.at(-1) ?? higherTimeframe.ema50.at(-1) ?? null;
 	const macd = intraday.macd.at(-1) ?? higherTimeframe.macd.at(-1) ?? null;
 	const rsi7 = intraday.rsi7.at(-1) ?? higherTimeframe.rsi7.at(-1) ?? null;
 	const rsi14 = intraday.rsi14.at(-1) ?? higherTimeframe.rsi14.at(-1) ?? null;
@@ -237,6 +236,7 @@ const buildLatestSnapshot = (
 	return {
 		price,
 		ema20,
+		ema50,
 		macd,
 		rsi7,
 		rsi14,
@@ -275,6 +275,7 @@ export async function getMarketSnapshots(
 			latest: {
 				price: roundValue(latest.price),
 				ema20: roundValue(latest.ema20),
+				ema50: roundValue(latest.ema50),
 				macd: roundValue(latest.macd),
 				rsi7: roundValue(latest.rsi7),
 				rsi14: roundValue(latest.rsi14),
@@ -285,19 +286,19 @@ export async function getMarketSnapshots(
 			},
 			fundingRate: roundValue(fundingRates.get(market.symbol) ?? null, 6),
 			openInterest: {
-				latest: roundValue(orderDetail?.open_interest ?? null, 2),
+				latest: roundValue(orderDetail?.openInterest ?? null, 2),
 				average: roundValue(extractOpenInterestAverage(orderDetail), 2),
 			},
 			liquidity: {
 				dailyBaseVolume: roundValue(
-					orderDetail?.daily_base_token_volume ?? null,
+					orderDetail?.dailyBaseTokenVolume ?? null,
 					2,
 				),
 				dailyQuoteVolume: roundValue(
-					orderDetail?.daily_quote_token_volume ?? null,
+					orderDetail?.dailyQuoteTokenVolume ?? null,
 					2,
 				),
-				dailyPriceChange: roundValue(orderDetail?.daily_price_change ?? null, 4),
+				dailyPriceChange: roundValue(orderDetail?.dailyPriceChange ?? null, 4),
 			},
 			series: {
 				intraday: intradaySeries,
@@ -330,7 +331,7 @@ export const formatMarketSnapshots = (snapshots: MarketSnapshot[]): string => {
 		const lines: string[] = [];
 		lines.push(`### ${snapshot.symbol} MARKET DATA`);
 		lines.push(
-			`current_price = ${formatNumber(snapshot.latest.price)}, current_ema20 = ${formatNumber(snapshot.latest.ema20)}, current_macd = ${formatNumber(snapshot.latest.macd)}, current_rsi_7 = ${formatNumber(snapshot.latest.rsi7)}, current_rsi_14 = ${formatNumber(snapshot.latest.rsi14)}`,
+			`current_price = ${formatNumber(snapshot.latest.price)}, current_ema20 = ${formatNumber(snapshot.latest.ema20)}, current_ema50 = ${formatNumber(snapshot.latest.ema50)}, current_macd = ${formatNumber(snapshot.latest.macd)}, current_rsi_7 = ${formatNumber(snapshot.latest.rsi7)}, current_rsi_14 = ${formatNumber(snapshot.latest.rsi14)}`,
 		);
 
 		lines.push(
@@ -353,6 +354,7 @@ export const formatMarketSnapshots = (snapshots: MarketSnapshot[]): string => {
 		lines.push("**Intraday (5m, oldest → newest)**");
 		lines.push(formatSeries("Mid prices", snapshot.series.intraday.midPrices));
 		lines.push(formatSeries("EMA20", snapshot.series.intraday.ema20));
+		lines.push(formatSeries("EMA50", snapshot.series.intraday.ema50));
 		lines.push(formatSeries("MACD", snapshot.series.intraday.macd));
 		lines.push(formatSeries("RSI (7)", snapshot.series.intraday.rsi7));
 		lines.push(formatSeries("RSI (14)", snapshot.series.intraday.rsi14));
@@ -365,6 +367,7 @@ export const formatMarketSnapshots = (snapshots: MarketSnapshot[]): string => {
 			formatSeries("Mid prices", snapshot.series.higherTimeframe.midPrices),
 		);
 		lines.push(formatSeries("EMA20", snapshot.series.higherTimeframe.ema20));
+		lines.push(formatSeries("EMA50", snapshot.series.higherTimeframe.ema50));
 		lines.push(formatSeries("MACD", snapshot.series.higherTimeframe.macd));
 		lines.push(formatSeries("RSI (7)", snapshot.series.higherTimeframe.rsi7));
 		lines.push(formatSeries("RSI (14)", snapshot.series.higherTimeframe.rsi14));

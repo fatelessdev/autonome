@@ -7,17 +7,16 @@ import {
 } from "@/env";
 import type { OrderSide } from "@/server/features/simulator/types";
 import type { Account } from "@/server/features/trading/accounts";
-import {
-	SignerClientFactory,
-	SignerClient,
-} from "@/server/features/trading/signerClient";
+import { SignerClient } from "@/server/features/trading/signerClient";
 import { MARKETS } from "@/shared/markets/marketMetadata";
 import { candlestickApi } from "@/server/integrations/lighter";
+import { NonceManagerType } from "../../../../lighter-sdk-ts/nonce_manager";
 import {
 	createOrder,
 	getOpenOrderBySymbol,
 	scaleIntoOrder,
 } from "@/server/db/ordersRepository.server";
+import { placeSlTpOrders, cancelSlTpOrders } from "./slTpOrderManager";
 
 export interface PositionRequest {
 	symbol: string;
@@ -132,17 +131,21 @@ export async function createPosition(
 								additionalQuantity: newQty.toString(),
 								newEntryPrice: entryPrice.toString(),
 								newAvgEntryPrice: newAvgEntry.toString(),
-								exitPlan: {
-									stop: stopLoss ?? existingOrder.exitPlan?.stop ?? null,
-									target:
-										profitTarget ?? existingOrder.exitPlan?.target ?? null,
-									invalidation:
-										invalidationCondition ??
-										existingOrder.exitPlan?.invalidation ??
-										null,
-									confidence:
-										confidence ?? existingOrder.exitPlan?.confidence ?? null,
-								},
+							exitPlan: {
+								stop: stopLoss ?? existingOrder.exitPlan?.stop ?? null,
+								target:
+									profitTarget ?? existingOrder.exitPlan?.target ?? null,
+								invalidation:
+									invalidationCondition ??
+									existingOrder.exitPlan?.invalidation ??
+									null,
+								invalidationPrice:
+									existingOrder.exitPlan?.invalidationPrice ?? null,
+								confidence:
+									confidence ?? existingOrder.exitPlan?.confidence ?? null,
+								timeExit: existingOrder.exitPlan?.timeExit ?? null,
+								cooldownUntil: existingOrder.exitPlan?.cooldownUntil ?? null,
+							},
 							});
 
 							results.push({
@@ -163,12 +166,15 @@ export async function createPosition(
 								quantity: orderQuantity.toString(),
 								entryPrice: entryPrice.toString(),
 								leverage: leverage?.toString() ?? null,
-								exitPlan: {
-									stop: stopLoss ?? null,
-									target: profitTarget ?? null,
-									invalidation: invalidationCondition ?? null,
-									confidence: confidence ?? null,
-								},
+							exitPlan: {
+								stop: stopLoss ?? null,
+								target: profitTarget ?? null,
+								invalidation: invalidationCondition ?? null,
+								invalidationPrice: null,
+								confidence: confidence ?? null,
+								timeExit: null,
+								cooldownUntil: null,
+							},
 							});
 
 							results.push({
@@ -214,12 +220,12 @@ export async function createPosition(
 		return results;
 	}
 
-	// Live trading mode - use SignerClient from new SDK
-	const client = await SignerClientFactory.create({
+	const client = await SignerClient.create({
 		url: BASE_URL,
 		privateKey: account.apiKey,
 		apiKeyIndex: API_KEY_INDEX,
 		accountIndex: Number(account.accountIndex),
+		nonceManagementType: NonceManagerType.API,
 	});
 
 	const results: PositionResult[] = [];
@@ -254,14 +260,14 @@ export async function createPosition(
 				continue;
 			}
 
-			// Fetch latest price using new SDK API
-			const candleStickData = await candlestickApi.getCandlesticks({
-				market_id: market.marketId,
-				resolution: "1m",
-				start_timestamp: Date.now() - 1000 * 60 * 5,
-				end_timestamp: Date.now(),
-				count_back: 1,
-			});
+			const candleStickData = await candlestickApi.candlesticks(
+				market.marketId,
+				"1m",
+				Date.now() - 1000 * 60 * 5,
+				Date.now(),
+				1,
+				false,
+			);
 			const latestPrice =
 				candleStickData?.candlesticks?.[candleStickData.candlesticks.length - 1]
 					?.close;
@@ -278,27 +284,24 @@ export async function createPosition(
 				continue;
 			}
 
-			const latestPriceNum = parseFloat(latestPrice);
 			const directionIsLong = side === "LONG";
 			const orderQuantity = Math.abs(quantity);
-
-			// Execute order on exchange using new SDK
+			// Execute order on exchange (response used for confirmation, not stored)
 			await client.createOrder({
 				marketIndex: market.marketId,
 				clientOrderIndex: market.clientOrderIndex,
 				baseAmount: Math.round(orderQuantity * market.qtyDecimals),
 				price: Math.round(
-					(directionIsLong ? latestPriceNum * 1.01 : latestPriceNum * 0.99) *
+					(directionIsLong ? latestPrice * 1.01 : latestPrice * 0.99) *
 						market.priceDecimals,
 				),
 				isAsk: !directionIsLong,
 				orderType: SignerClient.ORDER_TYPE_MARKET,
 				timeInForce: SignerClient.ORDER_TIME_IN_FORCE_IMMEDIATE_OR_CANCEL,
-				reduceOnly: false,
+				reduceOnly: 0,
 				triggerPrice: SignerClient.NIL_TRIGGER_PRICE,
 				orderExpiry: SignerClient.DEFAULT_IOC_EXPIRY,
 			});
-
 			// Check for existing open order to scale into
 			try {
 				const existingOrder = await getOpenOrderBySymbol(
@@ -312,17 +315,17 @@ export async function createPosition(
 					const prevEntry = parseFloat(existingOrder.entryPrice);
 					const newQty = orderQuantity;
 					const prevNotional = prevEntry * prevQty;
-					const newNotional = latestPriceNum * newQty;
+					const newNotional = latestPrice * newQty;
 					const totalQty = prevQty + newQty;
 					const newAvgEntry =
 						totalQty !== 0
 							? (prevNotional + newNotional) / totalQty
-							: latestPriceNum;
+							: latestPrice;
 
-					const updatedOrder = await scaleIntoOrder({
+				const updatedOrder = await scaleIntoOrder({
 						orderId: existingOrder.id,
 						additionalQuantity: newQty.toString(),
-						newEntryPrice: latestPriceNum.toString(),
+						newEntryPrice: latestPrice.toString(),
 						newAvgEntryPrice: newAvgEntry.toString(),
 						exitPlan: {
 							stop: stopLoss ?? existingOrder.exitPlan?.stop ?? null,
@@ -331,10 +334,39 @@ export async function createPosition(
 								invalidationCondition ??
 								existingOrder.exitPlan?.invalidation ??
 								null,
+							invalidationPrice:
+								existingOrder.exitPlan?.invalidationPrice ?? null,
 							confidence:
 								confidence ?? existingOrder.exitPlan?.confidence ?? null,
+							timeExit: existingOrder.exitPlan?.timeExit ?? null,
+							cooldownUntil: existingOrder.exitPlan?.cooldownUntil ?? null,
 						},
 					});
+
+					// Update SL/TP orders on exchange (cancel old ones, place new ones)
+					const newStop = stopLoss ?? existingOrder.exitPlan?.stop ?? null;
+					const newTarget = profitTarget ?? existingOrder.exitPlan?.target ?? null;
+					if (newStop || newTarget) {
+						// Cancel existing SL/TP orders first
+						if (existingOrder.slOrderIndex || existingOrder.tpOrderIndex) {
+							await cancelSlTpOrders(
+								client,
+								symbol.toUpperCase(),
+								existingOrder.slOrderIndex,
+								existingOrder.tpOrderIndex,
+								existingOrder.id,
+							);
+						}
+						// Place new SL/TP orders with updated quantity
+						await placeSlTpOrders(client, {
+							symbol: symbol.toUpperCase(),
+							side,
+							quantity: totalQty,
+							stopLoss: newStop,
+							takeProfit: newTarget,
+							orderId: updatedOrder.id,
+						});
+					}
 
 					results.push({
 						symbol,
@@ -346,28 +378,43 @@ export async function createPosition(
 						orderId: updatedOrder.id,
 					});
 				} else {
-					// Create new order (either no existing position or opposite side)
+				// Create new order (either no existing position or opposite side)
 					const dbOrder = await createOrder({
 						modelId: account.id,
 						symbol: symbol.toUpperCase(),
 						side,
 						quantity: orderQuantity.toString(),
-						entryPrice: latestPriceNum.toString(),
+						entryPrice: latestPrice.toString(),
 						leverage: leverage?.toString() ?? null,
 						exitPlan: {
 							stop: stopLoss ?? null,
 							target: profitTarget ?? null,
 							invalidation: invalidationCondition ?? null,
+							invalidationPrice: null,
 							confidence: confidence ?? null,
+							timeExit: null,
+							cooldownUntil: null,
 						},
 					});
+
+					// Place SL/TP orders on exchange
+					if (stopLoss || profitTarget) {
+						await placeSlTpOrders(client, {
+							symbol: symbol.toUpperCase(),
+							side,
+							quantity: orderQuantity,
+							stopLoss: stopLoss ?? null,
+							takeProfit: profitTarget ?? null,
+							orderId: dbOrder.id,
+						});
+					}
 
 					results.push({
 						symbol,
 						side,
 						quantity,
 						leverage,
-						entryPrice: latestPriceNum,
+						entryPrice: latestPrice,
 						success: true,
 						orderId: dbOrder.id,
 					});
@@ -382,7 +429,7 @@ export async function createPosition(
 					side,
 					quantity,
 					leverage,
-					entryPrice: latestPriceNum,
+					entryPrice: latestPrice,
 					success: true,
 				});
 			}
@@ -399,9 +446,6 @@ export async function createPosition(
 			});
 		}
 	}
-
-	// Close the client when done
-	await client.close();
 
 	return results;
 }

@@ -14,6 +14,7 @@ import {
 export const toolCallTypeEnum = pgEnum("ToolCallType", [
 	"CREATE_POSITION",
 	"CLOSE_POSITION",
+	"HOLDING",
 ]);
 
 export const orderStatusEnum = pgEnum("OrderStatus", ["OPEN", "CLOSED"]);
@@ -145,7 +146,10 @@ export const orders = pgTable(
 			stop: number | null;
 			target: number | null;
 			invalidation: string | null;
+			invalidationPrice: number | null;
 			confidence: number | null;
+			timeExit: string | null;
+			cooldownUntil: string | null;
 		}>(),
 		// Status: OPEN = active position, CLOSED = completed trade
 		status: orderStatusEnum("status").notNull().default("OPEN"),
@@ -154,6 +158,12 @@ export const orders = pgTable(
 		realizedPnl: numeric("realizedPnl", { precision: 18, scale: 2 }),
 		// Auto-close trigger (null = manual close, "STOP" or "TARGET" = auto)
 		closeTrigger: text("closeTrigger"),
+		// Lighter exchange order indices for real SL/TP orders
+		slOrderIndex: text("slOrderIndex"),
+		tpOrderIndex: text("tpOrderIndex"),
+		// Trigger prices for SL/TP orders (stored for reference)
+		slTriggerPrice: numeric("slTriggerPrice", { precision: 18, scale: 8 }),
+		tpTriggerPrice: numeric("tpTriggerPrice", { precision: 18, scale: 8 }),
 		// Timestamps
 		openedAt: timestamp("openedAt").defaultNow().notNull(),
 		closedAt: timestamp("closedAt"),
@@ -215,6 +225,7 @@ export type NewOrder = typeof orders.$inferInsert;
 export const ToolCallType = {
 	CREATE_POSITION: toolCallTypeEnum.enumValues[0],
 	CLOSE_POSITION: toolCallTypeEnum.enumValues[1],
+	HOLDING: toolCallTypeEnum.enumValues[2],
 } as const;
 
 export type ToolCallType = (typeof toolCallTypeEnum.enumValues)[number];

@@ -26,7 +26,20 @@ export const decisionSchema = z.object({
 	stop_loss: z.number().describe("Stop loss price level"),
 	invalidation_condition: z
 		.string()
-		.describe("When to exit if thesis breaks"),
+		.describe("When to exit if thesis breaks (e.g., '4h close above EMA50')"),
+	invalidation_price: z
+		.number()
+		.optional()
+		.nullable()
+		.describe("Exact price level where thesis is invalidated"),
+	time_exit: z
+		.string()
+		.optional()
+		.describe("Maximum hold duration condition (e.g., 'Close if held >24h and within 1R of entry')"),
+	cooldown_until: z
+		.string()
+		.optional()
+		.describe("ISO timestamp when direction change is next allowed on this symbol"),
 	confidence: z.number().describe("Setup quality 0-100"),
 });
 
@@ -72,5 +85,8 @@ export interface NormalizedDecision {
 	profitTarget: number | null;
 	stopLoss: number | null;
 	invalidationCondition: string | null;
+	invalidationPrice: number | null;
+	timeExit: string | null;
+	cooldownUntil: string | null;
 	confidence: number | null;
 }

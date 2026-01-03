@@ -12,8 +12,11 @@ import {
 	getOpenOrderBySymbol,
 	updateOrderExitPlan,
 } from "@/server/db/ordersRepository.server";
-import { DEFAULT_SIMULATOR_OPTIONS, IS_SIMULATION_ENABLED } from "@/env";
+import { API_KEY_INDEX, BASE_URL, DEFAULT_SIMULATOR_OPTIONS, IS_SIMULATION_ENABLED } from "@/env";
 import { ExchangeSimulator } from "@/server/features/simulator/exchangeSimulator";
+import { SignerClient } from "@/server/features/trading/signerClient";
+import { updateSlTpOrdersOnExchange } from "@/server/features/trading/slTpOrderManager";
+import { NonceManagerType } from "../../../../../../lighter-sdk-ts/nonce_manager";
 import {
 	computeRiskMetrics,
 	resolveNotionalUsd,
@@ -47,7 +50,22 @@ export function updateExitPlanTool(ctx: ToolContext) {
 							.optional()
 							.nullable()
 							.describe("Optional new target"),
-						reason: z.string().min(3).describe("Per-symbol justification"),
+						reason: z.string().min(3).describe("Per-symbol justification (invalidation_trigger)"),
+						invalidation_price: z
+							.number()
+							.optional()
+							.nullable()
+							.describe("Exact price level where thesis is invalidated"),
+						time_exit: z
+							.string()
+							.optional()
+							.nullable()
+							.describe("Maximum hold duration (e.g., 'Close if held >24h and within 1R')"),
+						cooldown_until: z
+							.string()
+							.optional()
+							.nullable()
+							.describe("ISO timestamp when direction change is next allowed"),
 					}),
 				)
 				.min(1),
@@ -60,6 +78,9 @@ export function updateExitPlanTool(ctx: ToolContext) {
 				profitTarget: number | null;
 				stopLoss: number | null;
 				invalidationCondition: string | null;
+				invalidationPrice: number | null;
+				timeExit: string | null;
+				cooldownUntil: string | null;
 				leverage: number | null;
 				confidence: number | null;
 				reason: string | null;
@@ -156,6 +177,9 @@ export function updateExitPlanTool(ctx: ToolContext) {
 					target: targetValue,
 					stop: stopValue,
 					invalidation: update.reason,
+					invalidationPrice: update.invalidation_price ?? position.exitPlan?.invalidationPrice ?? null,
+					timeExit: update.time_exit ?? position.exitPlan?.timeExit ?? null,
+					cooldownUntil: update.cooldown_until ?? position.exitPlan?.cooldownUntil ?? null,
 				};
 
 				position.exitPlan = updatedExitPlan;
@@ -177,7 +201,7 @@ export function updateExitPlanTool(ctx: ToolContext) {
 
 				const decisionQuantity = resolveQuantity(basePosition) ?? 0;
 
-				if (IS_SIMULATION_ENABLED) {
+			if (IS_SIMULATION_ENABLED) {
 					simulatorInstance =
 						simulatorInstance ??
 						(await ExchangeSimulator.bootstrap(DEFAULT_SIMULATOR_OPTIONS));
@@ -187,6 +211,42 @@ export function updateExitPlanTool(ctx: ToolContext) {
 						target: updatedExitPlan.target,
 						invalidation: updatedExitPlan.invalidation,
 					});
+				} else {
+					// Live mode: Update SL/TP orders on the exchange
+					try {
+						const accountId = ctx.account.id || "default";
+						const dbOrder = await getOpenOrderBySymbol(
+							accountId,
+							normalizedSymbol,
+						);
+						if (dbOrder && ctx.account.apiKey) {
+							const client = await SignerClient.create({
+								url: BASE_URL,
+								privateKey: ctx.account.apiKey,
+								apiKeyIndex: API_KEY_INDEX,
+								accountIndex: Number(ctx.account.accountIndex),
+								nonceManagementType: NonceManagerType.API,
+							});
+
+							await updateSlTpOrdersOnExchange(
+								client,
+								normalizedSymbol,
+								position.sign,
+								decisionQuantity,
+								dbOrder.id,
+								dbOrder.slOrderIndex,
+								dbOrder.tpOrderIndex,
+								updatedExitPlan.stop,
+								updatedExitPlan.target,
+							);
+						}
+					} catch (exchangeError) {
+						console.error(
+							`[updateExitPlan] Exchange SL/TP update failed for ${normalizedSymbol}:`,
+							exchangeError,
+						);
+						// Continue anyway - DB will be updated
+					}
 				}
 
 				// Update exitPlan in Orders table (single source of truth)
@@ -203,7 +263,10 @@ export function updateExitPlanTool(ctx: ToolContext) {
 								stop: updatedExitPlan.stop,
 								target: updatedExitPlan.target,
 								invalidation: updatedExitPlan.invalidation,
+								invalidationPrice: updatedExitPlan.invalidationPrice,
 								confidence: position.confidence ?? null,
+								timeExit: updatedExitPlan.timeExit,
+								cooldownUntil: updatedExitPlan.cooldownUntil,
 							},
 						});
 					}
@@ -222,6 +285,9 @@ export function updateExitPlanTool(ctx: ToolContext) {
 					profitTarget: updatedExitPlan.target,
 					stopLoss: updatedExitPlan.stop,
 					invalidationCondition: updatedExitPlan.invalidation,
+					invalidationPrice: position.exitPlan?.stop ?? null,
+					timeExit: updatedExitPlan.timeExit,
+					cooldownUntil: updatedExitPlan.cooldownUntil,
 					confidence: position.confidence ?? null,
 				});
 
@@ -232,6 +298,9 @@ export function updateExitPlanTool(ctx: ToolContext) {
 					profitTarget: updatedExitPlan.target,
 					stopLoss: updatedExitPlan.stop,
 					invalidationCondition: updatedExitPlan.invalidation,
+					invalidationPrice: updatedExitPlan.invalidationPrice,
+					timeExit: updatedExitPlan.timeExit,
+					cooldownUntil: updatedExitPlan.cooldownUntil,
 					leverage: position.leverage ?? null,
 					confidence: position.confidence ?? null,
 					reason: update.reason,
@@ -273,6 +342,9 @@ export function updateExitPlanTool(ctx: ToolContext) {
 						profitTarget: decision.profitTarget,
 						stopLoss: decision.stopLoss,
 						invalidationCondition: decision.invalidationCondition,
+						invalidationPrice: decision.invalidationPrice,
+						timeExit: decision.timeExit,
+						cooldownUntil: decision.cooldownUntil,
 						confidence: decision.confidence,
 						toolCallId: toolCallRecord.id,
 						toolCallType: "UPDATE_EXIT_PLAN",

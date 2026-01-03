@@ -36,6 +36,40 @@ interface TradingPromptParams {
 }
 
 /**
+ * Build a compact state summary for prepareStep updates.
+ * This is appended as a new message instead of rewriting the original prompt,
+ * preserving conversation causality.
+ */
+export function buildStateSummary(params: {
+	portfolio: PortfolioSnapshot;
+	openPositions: EnrichedOpenPosition[];
+	exposureSummary: ExposureSummary;
+}): string {
+	const { portfolio, openPositions, exposureSummary } = params;
+
+	const exposureRatio = calculateExposureToEquityPct(portfolio, exposureSummary);
+	const exposurePct =
+		exposureRatio != null && Number.isFinite(exposureRatio)
+			? exposureRatio.toFixed(1)
+			: "0.0";
+
+	// Build position summaries with safe number conversion
+	const positionSummaries = openPositions.map((pos) => {
+		const pnlValue = Number(pos.unrealizedPnl ?? 0);
+		const pnlSign = pnlValue >= 0 ? "+" : "";
+		const pnl = Number.isFinite(pnlValue) ? pnlValue.toFixed(2) : "?";
+		return `${pos.symbol} ${pos.sign} @ ${pos.entryPrice} (${pnlSign}$${pnl})`;
+	});
+
+	const positionsLine =
+		positionSummaries.length > 0
+			? `Open: ${positionSummaries.join(", ")}`
+			: "No open positions";
+
+	return `[STATE UPDATE] Cash: ${formatUsd(portfolio.availableCash)} | Exposure: ${exposurePct}% | Portfolio: ${formatUsd(portfolio.totalValue)} | ${positionsLine}`;
+}
+
+/**
  * Build both system and user prompts for the trading agent.
  * System prompt contains static instructions (hidden from model context).
  * User prompt contains dynamic session data.
@@ -44,6 +78,7 @@ export function buildTradingPrompts(params: TradingPromptParams): {
 	systemPrompt: string;
 	userPrompt: string;
 	variantId: VariantId;
+	stateSummary: string;
 } {
 	const {
 		account,
@@ -130,10 +165,18 @@ export function buildTradingPrompts(params: TradingPromptParams): {
 		)
 		;
 
+	// Build compact state summary for prepareStep updates
+	const stateSummary = buildStateSummary({
+		portfolio,
+		openPositions,
+		exposureSummary,
+	});
+
 	return {
 		systemPrompt: SYSTEM_PROMPT,
 		userPrompt,
 		variantId: variant,
+		stateSummary,
 	};
 }
 

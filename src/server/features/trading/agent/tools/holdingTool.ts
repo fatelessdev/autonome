@@ -13,6 +13,7 @@ import type { ToolContext } from "./types";
 
 /**
  * Creates the holding tool with the given context
+ * Uses the dedicated HOLDING tool call type for proper tracking and UI display
  */
 export function holdingTool(ctx: ToolContext) {
 	return tool({
@@ -21,16 +22,16 @@ export function holdingTool(ctx: ToolContext) {
 		inputSchema: z.object({
 			reason: z
 				.string()
-				.max(500)
+				.max(1000)
 				.describe(
-					"Brief reason for holding (max 500 chars): primary market condition or constraint",
+					"Brief reason for holding (max 1000 chars): primary market condition or constraint",
 				),
 		}),
 		execute: async ({ reason }) => {
-			// Record holding decision for telemetry
+			// Record holding decision for telemetry using dedicated HOLDING type
 			await createToolCallMutation({
 				invocationId: ctx.invocationId,
-				type: ToolCallType.CREATE_POSITION,
+				type: ToolCallType.HOLDING,
 				metadata: JSON.stringify({
 					action: "holding",
 					reason,

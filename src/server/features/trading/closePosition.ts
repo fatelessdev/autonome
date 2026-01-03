@@ -10,16 +10,15 @@ import {
 	getOpenPositions,
 	type OpenPositionSummary,
 } from "@/server/features/trading/openPositions";
-import {
-	SignerClientFactory,
-	SignerClient,
-} from "@/server/features/trading/signerClient";
+import { SignerClient } from "@/server/features/trading/signerClient";
 import { MARKETS } from "@/shared/markets/marketMetadata";
 import { candlestickApi } from "@/server/integrations/lighter";
+import { NonceManagerType } from "../../../../lighter-sdk-ts/nonce_manager";
 import {
 	closeOrder,
 	getOpenOrderBySymbol,
 } from "@/server/db/ordersRepository.server";
+import { cancelSlTpOrders } from "./slTpOrderManager";
 
 export interface ClosedPositionSummary {
 	symbol: string;
@@ -168,12 +167,12 @@ export async function closePosition(
 		return summaries;
 	}
 
-	// Live trading mode - use SignerClient from new SDK
-	const client = await SignerClientFactory.create({
+	const client = await SignerClient.create({
 		url: BASE_URL,
 		privateKey: account.apiKey,
 		apiKeyIndex: API_KEY_INDEX,
 		accountIndex: Number(account.accountIndex),
+		nonceManagementType: NonceManagerType.API,
 	});
 
 	const summaries: ClosedPositionSummary[] = [];
@@ -194,15 +193,15 @@ export async function closePosition(
 			continue;
 		}
 
-		try {
-			// Fetch latest price using new SDK API
-			const candleStickData = await candlestickApi.getCandlesticks({
-				market_id: market.marketId,
-				resolution: "1m",
-				start_timestamp: Date.now() - 1000 * 60 * 5,
-				end_timestamp: Date.now(),
-				count_back: 1,
-			});
+	try {
+			const candleStickData = await candlestickApi.candlesticks(
+				market.marketId,
+				"1m",
+				Date.now() - 1000 * 60 * 5,
+				Date.now(),
+				1,
+				false,
+			);
 			const latestPrice =
 				candleStickData?.candlesticks?.[candleStickData.candlesticks.length - 1]
 					?.close;
@@ -213,30 +212,40 @@ export async function closePosition(
 				continue;
 			}
 
-			const latestPriceNum = parseFloat(latestPrice);
+			// Cancel any pending SL/TP orders before closing position
+			const dbOrderForSlTp = await getOpenOrderBySymbol(account.id, key);
+			if (dbOrderForSlTp?.slOrderIndex || dbOrderForSlTp?.tpOrderIndex) {
+				console.log(`[closePosition] Canceling SL/TP orders for ${symbol}`);
+				await cancelSlTpOrders(
+					client,
+					symbol.toUpperCase(),
+					dbOrderForSlTp.slOrderIndex,
+					dbOrderForSlTp.tpOrderIndex,
+					dbOrderForSlTp.id,
+				);
+			}
+
 			const closeSign = position.sign === "LONG" ? "SHORT" : "LONG";
 
 			const baseQuantity =
 				position.quantity ?? toNumber(position.position) ?? 0;
 
-			// Execute close order using new SDK
 			await client.createOrder({
 				marketIndex: market.marketId,
 				clientOrderIndex: market.clientOrderIndex,
 				baseAmount: Math.abs(baseQuantity) * market.qtyDecimals,
 				price:
-					(closeSign === "LONG"
-						? latestPriceNum * 1.01
-						: latestPriceNum * 0.99) * market.priceDecimals,
+					(closeSign === "LONG" ? latestPrice * 1.01 : latestPrice * 0.99) *
+					market.priceDecimals,
 				isAsk: closeSign !== "LONG",
 				orderType: SignerClient.ORDER_TYPE_MARKET,
 				timeInForce: SignerClient.ORDER_TIME_IN_FORCE_IMMEDIATE_OR_CANCEL,
-				reduceOnly: false,
+				reduceOnly: 0,
 				triggerPrice: SignerClient.NIL_TRIGGER_PRICE,
 				orderExpiry: SignerClient.DEFAULT_IOC_EXPIRY,
 			});
 
-			const summary = buildSummary(symbol, position, latestPriceNum, closedAtIso);
+			const summary = buildSummary(symbol, position, latestPrice, closedAtIso);
 			if (summary) {
 				summaries.push(summary);
 
@@ -246,7 +255,7 @@ export async function closePosition(
 					if (dbOrder) {
 						await closeOrder({
 							orderId: dbOrder.id,
-							exitPrice: latestPriceNum.toString(),
+							exitPrice: latestPrice.toString(),
 							realizedPnl: (summary.netPnl ?? 0).toString(),
 						});
 					} else {
@@ -265,9 +274,6 @@ export async function closePosition(
 			console.error(`Failed to close position for ${symbol}:`, err);
 		}
 	}
-
-	// Close the client when done
-	await client.close();
 
 	return summaries;
 }
