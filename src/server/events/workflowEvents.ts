@@ -187,7 +187,11 @@ export async function emitAllDataChanged(modelId: string): Promise<void> {
 	emitTradeEvent({
 		type: "trades:updated",
 		timestamp: new Date().toISOString(),
-		data: trades as TradeEventData[],
+		data: (trades as any[]).map((t) => ({
+			...t,
+			entryNotional: (t.quantity || 0) * (t.entryPrice || 0),
+			exitNotional: (t.quantity || 0) * (t.exitPrice || 0),
+		})) as TradeEventData[],
 	});
 
 	emitConversationEvent({

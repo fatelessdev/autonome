@@ -231,13 +231,14 @@ function calculateAverageEntries(entries: LeaderboardEntry[]): LeaderboardEntry[
 }
 
 /**
- * Export leaderboard data to Excel with 6 sheets:
- * 1. OG - OG variant entries
- * 2. Minimal - Minimal variant entries
- * 3. Verbose - Verbose variant entries
- * 4. AGI - AGI variant entries
- * 5. All Models - All models across all variants
- * 6. Average - Averaged stats per model across variants
+ * Export leaderboard data to Excel with separate sheets for each variant:
+ * 1. Situational
+ * 2. Minimal
+ * 3. Guardian
+ * 4. Max
+ * 5. Sovereign
+ * 6. All Models - All models across all variants
+ * 7. Average - Averaged stats per model across variants
  * 
  * Filename format: YYYY-MM-DD_Leaderboard_{window}.xlsx
  */
@@ -250,8 +251,8 @@ export function exportLeaderboardToExcel(
 	// Create workbook
 	const wb = XLSX.utils.book_new();
 
-	// Add a sheet for each variant (OG, Minimal, Verbose, AGI)
-	const variants = ["Situational", "Minimal", "Guardian", "Max"];
+	// Add a sheet for each variant (Situational, Minimal, Guardian, Max, Sovereign)
+	const variants = ["Situational", "Minimal", "Guardian", "Max", "Sovereign"];
 	for (const variant of variants) {
 		const data = variantData.find((d) => d.variant === variant);
 		if (data && data.entries.length > 0) {

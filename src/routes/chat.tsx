@@ -1,5 +1,4 @@
 import { useChat } from "@ai-sdk/react";
-import { ShaderGradient, ShaderGradientCanvas } from "@shadergradient/react";
 import { createFileRoute } from "@tanstack/react-router";
 import { SquareIcon } from "lucide-react";
 import {

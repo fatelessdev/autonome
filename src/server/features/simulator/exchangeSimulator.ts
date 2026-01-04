@@ -27,6 +27,7 @@ import type {
 } from "@/server/features/simulator/types";
 import { emitAllDataChanged } from "@/server/events/workflowEvents";
 import { MARKETS } from "@/shared/markets/marketMetadata";
+import { DEFAULT_SIMULATOR_OPTIONS } from "@/env";
 
 // ============================================================================
 // Types
@@ -36,10 +37,6 @@ type SimulatorEventType = MarketEvent["type"];
 
 interface PlaceOrderOptions {
 	skipValidation?: boolean;
-}
-
-interface ClosePositionsOptions {
-	autoTrigger?: "STOP" | "TARGET";
 }
 
 class SimpleEmitter {
@@ -106,7 +103,10 @@ export class ExchangeSimulator {
 		options?: Partial<ExchangeSimulatorOptions>,
 	): Promise<ExchangeSimulator> {
 		if (!globalThis.__exchangeSimulator) {
-			globalThis.__exchangeSimulator = ExchangeSimulator.create(options);
+			globalThis.__exchangeSimulator = ExchangeSimulator.create({
+				...DEFAULT_SIMULATOR_OPTIONS,
+				...options,
+			});
 		}
 		return globalThis.__exchangeSimulator;
 	}
@@ -231,6 +231,7 @@ export class ExchangeSimulator {
 						fills: [{ quantity, price: entryPrice }],
 						averagePrice: entryPrice,
 						totalQuantity: quantity,
+						totalFees: 0,
 						status: "filled",
 					},
 					leverage,
@@ -307,9 +308,6 @@ export class ExchangeSimulator {
 				const outcomes = await this.closePositions(
 					[request.symbol],
 					request.accountId,
-					{
-						autoTrigger: request.trigger,
-					},
 				);
 				const outcome =
 					outcomes[request.symbol] ?? outcomes[normalizeSymbol(request.symbol)];
@@ -529,7 +527,6 @@ export class ExchangeSimulator {
 	async closePositions(
 		symbols: string[],
 		accountId: string,
-		options?: ClosePositionsOptions,
 	): Promise<Record<string, SimulatedOrderResult>> {
 		const outcomes: Record<string, SimulatedOrderResult> = {};
 

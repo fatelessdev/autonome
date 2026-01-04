@@ -4,6 +4,8 @@ import { stat } from "node:fs/promises";
 import { join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
+declare const Bun: any;
+
 const startHandler = createStartHandler(defaultStreamHandler);
 const clientDistDir = fileURLToPath(new URL("../client", import.meta.url));
 

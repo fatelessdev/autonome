@@ -56,7 +56,6 @@ export class MarketState {
 	constructor(
 		private readonly metadata: MarketMetadata,
 		_orderApi: any, // Keep for backwards compatibility but unused
-		private readonly depth = 50,
 	) {
 		this.orderBook = new OrderBook(metadata);
 	}

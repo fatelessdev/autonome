@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 
-export type VariantId = "all" | "Situational" | "Minimal" | "Guardian" | "Max";
+export type VariantId = "all" | "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign";
 
 export interface VariantContextValue {
 	selectedVariant: VariantId;
@@ -37,25 +37,31 @@ export const VARIANT_TABS: {
 	{
 		id: "Situational",
 		label: "Situational Awareness",
-		color: "#1f9d55",
-		background: "#e4f3da",
+		color: "#22c55e",
+		background: "#f0fdf4",
 	},
 	{
 		id: "Minimal",
 		label: "Minimal Discipline",
-		color: "#c0843d",
-		background: "#f6eddc",
+		color: "#3b82f6",
+		background: "#eff6ff",
 	},
 	{
 		id: "Guardian",
 		label: "Guardian (Survival)",
-		color: "#c14c86",
-		background: "#f9e0ec",
+		color: "#a855f7",
+		background: "#faf5ff",
 	},
 	{
 		id: "Max",
 		label: "Max Leverage",
-		color: "#3a82b9",
-		background: "#e3f1fb",
+		color: "#f59e0b",
+		background: "#fffbeb",
+	},
+	{
+		id: "Sovereign",
+		label: "Sovereign (Elite)",
+		color: "#e11d48",
+		background: "#fff1f2",
 	},
 ];

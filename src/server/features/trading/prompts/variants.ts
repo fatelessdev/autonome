@@ -22,12 +22,16 @@ import {
 	SYSTEM_PROMPT as SYSTEM_PROMPT_MAX,
 	USER_PROMPT as USER_PROMPT_MAX,
 } from "./prompt4";
+import {
+	SYSTEM_PROMPT as SYSTEM_PROMPT_SOVEREIGN,
+	USER_PROMPT as USER_PROMPT_SOVEREIGN,
+} from "./prompt5";
 
 // ==========================================
 // Types
 // ==========================================
 
-export type VariantId = "Situational" | "Minimal" | "Guardian" | "Max";
+export type VariantId = "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign";
 
 export interface VariantConfig {
 	/** Unique variant identifier */
@@ -88,6 +92,15 @@ export const VARIANTS: Record<VariantId, VariantConfig> = {
 		temperature: 0,
 		color: "#f59e0b", // amber-500
 	},
+	Sovereign: {
+		id: "Sovereign",
+		label: "Sovereign (Elite)",
+		description: "High Agency Alpha with strict mathematical safety and thesis validation",
+		systemPrompt: SYSTEM_PROMPT_SOVEREIGN,
+		userPrompt: USER_PROMPT_SOVEREIGN,
+		temperature: 0,
+		color: "#e11d48", // rose-600
+	},
 };
 
 /**
@@ -98,6 +111,7 @@ export const VARIANT_IDS: VariantId[] = [
 	"Minimal",
 	"Guardian",
 	"Max",
+	"Sovereign",
 ];
 
 /**

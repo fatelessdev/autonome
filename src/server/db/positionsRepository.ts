@@ -14,9 +14,9 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
 	models,
-	positions,
-	type Position,
-	type PositionSide,
+	orders as positions,
+	type Order as Position,
+	type OrderSide as PositionSide,
 } from "@/db/schema";
 
 // ============================================================================
@@ -30,24 +30,29 @@ export interface CreatePositionParams {
 	quantity: number;
 	entryPrice: number;
 	leverage?: number | null;
-	confidence?: number | null;
 	exitPlan?: {
-		target: number | null;
-		stop: number | null;
-		invalidation: string | null;
+		target?: number | null;
+		stop?: number | null;
+		invalidation?: string | null;
+		invalidationPrice?: number | null;
+		confidence?: number | null;
+		timeExit?: string | null;
+		cooldownUntil?: string | null;
 	} | null;
-	toolCallId?: string | null;
 }
 
 export interface UpdatePositionParams {
 	quantity?: number;
 	entryPrice?: number;
 	leverage?: number | null;
-	confidence?: number | null;
 	exitPlan?: {
-		target: number | null;
-		stop: number | null;
-		invalidation: string | null;
+		target?: number | null;
+		stop?: number | null;
+		invalidation?: string | null;
+		invalidationPrice?: number | null;
+		confidence?: number | null;
+		timeExit?: string | null;
+		cooldownUntil?: string | null;
 	} | null;
 }
 
@@ -64,6 +69,26 @@ export interface ModelPositionsGroup {
 	modelName: string;
 	modelLogo: string;
 	positions: Position[];
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Normalizes an exit plan object to include all required fields for the DB schema
+ */
+function normalizeExitPlan(exitPlan: CreatePositionParams["exitPlan"]) {
+	if (!exitPlan) return null;
+	return {
+		target: exitPlan.target ?? null,
+		stop: exitPlan.stop ?? null,
+		invalidation: exitPlan.invalidation ?? null,
+		invalidationPrice: exitPlan.invalidationPrice ?? null,
+		confidence: exitPlan.confidence ?? null,
+		timeExit: exitPlan.timeExit ?? null,
+		cooldownUntil: exitPlan.cooldownUntil ?? null,
+	};
 }
 
 // ============================================================================
@@ -95,9 +120,7 @@ export async function createPositionRecord(
 			quantity: params.quantity.toString(),
 			entryPrice: params.entryPrice.toString(),
 			leverage: params.leverage?.toString() ?? null,
-			confidence: params.confidence?.toString() ?? null,
-			exitPlan: params.exitPlan ?? null,
-			toolCallId: params.toolCallId ?? null,
+			exitPlan: normalizeExitPlan(params.exitPlan),
 		})
 		.returning();
 
@@ -123,9 +146,7 @@ export async function upsertPosition(
 			quantity: params.quantity.toString(),
 			entryPrice: params.entryPrice.toString(),
 			leverage: params.leverage?.toString() ?? null,
-			confidence: params.confidence?.toString() ?? null,
-			exitPlan: params.exitPlan ?? null,
-			toolCallId: params.toolCallId ?? null,
+			exitPlan: normalizeExitPlan(params.exitPlan),
 		})
 		.onConflictDoUpdate({
 			target: [positions.modelId, positions.symbol],
@@ -134,9 +155,7 @@ export async function upsertPosition(
 				quantity: params.quantity.toString(),
 				entryPrice: params.entryPrice.toString(),
 				leverage: params.leverage?.toString() ?? null,
-				confidence: params.confidence?.toString() ?? null,
-				exitPlan: params.exitPlan ?? null,
-				toolCallId: params.toolCallId ?? null,
+				exitPlan: normalizeExitPlan(params.exitPlan),
 				updatedAt: new Date(),
 			},
 		})
@@ -232,11 +251,8 @@ export async function updatePosition(
 	if (params.leverage !== undefined) {
 		updateData.leverage = params.leverage?.toString() ?? null;
 	}
-	if (params.confidence !== undefined) {
-		updateData.confidence = params.confidence?.toString() ?? null;
-	}
 	if (params.exitPlan !== undefined) {
-		updateData.exitPlan = params.exitPlan;
+		updateData.exitPlan = normalizeExitPlan(params.exitPlan);
 	}
 
 	const [updated] = await db
@@ -260,9 +276,13 @@ export async function updatePositionExitPlan(
 	modelId: string,
 	symbol: string,
 	exitPlan: {
-		target: number | null;
-		stop: number | null;
-		invalidation: string | null;
+		target?: number | null;
+		stop?: number | null;
+		invalidation?: string | null;
+		invalidationPrice?: number | null;
+		confidence?: number | null;
+		timeExit?: string | null;
+		cooldownUntil?: string | null;
 	},
 ): Promise<Position | null> {
 	return updatePosition(modelId, symbol, { exitPlan });

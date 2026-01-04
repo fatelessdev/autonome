@@ -5,7 +5,7 @@
 
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
-import { Output, ToolLoopAgent, stepCountIs, hasToolCall } from "ai";
+import { ToolLoopAgent, stepCountIs, hasToolCall } from "ai";
 import * as Sentry from "@sentry/react";
 
 import { env } from "@/env";
@@ -13,7 +13,7 @@ import type { Account } from "@/server/features/trading/accounts";
 import type { StepTelemetry } from "@/server/features/trading/invocationResponse";
 import { getModelProvider } from "@/shared/models/modelConfig";
 
-import { agentOutputSchema, callOptionsSchema } from "./schemas";
+import { callOptionsSchema } from "./schemas";
 import { createTradingTools, type ToolContext } from "./tools";
 
 /**
@@ -81,9 +81,9 @@ export function createTradeAgent(config: TradeAgentConfig) {
 
 	// Build output configuration - only use structured output for OpenRouter models
 	// NIM models don't support structuredOutputs, so we rely on tool calls only
-	const outputConfig = useOpenRouter
-		? Output.object({ schema: agentOutputSchema })
-		: undefined;
+	// const _outputConfig = useOpenRouter
+	// 	? Output.object({ schema: agentOutputSchema })
+	// 	: undefined;
 
 	// Create the agent
 	const agent = new ToolLoopAgent({

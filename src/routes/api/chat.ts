@@ -1,6 +1,5 @@
 import "@/polyfill";
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { mistral, type MistralLanguageModelOptions } from "@ai-sdk/mistral";
+import { type MistralLanguageModelOptions } from "@ai-sdk/mistral";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { convertToModelMessages, ToolLoopAgent, stepCountIs } from "ai";
 import { createFileRoute } from "@tanstack/react-router";
@@ -8,9 +7,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { env } from "@/env";
 import { SQL_ASSISTANT_PROMPT } from "@/server/chat/sqlPrompt";
 import { tools } from "@/server/chat/tools";
-
-// Primary model for initial analysis and tool orchestration
-const primaryModel = mistral("codestral-latest");
 
 // AI SDK-compatible chat endpoint
 async function handleChat({ request }: { request: Request }) {
@@ -28,31 +24,13 @@ async function handleChat({ request }: { request: Request }) {
 			);
 		}
 
-		const nim = createOpenAICompatible({
-			name: "nim",
-			baseURL: "https://integrate.api.nvidia.com/v1",
-			headers: {
-				Authorization: `Bearer ${env.NIM_API_KEY}`,
-			},
-			// fetch: async (url, options) => {
-			// 	if (options.method === 'POST' && options.body) {
-			// 		const body = JSON.parse(options.body as string);
-
-			// 		// INJECT YOUR CUSTOM PARAMETERS HERE
-			// 		body.chat_template_kwargs = { thinking: true };
-
-			// 		options.body = JSON.stringify(body);
-			// 	}
-			// 	return fetch(url, options);
-			// },
-		});
 		const openrouter = createOpenRouter({
 			apiKey: env.OPENROUTER_API_KEY,
 		});
 
 		const sqlAgent = new ToolLoopAgent({
 			// model: primaryModel,
-			model: openrouter("xiaomi/mimo-v2-flash:free"),
+			model: openrouter("xiaomi/mimo-v2-flash:free") as any,
 			instructions: SQL_ASSISTANT_PROMPT,
 			// instructions: "You are an helpful assistant",
 			providerOptions: {
@@ -65,9 +43,6 @@ async function handleChat({ request }: { request: Request }) {
 				mistral: {
 					parallelToolCalls: true,
 				} satisfies MistralLanguageModelOptions,
-				nim: {
-					chat_template_kwargs: { thinking: false },
-				},
 				openrouter: {
 					reasoning: {
 						effort: "low",

@@ -35,7 +35,6 @@ import type { TradingDecisionWithContext } from "@/server/features/trading/tradi
 import {
 	type VariantId,
 	DEFAULT_VARIANT,
-	getVariantConfig,
 } from "@/server/features/trading/prompts/variants";
 import {
 	emitAllDataChanged,
@@ -43,7 +42,6 @@ import {
 } from "@/server/events/workflowEvents";
 import { analyzeToolCallFailure } from "@/server/features/analytics/toolCallAnalyzer";
 import {
-	runConsensusWorkflow,
 	CONSENSUS_MODEL_NAME,
 } from "@/server/features/trading/orchestrator";
 
@@ -123,7 +121,7 @@ export async function runTradeWorkflow(account: Account) {
 
 	// Get variant config for temperature and other settings
 	const variantId = account.variant ?? DEFAULT_VARIANT;
-	const variantConfig = getVariantConfig(variantId);
+	// const variantConfig = getVariantConfig(variantId);
 
 	// Leaderboard context (variant-scoped)
 	const competitionSnapshot = await buildCompetitionSnapshot({
@@ -414,37 +412,9 @@ export async function executeScheduledTrades() {
 		}
 	};
 
-	// Run consensus workflow
-	const runConsensus = async () => {
-		if (!consensusModel || consensusIsRunning) {
-			return null;
-		}
-		globalThis.modelsRunning?.set(consensusModel.id, true);
-		try {
-			console.log("[Consensus] Starting consensus workflow in parallel with models");
-			await runConsensusWorkflow({
-				apiKey: consensusModel.lighterApiKey,
-				modelName: consensusModel.openRouterModelName,
-				name: consensusModel.name,
-				invocationCount: consensusModel.invocationCount,
-				id: consensusModel.id,
-				accountIndex: consensusModel.accountIndex,
-				totalMinutes: consensusModel.totalMinutes,
-				variant: (consensusModel.variant as VariantId) ?? DEFAULT_VARIANT,
-			});
-			return { modelId: consensusModel.id, success: true as const };
-		} catch (error) {
-			console.error("[Consensus] Consensus workflow failed:", error);
-			return { modelId: consensusModel.id, success: false as const, error };
-		} finally {
-			globalThis.modelsRunning?.set(consensusModel.id, false);
-		}
-	};
-
-	// Fire off all models AND consensus in parallel
+	// Fire off all models in parallel
 	const allPromises: Promise<{ modelId: string; success: boolean } | null>[] = [
 		...modelsToRun.map(runModel),
-		// runConsensus(),
 	];
 
 	Promise.allSettled(allPromises).then((results) => {

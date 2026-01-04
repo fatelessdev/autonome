@@ -27,6 +27,7 @@ function asTaker(ctx: MatchingContext): OrderExecution {
 			fills: [],
 			averagePrice: 0,
 			totalQuantity: 0,
+			totalFees: 0,
 			status: "rejected",
 			reason: "no liquidity available",
 		};
@@ -56,6 +57,7 @@ function asTaker(ctx: MatchingContext): OrderExecution {
 			fills,
 			averagePrice: 0,
 			totalQuantity: 0,
+			totalFees: 0,
 			status: "rejected",
 			reason: "insufficient liquidity",
 		};
@@ -69,6 +71,7 @@ function asTaker(ctx: MatchingContext): OrderExecution {
 		fills,
 		averagePrice,
 		totalQuantity,
+		totalFees: 0, // TODO: Implement fee calculation if needed
 		status,
 		reason: status === "partial" ? "insufficient book depth" : undefined,
 	};
@@ -87,6 +90,7 @@ function asMaker(ctx: MatchingContext): OrderExecution {
 		fills: [fill],
 		averagePrice: price,
 		totalQuantity: order.quantity,
+		totalFees: 0,
 		status: "filled",
 	};
 }
@@ -108,6 +112,7 @@ export function matchOrder(
 			fills: [],
 			averagePrice: 0,
 			totalQuantity: 0,
+			totalFees: 0,
 			status: "rejected",
 			reason: "limit order missing limitPrice",
 		};
@@ -134,6 +139,7 @@ export function matchOrder(
 		fills: [],
 		averagePrice: 0,
 		totalQuantity: 0,
+		totalFees: 0,
 		status: "rejected",
 		reason: "invalid order parameters",
 	};

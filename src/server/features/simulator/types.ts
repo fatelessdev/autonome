@@ -53,6 +53,7 @@ export interface OrderExecution {
 	fills: FillDetail[];
 	averagePrice: number;
 	totalQuantity: number;
+	totalFees: number;
 	status: "filled" | "partial" | "rejected";
 	reason?: string;
 }

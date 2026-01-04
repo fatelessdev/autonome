@@ -65,7 +65,7 @@ export const AIComponentSchema: z.ZodType<AIComponent> = z.lazy(() =>
     z.object({
         id: z.string().optional(),
         type: z.string() as z.ZodType<ComponentType>,
-        props: z.record(z.any()).default({}),
+        props: z.record(z.string(), z.any()).default({}),
         children: z.array(z.any()).optional(), // Relaxed validation
         visibleIf: z.string().optional(),
         bind: z.string().optional(),
@@ -74,7 +74,7 @@ export const AIComponentSchema: z.ZodType<AIComponent> = z.lazy(() =>
             onChange: z.array(LogicActionSchema).optional(),
             onMount: z.array(LogicActionSchema).optional(),
         }).optional(),
-        style: z.record(z.any()).optional(),
+        style: z.record(z.string(), z.any()).optional(),
     })
 );
 
@@ -103,11 +103,11 @@ export interface AIAppDefinition {
 }
 
 export const AIAppDefinitionSchema = z.object({
-    initialState: z.record(z.any()).optional(),
+    initialState: z.record(z.string(), z.any()).optional(),
     theme: z.object({
         mode: z.enum(["light", "dark"]).optional(),
-        colors: z.record(z.string()).optional(),
-        typography: z.record(z.string()).optional(),
+        colors: z.record(z.string(), z.string()).optional(),
+        typography: z.record(z.string(), z.string()).optional(),
         borderRadius: z.string().optional(),
     }).optional(),
     root: AIComponentSchema,

@@ -26,6 +26,7 @@ export const variantEnum = pgEnum("Variant", [
 	"Minimal",
 	"Guardian",
 	"Max",
+	"Sovereign",
 ]);
 
 export const models = pgTable(
@@ -44,7 +45,7 @@ export const models = pgTable(
 	},
 	(table) => ({
 		nameIdx: index("Models_name_idx").on(table.name),
-		// Unique on name + variant so each model can have 4 variants
+		// Unique on name + variant so each model can have 5 variants
 		nameVariantUnique: uniqueIndex("Models_name_variant_key").on(table.name, table.variant),
 	}),
 );
@@ -249,6 +250,7 @@ export const Variant = {
 	Minimal: variantEnum.enumValues[1],
 	Guardian: variantEnum.enumValues[2],
 	Max: variantEnum.enumValues[3],
+	Sovereign: variantEnum.enumValues[4],
 } as const;
 
 export type Variant = (typeof variantEnum.enumValues)[number];

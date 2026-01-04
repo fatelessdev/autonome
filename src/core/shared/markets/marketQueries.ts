@@ -27,7 +27,7 @@ export type PortfolioHistoryEntry = {
 	updatedAt: string;
 	model: {
 		name: string;
-		variant?: "Situational" | "Minimal" | "Guardian" | "Max";
+		variant?: "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign";
 		openRouterModelName: string;
 	};
 };
@@ -190,8 +190,8 @@ function normalizePortfolioHistory(
 
 		const modelRecord = model as Record<string, unknown>;
 		const variant = typeof modelRecord.variant === "string" &&
-			["Situational", "Minimal", "Guardian", "Max"].includes(modelRecord.variant)
-				? (modelRecord.variant as "Situational" | "Minimal" | "Guardian" | "Max")
+			["Situational", "Minimal", "Guardian", "Max", "Sovereign"].includes(modelRecord.variant)
+				? (modelRecord.variant as "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign")
 				: undefined;
 
 		entries.push({
@@ -217,10 +217,10 @@ function normalizePortfolioHistory(
 	return entries;
 }
 
-async function requestPortfolioHistory(variant?: "Situational" | "Minimal" | "Guardian" | "Max") {
+async function requestPortfolioHistory(variant?: "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign") {
 	// When fetching aggregate (all variants), request more points since they're spread across all model-variant combinations
-	// With 7 models × 4 variants = 28 combinations, we need ~4x more points to maintain the same time resolution
-	const maxPoints = variant ? 2000 : 8000;
+	// With 7 models × 5 variants = 35 combinations, we need ~5x more points to maintain the same time resolution
+	const maxPoints = variant ? 2000 : 10000;
 	
 	const data = await orpc.trading.getPortfolioHistory.call({
 		variant,
@@ -238,7 +238,7 @@ async function requestPortfolioHistory(variant?: "Situational" | "Minimal" | "Gu
 	return normalizePortfolioHistory({ history: transformedData });
 }
 
-export const portfolioHistoryQueryOptions = (variant?: "Situational" | "Minimal" | "Guardian" | "Max") =>
+export const portfolioHistoryQueryOptions = (variant?: "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign") =>
 	queryOptions({
 		queryKey: PORTFOLIO_QUERY_KEYS.history(variant),
 		queryFn: () => requestPortfolioHistory(variant),
@@ -247,7 +247,7 @@ export const portfolioHistoryQueryOptions = (variant?: "Situational" | "Minimal"
 		refetchInterval: 3 * 60_000,
 	});
 
-export async function prefetchPortfolioHistory(queryClient: QueryClient, variant?: "Situational" | "Minimal" | "Guardian" | "Max") {
+export async function prefetchPortfolioHistory(queryClient: QueryClient, variant?: "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign") {
 	return queryClient.ensureQueryData(portfolioHistoryQueryOptions(variant));
 }
 
@@ -281,7 +281,7 @@ export type VariantHistoryPoint = {
 };
 
 export type VariantHistoryEntry = {
-	variantId: "Situational" | "Minimal" | "Guardian" | "Max";
+	variantId: "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign";
 	label: string;
 	color: string;
 	history: VariantHistoryPoint[];

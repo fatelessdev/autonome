@@ -204,18 +204,21 @@ export async function searchModels(params: {
 	const limit = params.limit ?? 10;
 	const pattern = params.search ? `%${params.search}%` : null;
 
-	let query = db.select().from(models).orderBy(asc(models.name)).limit(limit);
-
 	if (pattern) {
-		query = query.where(
-			or(
-				ilike(models.name, pattern),
-				ilike(models.openRouterModelName, pattern),
-			),
-		);
+		return db
+			.select()
+			.from(models)
+			.where(
+				or(
+					ilike(models.name, pattern),
+					ilike(models.openRouterModelName, pattern),
+				),
+			)
+			.orderBy(asc(models.name))
+			.limit(limit);
 	}
 
-	return query;
+	return db.select().from(models).orderBy(asc(models.name)).limit(limit);
 }
 
 export async function fetchPortfolioSnapshots(params: {
@@ -230,7 +233,7 @@ export async function fetchPortfolioSnapshots(params: {
 	const limit = params.limit ?? 60;
 	const pattern = params.modelName ? `%${params.modelName}%` : null;
 
-	let query = db
+	const rows = await db
 		.select({
 			snapshot: portfolioSize,
 			modelName: models.name,
@@ -238,14 +241,9 @@ export async function fetchPortfolioSnapshots(params: {
 		})
 		.from(portfolioSize)
 		.innerJoin(models, eq(portfolioSize.modelId, models.id))
+		.where(pattern ? ilike(models.name, pattern) : undefined)
 		.orderBy(desc(portfolioSize.createdAt))
 		.limit(limit);
-
-	if (pattern) {
-		query = query.where(ilike(models.name, pattern));
-	}
-
-	const rows = await query;
 
 	return rows.map((row) => ({
 		snapshot: {

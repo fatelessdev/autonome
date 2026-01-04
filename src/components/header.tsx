@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { ThemeToggleButton2 } from "@/components/ui/theme-toggle-button-2";
-import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 type HeaderProps = {
 	isSidebarExpanded: boolean;
@@ -12,9 +11,6 @@ export default function Header({
 	isSidebarExpanded,
 	onToggleSidebar,
 }: HeaderProps) {
-	 const isMobile = useMediaQuery("(max-width: 1023px)", {
-			defaultValue: false,
-		});
 	return (
 		<div className="flex items-center justify-between border-b px-4 py-2.5 sm:px-6 sm:py-4">
 			<div className="flex items-center gap-3">

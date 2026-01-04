@@ -141,7 +141,7 @@ type TradeRecord = {
 };
 
 export type FetchTradesOptions = {
-	variant?: "Situational" | "Minimal" | "Guardian" | "Max";
+	variant?: "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign";
 	limit?: number;
 };
 
@@ -151,7 +151,7 @@ export async function fetchTrades(options?: FetchTradesOptions): Promise<TradeRe
 	// If a specific variant is requested, fetch only for that variant
 	const variants = variant
 		? [variant]
-		: (["Situational", "Minimal", "Guardian", "Max"] as const);
+		: (["Situational", "Minimal", "Guardian", "Max", "Sovereign"] as const);
 	const LIMIT_PER_VARIANT = Math.ceil(limit / variants.length);
 
 	const variantQueries = variants.map((v) =>
@@ -272,7 +272,7 @@ async function reconcilePositionsWithLive(
 }
 
 export type FetchPositionsOptions = {
-	variant?: "Situational" | "Minimal" | "Guardian" | "Max";
+	variant?: "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign";
 };
 
 export async function fetchPositions(options?: FetchPositionsOptions) {
@@ -608,7 +608,7 @@ export const invocationsQuery = () =>
 // MODELS LIST
 // ==========================================
 
-async function fetchModelsList() {
+export async function fetchModelsList() {
 	const rows = await db
 		.select({ id: models.id, name: models.name })
 		.from(models)

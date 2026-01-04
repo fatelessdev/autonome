@@ -3,7 +3,7 @@ import { EventEmitter } from "node:events";
 export type PortfolioSnapshotData = {
 	modelId: string;
 	modelName: string;
-	variant?: "Situational" | "Minimal" | "Guardian" | "Max";
+	variant?: "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign";
 	netPortfolio: string;
 	createdAt: string;
 };

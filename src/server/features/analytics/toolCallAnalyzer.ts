@@ -1,6 +1,5 @@
 import { generateText } from "ai";
 import { incrementModelUsage } from "@/server/db/tradingRepository";
-import { mistral } from "@ai-sdk/mistral";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { env } from "@/env";
 
@@ -153,7 +152,7 @@ Answer YES or NO:`;
 		});
 
 		const result = await generateText({
-			model: nim.chatModel('qwen/qwen3-next-80b-a3b-instruct'),
+			model: nim.chatModel('qwen/qwen3-next-80b-a3b-instruct') as any,
 			prompt: analysisPrompt,
 			temperature: 0,
 		});

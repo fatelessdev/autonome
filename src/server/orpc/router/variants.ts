@@ -19,6 +19,7 @@ const VariantIdSchema = z.enum([
 	"Minimal",
 	"Guardian",
 	"Max",
+	"Sovereign",
 ]);
 
 const VariantSchema = z.object({

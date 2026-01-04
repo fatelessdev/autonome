@@ -115,7 +115,7 @@ const loadSimulatorPositions = async (accountId?: string) => {
 };
 
 export async function getOpenPositions(
-	apiKey: string,
+	_apiKey: string,
 	accountIndex: string,
 	accountId?: string,
 	options: GetOpenPositionsOptions = {},

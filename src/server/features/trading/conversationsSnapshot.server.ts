@@ -1,15 +1,19 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
 import { invocations, models } from "@/db/schema";
-import { parseTradingToolCallMetadata } from "@/server/features/trading/tradingDecisions";
+import {
+	parseTradingToolCallMetadata,
+	type TradingDecision,
+	type TradingDecisionResult,
+} from "@/server/features/trading/tradingDecisions";
 import { safeJsonParse } from "@/utils/json";
 
 export type ConversationSnapshot = {
 	id: string;
 	modelId: string;
 	modelName: string;
-	modelVariant?: "Situational" | "Minimal" | "Guardian" | "Max";
+	modelVariant?: "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign";
 	modelLogo: string;
 	response: string | null;
 	responsePayload: unknown;
@@ -19,8 +23,8 @@ export type ConversationSnapshot = {
 		type: string;
 		metadata: {
 			raw: unknown;
-			decisions: unknown;
-			results: unknown;
+			decisions: TradingDecision[];
+			results: TradingDecisionResult[];
 		};
 		timestamp: string;
 	}>;
@@ -57,7 +61,7 @@ export async function fetchConversationSnapshots(
 	limitPerVariant = 100,
 ): Promise<ConversationSnapshot[]> {
 	// Fetch 100 invocations per variant to ensure fair representation
-	const variants = ["Situational", "Minimal", "Guardian", "Max"] as const;
+	const variants = ["Situational", "Minimal", "Guardian", "Max", "Sovereign"] as const;
 
 	const variantQueries = variants.map((variant) =>
 		db.query.invocations.findMany({

@@ -5,7 +5,7 @@ import type { ChartConfig } from "@/components/ui/chart";
 import { GlowingLineChart } from "@/components/ui/glowing-line";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useVariant } from "@/components/variant-context";
-import { PORTFOLIO_QUERIES, type PortfolioHistoryEntry } from "@/core/shared/markets/marketQueries";
+import { PORTFOLIO_QUERIES } from "@/core/shared/markets/marketQueries";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { getModelInfo } from "@/shared/models/modelConfig";
 
@@ -29,7 +29,7 @@ export default function PerformanceGraph() {
 	const queryClient = useQueryClient();
 
 	// Server-side variant filtering - pass variant to query
-	const variantParam = selectedVariant === "all" ? undefined : selectedVariant as "Situational" | "Minimal" | "Guardian" | "Max";
+	const variantParam = selectedVariant === "all" ? undefined : selectedVariant as "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign";
 
 	const {
 		data: portfolioData,

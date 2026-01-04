@@ -6,7 +6,7 @@
  * This script will:
  * 1. Truncate all tables (cascade)
  * 2. Insert the predefined AI models into the Models table
- *    - Each model gets 4 rows, one per variant (Situational, Minimal, Guardian, Max)
+ *    - Each model gets 5 rows, one per variant (Situational, Minimal, Guardian, Max, Sovereign)
  */
 
 import { config } from "dotenv";
@@ -31,7 +31,7 @@ const pool = new Pool({ connectionString: DATABASE_URL });
 const db = drizzle(pool);
 
 // All variants to create for each model
-const VARIANTS = ["Situational", "Minimal", "Guardian", "Max"] as const;
+const VARIANTS = ["Situational", "Minimal", "Guardian", "Max", "Sovereign"] as const;
 
 // Model definitions - openRouterModelName
 const MODEL_DEFINITIONS = [
