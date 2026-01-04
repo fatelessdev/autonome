@@ -1,10 +1,11 @@
-import type { Candlestick, OrderBookDetail } from "@/lighter/generated/index";
+import type { OrderBookDetailItem } from "@reservoir0x/lighter-ts-sdk";
+import type { Candlestick } from "@/server/features/trading/indicators";
 import {
-	candlestickApi,
+	fetchCandlesticksRest,
 	fundingApi,
 	orderApi,
 } from "@/server/integrations/lighter";
-import { FundingRateExchangeEnum } from "@/lighter/generated/index";
+import { MARKETS } from "@/shared/markets/marketMetadata";
 import {
 	getAtr,
 	getCloses,
@@ -146,28 +147,26 @@ const fetchCandles = async (
 			: 1000 * 60 * 60 * 4 * HIGHER_TIMEFRAME_LIMIT;
 	const limit = duration === "5m" ? INTRADAY_LIMIT : HIGHER_TIMEFRAME_LIMIT;
 
-	const response = await candlestickApi.candlesticks(
-		marketId,
-		duration,
-		now - lookbackMs,
-		now,
-		limit,
-		false,
-	);
-
-	return response.candlesticks ?? [];
+	// Use REST API directly - SDK's CandlestickApi is outdated
+	return fetchCandlesticksRest({
+		market_id: marketId,
+		resolution: duration,
+		start_timestamp: now - lookbackMs,
+		end_timestamp: now,
+		count_back: limit,
+	});
 };
 
 const fetchFundingRates = async (): Promise<Map<string, number>> => {
 	try {
-		const response = await fundingApi.fundingRates();
+		const response = await fundingApi.getFundingRates();
 		const map = new Map<string, number>();
 
-		for (const entry of response.fundingRates ?? []) {
+		for (const entry of response.funding_rates ?? []) {
 			const symbol = normalizeSymbol(entry.symbol);
 			if (!symbol) continue;
 			const existing = map.get(symbol);
-			const isPreferred = entry.exchange === FundingRateExchangeEnum.Lighter;
+			const isPreferred = entry.exchange === "lighter";
 			if (existing === undefined || isPreferred) {
 				map.set(symbol, entry.rate);
 			}
@@ -181,12 +180,18 @@ const fetchFundingRates = async (): Promise<Map<string, number>> => {
 };
 
 const fetchOrderBookDetails = async (): Promise<
-	Map<string, OrderBookDetail>
+	Map<string, OrderBookDetailItem>
 > => {
 	try {
-		const response = await orderApi.orderBookDetails();
-		const map = new Map<string, OrderBookDetail>();
-		for (const detail of response.orderBookDetails ?? []) {
+		// Fetch order book details for all markets using the first market
+		// The API returns details for all markets in a single call
+		const firstMarket = Object.values(MARKETS)[0];
+		if (!firstMarket) {
+			return new Map();
+		}
+		const response = await orderApi.getOrderBookDetailsRaw(firstMarket.marketId);
+		const map = new Map<string, OrderBookDetailItem>();
+		for (const detail of response.order_book_details ?? []) {
 			const normalized = normalizeSymbol(detail.symbol);
 			if (!normalized) continue;
 			map.set(normalized, detail);
@@ -199,17 +204,17 @@ const fetchOrderBookDetails = async (): Promise<
 };
 
 const extractOpenInterestAverage = (
-	detail: OrderBookDetail | undefined,
+	detail: OrderBookDetailItem | undefined,
 ): number | null => {
-	if (!detail?.dailyChart) {
-		return detail?.openInterest ?? null;
+	if (!detail?.daily_chart) {
+		return detail?.open_interest ?? null;
 	}
 
-	const values = Object.values(detail.dailyChart).filter(
+	const values = Object.values(detail.daily_chart).filter(
 		(item): item is number => Number.isFinite(item),
 	);
 	if (!values.length) {
-		return detail?.openInterest ?? null;
+		return detail?.open_interest ?? null;
 	}
 	return values.reduce((sum, value) => sum + value, 0) / values.length;
 };
@@ -286,19 +291,19 @@ export async function getMarketSnapshots(
 			},
 			fundingRate: roundValue(fundingRates.get(market.symbol) ?? null, 6),
 			openInterest: {
-				latest: roundValue(orderDetail?.openInterest ?? null, 2),
+				latest: roundValue(orderDetail?.open_interest ?? null, 2),
 				average: roundValue(extractOpenInterestAverage(orderDetail), 2),
 			},
 			liquidity: {
 				dailyBaseVolume: roundValue(
-					orderDetail?.dailyBaseTokenVolume ?? null,
+					orderDetail?.daily_base_token_volume ?? null,
 					2,
 				),
 				dailyQuoteVolume: roundValue(
-					orderDetail?.dailyQuoteTokenVolume ?? null,
+					orderDetail?.daily_quote_token_volume ?? null,
 					2,
 				),
-				dailyPriceChange: roundValue(orderDetail?.dailyPriceChange ?? null, 4),
+				dailyPriceChange: roundValue(orderDetail?.daily_price_change ?? null, 4),
 			},
 			series: {
 				intraday: intradaySeries,

@@ -159,9 +159,9 @@ export async function runTradeWorkflow(account: Account) {
 	};
 
 	/**
-	 * Rebuilds the user prompt with fresh portfolio data.
-	 * Called by prepareStep after each tool call to ensure the agent
-	 * sees current cash/exposure/positions.
+	 * Rebuilds the state summary with fresh portfolio data.
+	 * Called by prepareStep after each tool call to provide a compact
+	 * state update that gets appended (not rewritten) to preserve causality.
 	 */
 	const rebuildUserPrompt = async (): Promise<string> => {
 		// Re-fetch fresh portfolio and positions data
@@ -181,7 +181,7 @@ export async function runTradeWorkflow(account: Account) {
 		toolContext.openPositions = freshPositions;
 		toolContext.decisionIndex = freshDecisionIndex;
 
-		// Rebuild the prompt with fresh data
+		// Rebuild the prompt with fresh data - returns stateSummary for appending
 		const freshPrompt = buildTradingPrompts({
 			account,
 			portfolio: freshPortfolio,
@@ -195,7 +195,8 @@ export async function runTradeWorkflow(account: Account) {
 			competition: competitionSnapshot,
 		});
 
-		return freshPrompt.userPrompt;
+		// Return the compact state summary instead of full prompt
+		return freshPrompt.stateSummary;
 	};
 
 	// Create the agent

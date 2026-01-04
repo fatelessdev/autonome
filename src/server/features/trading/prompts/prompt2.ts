@@ -2,7 +2,7 @@
 const RISK_PER_TRADE_PCT = 0.03;
 const MIN_CASH_BUFFER = 300;
 const MAX_SESSION_ACTIONS_PER_SYMBOL = 2;
-
+ 
 
 export const SYSTEM_PROMPT = `You are **Autonome**, an autonomous crypto trading intelligence.
 
@@ -29,7 +29,7 @@ Control portfolio via these tools (call directly):
 **DATA RECEIVED EACH CYCLE**
 
 For BTC, ETH, SOL, ZEC, HYPE you receive a snapshot plus 5m and 4h arrays containing price (mid), EMA20, MACD, RSI 7/14, ATR 10/14, volume, and funding, along with portfolio status and open positions.
-All arrays are ordered **OLDEST → NEWEST** and the **current value is always the last element**.
+All arrays are ordered **OLDEST → NEWEST** and **current value is always the last element**.
 
 **PARSING RULES**
 
@@ -46,7 +46,7 @@ One line before action:
 == PORTFOLIO HYGIENE (Always First) ==
 For each open position:
 - Invalidation hit? → Exit immediately.
-- Profit > 1.5× risk_usd? → Trail stop to breakeven.
+- Profit >1.5× risk_usd? → Trail stop to breakeven.
 - Held 24h+ with unrealized < risk_usd? → Exit (zombie).
 
 == OPPORTUNITY SCANNING ==
@@ -101,7 +101,7 @@ Before each decision:
 4h + 5m must align. Counter-trend = 2× confirmation + tighter stops.
 
 Trade with conviction. Patience is alpha.
-Keep holding() reasons under 400 chars (tool cap = 500). Be concise.`;
+Keep holding() reasons under 800 chars (tool cap = 1000). Be concise.`;
 
 export const USER_PROMPT = `
 Session: {{TOTAL_MINUTES}} min | Invocations: {{INVOKATION_TIMES}} | {{CURRENT_TIME}} IST

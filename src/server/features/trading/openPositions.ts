@@ -12,6 +12,9 @@ export interface ExitPlanSummary {
 	target: number | null;
 	stop: number | null;
 	invalidation: string | null;
+	invalidationPrice: number | null;
+	timeExit: string | null;
+	cooldownUntil: string | null;
 }
 
 export interface OpenPositionSummary {
@@ -71,6 +74,18 @@ const mapSimulatorPositions = (
 				? position.leverage
 				: undefined;
 
+		// Normalize exitPlan to include all required fields
+		const exitPlan: ExitPlanSummary | null = position.exitPlan
+			? {
+					stop: position.exitPlan.stop ?? null,
+					target: position.exitPlan.target ?? null,
+					invalidation: position.exitPlan.invalidation ?? null,
+					invalidationPrice: position.exitPlan.invalidationPrice ?? null,
+					timeExit: position.exitPlan.timeExit ?? null,
+					cooldownUntil: position.exitPlan.cooldownUntil ?? null,
+				}
+			: null;
+
 		return {
 			symbol: position.symbol,
 			position: position.quantity.toFixed(4),
@@ -83,7 +98,7 @@ const mapSimulatorPositions = (
 			notional: notionalEntry != null ? notionalEntry.toFixed(2) : undefined,
 			entryPrice,
 			markPrice: position.markPrice ?? null,
-			exitPlan: position.exitPlan ?? null,
+			exitPlan,
 			confidence: null,
 			signal: position.side,
 			lastDecisionAt: null,

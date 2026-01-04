@@ -31,10 +31,54 @@ export const extractTradingDecisions = (
 
 	toolCalls.forEach((tc) => {
 		const metadata = tc.metadata;
-		const decisionList = [
-			...(Array.isArray(metadata?.decisions) ? metadata.decisions : []),
+		
+		// Handle HOLDING type - extract holding decisions with reason
+		if (tc.type === "HOLDING") {
+			const rawMetadata = metadata?.raw as Record<string, unknown> | undefined;
+			const holdingReason =
+				typeof rawMetadata?.reason === "string"
+					? rawMetadata.reason.trim()
+					: typeof metadata?.reason === "string"
+						? metadata.reason.trim()
+						: null;
+
+			decisions.push({
+				key: `${tc.id}-holding`,
+				symbol: "PORTFOLIO",
+				signal: "HOLD",
+				action: "HOLDING",
+				quantity: null,
+				leverage: null,
+				profitTarget: null,
+				stopLoss: null,
+				invalidationCondition: null,
+				confidence: null,
+				toolCallType: tc.type,
+				status: "HOLDING",
+				result: { symbol: "PORTFOLIO", success: true },
+				timestamp: tc.timestamp,
+				reason: holdingReason,
+			});
+			return;
+		}
+
+		type DecisionItem = Partial<{
+			symbol: string;
+			signal: string;
+			quantity: number | null;
+			leverage: number | null;
+			profitTarget: number | null;
+			stopLoss: number | null;
+			invalidationCondition: string | null;
+			confidence: number | null;
+			status: string | null;
+			reason: string | null;
+		}>;
+
+		const decisionList: DecisionItem[] = [
+			...(Array.isArray(metadata?.decisions) ? (metadata.decisions as DecisionItem[]) : []),
 			...(Array.isArray((metadata as any)?.updates)
-				? ((metadata as any).updates as unknown[])
+				? ((metadata as any).updates as DecisionItem[])
 				: []),
 		];
 		const results = metadata?.results ?? [];

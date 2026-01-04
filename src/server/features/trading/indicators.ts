@@ -1,11 +1,14 @@
-import type { Candlestick } from "@reservoir0x/lighter-ts-sdk/dist/types/api";
-
-// Helper to parse string values from new SDK to numbers
-const parseNum = (value: string | number): number => {
-	if (typeof value === "number") return value;
-	const parsed = parseFloat(value);
-	return Number.isFinite(parsed) ? parsed : 0;
-};
+// Candlestick interface matching the SDK's response format
+export interface Candlestick {
+	timestamp: number;
+	open: number;
+	high: number;
+	low: number;
+	close: number;
+	volume?: number;
+	volume0?: number; // base token volume in new SDK
+	volume1?: number; // quote token volume in new SDK
+}
 
 export function getEma(prices: number[], period: number): number[] {
 	if (prices.length < period) {
@@ -51,15 +54,16 @@ export function getSma(prices: number[], period: number): number[] {
 }
 
 export function getMidPrices(candlesticks: Candlestick[]): number[] {
-	return candlesticks.map(({ open, close }) => (parseNum(open) + parseNum(close)) / 2);
+	return candlesticks.map(({ open, close }) => (open + close) / 2);
 }
 
 export function getCloses(candlesticks: Candlestick[]): number[] {
-	return candlesticks.map((candle) => parseNum(candle.close));
+	return candlesticks.map((candle) => candle.close);
 }
 
 export function getVolumes(candlesticks: Candlestick[]): number[] {
-	return candlesticks.map((candle) => parseNum(candle.volume));
+	// volume0 is base token volume in the new SDK (volume1 is quote token volume)
+	return candlesticks.map((candle) => (candle as any).volume0 ?? (candle as any).volume ?? 0);
 }
 
 export function getMacd(prices: number[]): number[] {
@@ -119,14 +123,11 @@ export function getAtr(candlesticks: Candlestick[], period: number): number[] {
 	const trueRanges: number[] = [];
 	for (let i = 0; i < candlesticks.length; i++) {
 		const current = candlesticks[i];
-		const currentHigh = parseNum(current.high);
-		const currentLow = parseNum(current.low);
-		const currentClose = parseNum(current.close);
 		const prevClose =
-			i > 0 ? parseNum(candlesticks[i - 1]?.close ?? current.close) : currentClose;
-		const highLow = currentHigh - currentLow;
-		const highPrev = Math.abs(currentHigh - prevClose);
-		const lowPrev = Math.abs(currentLow - prevClose);
+			i > 0 ? (candlesticks[i - 1]?.close ?? current.close) : current.close;
+		const highLow = current.high - current.low;
+		const highPrev = Math.abs(current.high - prevClose);
+		const lowPrev = Math.abs(current.low - prevClose);
 		trueRanges.push(Math.max(highLow, highPrev, lowPrev));
 	}
 

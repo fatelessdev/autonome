@@ -13,7 +13,7 @@ import type router from "@/server/orpc/router";
 function getApiUrl(): string {
 	if (typeof window === "undefined") {
 		// Server-side: shouldn't be called, but fallback to env
-		return process.env.VITE_API_URL || "http://localhost:8080";
+		return process.env.VITE_API_URL || "http://localhost:8081";
 	}
 	
 	// Client-side: use relative path (proxied in dev, same origin in prod)

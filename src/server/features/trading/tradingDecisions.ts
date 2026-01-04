@@ -8,6 +8,9 @@ export interface TradingDecision {
 	profitTarget: number | null;
 	stopLoss: number | null;
 	invalidationCondition: string | null;
+	invalidationPrice: number | null;
+	timeExit: string | null;
+	cooldownUntil: string | null;
 	confidence: number | null;
 	status?: string | null;
 }
@@ -113,6 +116,15 @@ const parseDecisionCandidate = (
 				record.invalid_condition ??
 				record.invalidation_condition,
 		) ?? null;
+	const invalidationPrice = toNumber(
+		record.invalidationPrice ?? record.invalidation_price,
+	);
+	const timeExit = toStringValue(
+		record.timeExit ?? record.time_exit,
+	) ?? null;
+	const cooldownUntil = toStringValue(
+		record.cooldownUntil ?? record.cooldown_until,
+	) ?? null;
 	const confidence = toNumber(
 		record.confidence ??
 			record.confidenceScore ??
@@ -132,6 +144,9 @@ const parseDecisionCandidate = (
 		profitTarget,
 		stopLoss,
 		invalidationCondition,
+		invalidationPrice,
+		timeExit,
+		cooldownUntil,
 		confidence,
 		status,
 	};

@@ -1,3 +1,5 @@
+import type { Order as SdkOrder } from "@reservoir0x/lighter-ts-sdk";
+
 export type TradingMode = "live" | "simulated";
 
 export type OrderSide = "buy" | "sell";
@@ -70,6 +72,9 @@ export interface PositionExitPlan {
 	stop: number | null;
 	target: number | null;
 	invalidation: string | null;
+	invalidationPrice?: number | null;
+	timeExit?: string | null;
+	cooldownUntil?: string | null;
 }
 
 export interface PositionSummary {
@@ -96,6 +101,13 @@ export interface AccountSnapshot {
 	positions: PositionSummary[];
 	totalRealizedPnl: number;
 	totalUnrealizedPnl: number;
+}
+
+export interface OrderBookSource {
+	totalAsks: number;
+	totalBids: number;
+	asks: SdkOrder[];
+	bids: SdkOrder[];
 }
 
 export interface AccountEventPayload {

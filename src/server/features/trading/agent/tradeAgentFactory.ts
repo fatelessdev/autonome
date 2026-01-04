@@ -125,34 +125,33 @@ export function createTradeAgent(config: TradeAgentConfig) {
 				},
 			};
 		},
-		// Re-fetch portfolio data and update the user prompt before each step
-		// This ensures the agent sees current cash/exposure/positions after tool calls
+		// Append state update as new message instead of rewriting history.
+		// This preserves conversation causality - the model sees its original context
+		// plus incremental state updates, avoiding confusion about past decisions.
 		prepareStep: async ({ stepNumber, messages }) => {
 			// Base result (no tool restrictions - using prompt-based hysteresis instead)
 			const baseResult: {
 				messages?: typeof messages;
 			} = {};
 
-			// Only rebuild prompt after the first step (when there have been tool calls)
+			// Only add state update after the first step (when there have been tool calls)
 			if (stepNumber === 0 || !rebuildUserPrompt) {
 				return baseResult;
 			}
 
 			try {
-				const freshUserPrompt = await rebuildUserPrompt();
+				// Get compact state summary (not full prompt)
+				const stateSummary = await rebuildUserPrompt();
 
-				// Find and update the first user message with fresh data
-				// This ensures the agent sees current portfolio state
-				const updatedMessages = messages.map((msg, index) => {
-					// Find the first user message (initial prompt) and update it
-					if (msg.role === "user" && index === 0) {
-						return {
-							...msg,
-							content: freshUserPrompt,
-						};
-					}
-					return msg;
-				});
+				// Append as a new user message instead of rewriting the first one
+				// This preserves the original context and shows state progression
+				const updatedMessages = [
+					...messages,
+					{
+						role: "user" as const,
+						content: stateSummary,
+					},
+				];
 
 				return { ...baseResult, messages: updatedMessages };
 			} catch (error) {

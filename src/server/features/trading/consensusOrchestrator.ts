@@ -18,6 +18,7 @@ import { z } from "zod";
 
 import { env } from "@/env";
 import { getModelProvider } from "@/core/shared/models/modelConfig";
+import { MARKETS } from "@/shared/markets/marketMetadata";
 import type { PortfolioSnapshot } from "@/server/features/trading/getPortfolio";
 import type { EnrichedOpenPosition } from "@/server/features/trading/openPositionEnrichment";
 import { createPosition, type PositionRequest } from "@/server/features/trading/createPosition";

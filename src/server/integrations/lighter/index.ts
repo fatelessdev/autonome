@@ -1,5 +1,5 @@
 export {
-	candlestickApi,
+	fetchCandlesticksRest,
 	fundingApi,
 	orderApi,
 	accountApi,

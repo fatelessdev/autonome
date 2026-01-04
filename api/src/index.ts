@@ -273,7 +273,7 @@ app.get("/", (c) => {
 
 // ==================== Start Server ====================
 
-const port = Number(process.env.PORT) || 8080;
+const port = Number(process.env.PORT) || 8081;
 
 async function main() {
 	console.log("🚀 Starting Autonome API server...");

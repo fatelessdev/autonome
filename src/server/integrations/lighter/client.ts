@@ -4,122 +4,75 @@
  * All server-side code should import from this module to avoid creating
  * duplicate API client instances which would cause unnecessary API calls
  * and potential rate limiting.
+ *
+ * Uses @reservoir0x/lighter-ts-sdk for SignerClient and other APIs.
+ * Uses REST API directly for candlesticks (/api/v1/candles endpoint).
  */
 import { BASE_URL } from "@/env";
 import {
+	ApiClient,
 	FundingApi,
-	IsomorphicFetchHttpLibrary,
 	OrderApi,
-	ServerConfiguration,
-} from "@/lighter/generated/index";
-import type { Candlestick, Candlesticks } from "@/lighter/generated/index";
+	AccountApi,
+} from "@reservoir0x/lighter-ts-sdk";
+import axios from "axios";
+import type { Candlestick } from "@/server/features/trading/indicators";
 
-// Shared configuration
-const serverConfiguration = new ServerConfiguration(BASE_URL, {});
-const httpLibrary = new IsomorphicFetchHttpLibrary();
+// Singleton API client
+const apiClient = new ApiClient({ host: BASE_URL });
+
+// Singleton API instances - all server code should use these
+export const fundingApi = new FundingApi(apiClient);
+export const orderApi = new OrderApi(apiClient);
+export const accountApi = new AccountApi(apiClient);
 
 /**
- * CandlestickApiCompat - Drop-in replacement for CandlestickApi
- * 
- * The SDK's CandlestickApi uses /api/v1/candlesticks which returns 403.
- * This compatibility layer uses the /api/v1/candles endpoint which works.
- * Same interface as the SDK class so no consuming code changes needed.
- * 
- * API Response format:
- * {
- *   "code": 200,
- *   "r": "5m",
- *   "c": [{ "t": timestamp, "o": open, "h": high, "l": low, "c": close, "v": volume, "V": quoteVolume, "i": openInterest }]
- * }
+ * Fetch candlesticks using the REST API /api/v1/candles endpoint.
+ * Requires 'accept: application/json' header.
+ * Response format: { code: 200, r: resolution, c: [{ t, o, h, l, c, v, V, i }] }
  */
-export class CandlestickApiCompat {
-	private baseUrl: string;
+export async function fetchCandlesticksRest(params: {
+	market_id: number;
+	resolution: string;
+	start_timestamp?: number;
+	end_timestamp?: number;
+	count_back?: number;
+}): Promise<Candlestick[]> {
+	try {
+		const now = Date.now();
+		const response = await axios.get(`${BASE_URL}/api/v1/candles`, {
+			headers: {
+				'accept': 'application/json',
+			},
+			params: {
+				market_id: params.market_id,
+				resolution: params.resolution,
+				start_timestamp: params.start_timestamp ?? (now - 24 * 60 * 60 * 1000),
+				end_timestamp: params.end_timestamp ?? now,
+				count_back: params.count_back,
+			},
+		});
 
-	constructor(baseUrl: string) {
-		this.baseUrl = baseUrl.replace(/\/$/, ""); // Remove trailing slash
-	}
-
-	/**
-	 * Fetch candlesticks - same signature as SDK's CandlestickApi.candlesticks()
-	 */
-	async candlesticks(
-		marketId: number,
-		resolution: "1m" | "5m" | "15m" | "1h" | "4h" | "1d",
-		startTimestamp: number,
-		endTimestamp: number,
-		countBack: number,
-		_setTimestampToEnd?: boolean,
-	): Promise<Candlesticks> {
-		const url = new URL(`${this.baseUrl}/api/v1/candles`);
-		url.searchParams.set("market_id", marketId.toString());
-		url.searchParams.set("resolution", resolution);
-		url.searchParams.set("start_timestamp", Math.floor(startTimestamp).toString());
-		url.searchParams.set("end_timestamp", Math.floor(endTimestamp).toString());
-		url.searchParams.set("count_back", countBack.toString());
-
-		try {
-			const response = await fetch(url.toString(), {
-				method: "GET",
-				headers: { Accept: "application/json" },
-			});
-
-			if (!response.ok) {
-				console.warn(
-					`[CandlestickApiCompat] /candles returned ${response.status}, returning empty`,
-				);
-				return { code: response.status, resolution, candlesticks: [] };
-			}
-
-			const data = await response.json();
-			
-			// API returns { c: [...] } with abbreviated candlestick objects
-			// Need to map to SDK's Candlestick format
-			const rawCandles = data.c ?? data.candlesticks ?? data.candles ?? [];
-			
-			const candles: Candlestick[] = rawCandles.map((c: {
-				t: number;
-				o: number;
-				h: number;
-				l: number;
-				c: number;
-				v: number;
-				V?: number;
-				i?: number;
-			}) => ({
-				timestamp: c.t,
-				open: c.o,
-				high: c.h,
-				low: c.l,
-				close: c.c,
-				volume: c.v,
-				quoteVolume: c.V,
-				openInterest: c.i,
-			}));
-			
-			return { code: data.code ?? 200, resolution: data.r ?? resolution, candlesticks: candles };
-		} catch (error) {
-			console.error("[CandlestickApiCompat] Fetch failed:", error);
-			return { code: 500, resolution, candlesticks: [] };
-		}
+		// API response format: { code, r, c: [...candles] }
+		// Each candle: { t: timestamp, o: open, h: high, l: low, c: close, v: volume, V: quoteVolume }
+		const candles = response.data?.c ?? [];
+		
+		// Convert to our internal Candlestick format
+		return candles.map((c: any) => ({
+			timestamp: c.t,
+			open: c.o,
+			high: c.h,
+			low: c.l,
+			close: c.c,
+			volume: c.v ?? 0,
+			volume0: c.v,  // base volume
+			volume1: c.V,  // quote volume
+		}));
+	} catch (error) {
+		console.error('[fetchCandlesticksRest] Failed to fetch candles:', error);
+		return [];
 	}
 }
 
-// Use our compatibility layer instead of the SDK's CandlestickApi
-export const candlestickApi = new CandlestickApiCompat(BASE_URL);
-
-export const fundingApi = new FundingApi({
-	baseServer: serverConfiguration,
-	httpApi: httpLibrary,
-	middleware: [],
-	authMethods: {},
-});
-
-export const orderApi = new OrderApi({
-	baseServer: serverConfiguration,
-	httpApi: httpLibrary,
-	middleware: [],
-	authMethods: {},
-});
-
 // Re-export types and utilities that may be needed
-export { BASE_URL, serverConfiguration, httpLibrary };
+export { apiClient, BASE_URL };

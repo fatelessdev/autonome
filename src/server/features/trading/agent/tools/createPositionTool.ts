@@ -38,6 +38,9 @@ export function createPositionTool(ctx: ToolContext) {
 					profitTarget: item.profit_target ?? null,
 					stopLoss: item.stop_loss ?? null,
 					invalidationCondition: item.invalidation_condition ?? null,
+					invalidationPrice: item.invalidation_price ?? null,
+					timeExit: item.time_exit ?? null,
+					cooldownUntil: item.cooldown_until ?? null,
 					confidence: item.confidence ?? null,
 				})) ?? [];
 
@@ -55,17 +58,12 @@ export function createPositionTool(ctx: ToolContext) {
 					continue;
 				}
 
-				// TODO: Re-enable per-symbol session limits later
-				// const currentCount = ctx.symbolActionCounts.get(symbol) ?? 0;
-				// if (currentCount >= MAX_ACTIONS_PER_SYMBOL) {
-				// 	skippedLimitReached.push(symbol);
-				// 	continue;
-				// }
-
 				const sideRaw =
 					typeof entry.side === "string" ? entry.side.toUpperCase() : "HOLD";
 				const validSide =
-					sideRaw === "LONG" || sideRaw === "SHORT" ? sideRaw : "HOLD";
+					sideRaw === "LONG" || sideRaw === "SHORT"
+						? sideRaw
+						: (entry.side as string);
 				const quantity = Number.isFinite(entry.quantity) ? entry.quantity : 0;
 
 				if (!(symbol in MARKETS)) continue;
@@ -74,16 +72,19 @@ export function createPositionTool(ctx: ToolContext) {
 
 				normalized.push({
 					symbol,
-					side: validSide,
+					side: validSide as "LONG" | "SHORT" | "HOLD",
 					quantity,
 					leverage: entry.leverage ?? null,
 					profitTarget: entry.profitTarget ?? null,
 					stopLoss: entry.stopLoss ?? null,
 					invalidationCondition: entry.invalidationCondition ?? null,
+					invalidationPrice: entry.invalidationPrice ?? null,
+					timeExit: entry.timeExit ?? null,
+					cooldownUntil: entry.cooldownUntil ?? null,
 					confidence: entry.confidence ?? null,
 				});
 			}
-
+ 
 			// Return early if all symbols were duplicates or hit limits
 			if (normalized.length === 0) {
 				const messages: string[] = [];
@@ -120,6 +121,9 @@ export function createPositionTool(ctx: ToolContext) {
 					profitTarget: decision.profitTarget,
 					stopLoss: decision.stopLoss,
 					invalidationCondition: decision.invalidationCondition,
+					invalidationPrice: decision.invalidationPrice,
+					timeExit: decision.timeExit,
+					cooldownUntil: decision.cooldownUntil,
 					confidence: decision.confidence,
 				});
 			}

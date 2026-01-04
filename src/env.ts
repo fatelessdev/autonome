@@ -34,6 +34,8 @@ export const env = createEnv({
 	server: {
 		// General server configuration
 		SERVER_URL: z.string().url().optional(),
+		FRONTEND_PORT: z.coerce.number().default(8080),
+		API_URL: z.string().url().default("http://localhost:8081"),
 		DATABASE_URL: z.string().url(),
 		NIM_API_KEY: z.string(),
 		OPENROUTER_API_KEY: z.string(),
@@ -91,6 +93,8 @@ export const env = createEnv({
 });
 
 // Export convenient aliases for backwards compatibility and cleaner imports
+export const FRONTEND_PORT = env.FRONTEND_PORT;
+export const API_URL = env.API_URL;
 export const API_KEY_INDEX = env.LIGHTER_API_KEY_INDEX;
 export const BASE_URL = env.LIGHTER_BASE_URL;
 export const TRADING_MODE: TradingMode = env.TRADING_MODE;

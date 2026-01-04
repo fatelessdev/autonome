@@ -10,7 +10,7 @@ import type {
 export interface EnrichedOpenPosition extends OpenPositionSummary {
 	exitPlan: ExitPlanSummary | null;
 	confidence: number | null;
-	signal: TradingSignal | null;
+	signal?: TradingSignal;
 	lastDecisionAt: string | null;
 	decisionStatus: string | null;
 	notionalUsd: number | null;
@@ -91,7 +91,14 @@ const mergeExitPlans = (
 		return null;
 	}
 
-	return { target, stop, invalidation };
+	return {
+		target,
+		stop,
+		invalidation,
+		invalidationPrice: decision?.invalidationPrice ?? fallback?.invalidationPrice ?? null,
+		timeExit: decision?.timeExit ?? fallback?.timeExit ?? null,
+		cooldownUntil: decision?.cooldownUntil ?? fallback?.cooldownUntil ?? null,
+	};
 };
 
 export const computeRiskMetrics = (

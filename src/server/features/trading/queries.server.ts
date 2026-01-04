@@ -4,7 +4,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { models, orders } from "@/db/schema";
 import { DEFAULT_SIMULATOR_OPTIONS, IS_SIMULATION_ENABLED } from "@/env";
-import { candlestickApi } from "@/server/integrations/lighter";
+import { fetchCandlesticksRest } from "@/server/integrations/lighter";
 import { ExchangeSimulator } from "@/server/features/simulator/exchangeSimulator";
 import { closeOrder, getOpenOrdersByModel } from "@/server/db/ordersRepository.server";
 import { refreshConversationEvents } from "@/server/features/trading/conversationsSnapshot.server";
@@ -68,14 +68,15 @@ async function getLighterPrices(symbols: string[]) {
 			}
 
 			try {
-				const candles = await candlestickApi.getCandlesticks({
+				// Use REST API directly - SDK's CandlestickApi is outdated
+				const candles = await fetchCandlesticksRest({
 					market_id: market.marketId,
 					resolution: "1m",
 					start_timestamp: now - 1000 * 60 * 15,
 					end_timestamp: now,
 					count_back: 1,
 				});
-				const last = candles.candlesticks?.[candles.candlesticks.length - 1];
+				const last = candles?.[candles.length - 1];
 				const price = normalizeNumber(last?.close);
 				return { symbol, price };
 			} catch (error) {

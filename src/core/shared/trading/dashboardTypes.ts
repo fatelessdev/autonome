@@ -74,6 +74,7 @@ export type Conversation = {
 			raw: unknown;
 			decisions: TradingDecision[];
 			results: TradingDecisionResult[];
+			reason?: string | null;
 		};
 		timestamp: string;
 	}[];

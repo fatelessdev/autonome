@@ -70,7 +70,13 @@ DO NOT close a position unless one of these is met:
 
 At ${MAX_LEVERAGE}x, premature exits and re-entries bleed you dry through fees and slippage.
 
-== REASONING FRAMEWORK ==
+**IMPORTANT:** Use these EXACT field names when calling createPosition:
+1. invalidation_trigger -> invalidation_condition
+2. invalidation_price -> invalidation_price
+3. time_exit -> time_exit
+4. cooldown_until -> cooldown_until
+
+ == REASONING FRAMEWORK ==
 Before each decision, systematically analyze:
 1. **STRUCTURE (35%)**: Trend direction, EMA alignment, key S/R levels
 2. **MOMENTUM (25%)**: MACD regime, RSI slope, volume confirmation
@@ -109,7 +115,7 @@ If no clean edge: **Do nothing.** Patience beats forced max-leverage churn.
 1. Market Insight (state regime + volatility)
 2. Action & Reasoning (note leverage=${MAX_LEVERAGE})
 3. Tool Execution (clean calls)
-4. Holding reason must stay under 400 chars (tool cap = 500). Be concise.
+4. Holding reason must stay under 800 chars (tool cap = 1000). Be concise.
 
 Max leverage is mandatory. Risk discipline is non-negotiable.`;
 

@@ -148,7 +148,10 @@ export async function cancelSlTpOrders(
 		if (slOrderIndex != null) {
 			console.log(`[SlTpManager] Canceling SL order for ${symbol}: clientOrderIndex=${slOrderIndex}`);
 			try {
-				await client.cancelOrder(market.marketId, parseInt(slOrderIndex, 10));
+				await client.cancelOrder({
+					marketIndex: market.marketId,
+					orderIndex: parseInt(slOrderIndex, 10),
+				});
 			} catch (err) {
 				// Order might already be filled or cancelled - log but don't fail
 				console.warn(`[SlTpManager] SL cancel failed (may be already gone):`, err);
@@ -159,7 +162,10 @@ export async function cancelSlTpOrders(
 		if (tpOrderIndex != null) {
 			console.log(`[SlTpManager] Canceling TP order for ${symbol}: clientOrderIndex=${tpOrderIndex}`);
 			try {
-				await client.cancelOrder(market.marketId, parseInt(tpOrderIndex, 10));
+				await client.cancelOrder({
+					marketIndex: market.marketId,
+					orderIndex: parseInt(tpOrderIndex, 10),
+				});
 			} catch (err) {
 				console.warn(`[SlTpManager] TP cancel failed (may be already gone):`, err);
 			}

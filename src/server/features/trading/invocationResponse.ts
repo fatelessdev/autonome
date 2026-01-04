@@ -21,6 +21,9 @@ export interface InvocationDecisionSummary {
 	profitTarget: number | null;
 	stopLoss: number | null;
 	invalidationCondition: string | null;
+	invalidationPrice: number | null;
+	timeExit: string | null;
+	cooldownUntil: string | null;
 	confidence: number | null;
 }
 

@@ -10,10 +10,9 @@ import {
 	getOpenPositions,
 	type OpenPositionSummary,
 } from "@/server/features/trading/openPositions";
-import { SignerClient } from "@/server/features/trading/signerClient";
+import { SignerClientFactory, SignerClient } from "@/server/features/trading/signerClient";
 import { MARKETS } from "@/shared/markets/marketMetadata";
-import { candlestickApi } from "@/server/integrations/lighter";
-import { NonceManagerType } from "../../../../lighter-sdk-ts/nonce_manager";
+import { fetchCandlesticksRest } from "@/server/integrations/lighter";
 import {
 	closeOrder,
 	getOpenOrderBySymbol,
@@ -167,12 +166,11 @@ export async function closePosition(
 		return summaries;
 	}
 
-	const client = await SignerClient.create({
+	const client = await SignerClientFactory.create({
 		url: BASE_URL,
 		privateKey: account.apiKey,
 		apiKeyIndex: API_KEY_INDEX,
 		accountIndex: Number(account.accountIndex),
-		nonceManagementType: NonceManagerType.API,
 	});
 
 	const summaries: ClosedPositionSummary[] = [];
@@ -194,17 +192,15 @@ export async function closePosition(
 		}
 
 	try {
-			const candleStickData = await candlestickApi.candlesticks(
-				market.marketId,
-				"1m",
-				Date.now() - 1000 * 60 * 5,
-				Date.now(),
-				1,
-				false,
-			);
-			const latestPrice =
-				candleStickData?.candlesticks?.[candleStickData.candlesticks.length - 1]
-					?.close;
+			// Use REST API directly - SDK's CandlestickApi is outdated
+			const candles = await fetchCandlesticksRest({
+				market_id: market.marketId,
+				resolution: "1m",
+				start_timestamp: Date.now() - 1000 * 60 * 5,
+				end_timestamp: Date.now(),
+				count_back: 1,
+			});
+			const latestPrice = candles?.[candles.length - 1]?.close;
 			if (!latestPrice) {
 				console.warn(
 					`No latest price found for ${symbol}, skipping close request`,
@@ -237,10 +233,10 @@ export async function closePosition(
 				price:
 					(closeSign === "LONG" ? latestPrice * 1.01 : latestPrice * 0.99) *
 					market.priceDecimals,
-				isAsk: closeSign !== "LONG",
+			isAsk: closeSign !== "LONG",
 				orderType: SignerClient.ORDER_TYPE_MARKET,
 				timeInForce: SignerClient.ORDER_TIME_IN_FORCE_IMMEDIATE_OR_CANCEL,
-				reduceOnly: 0,
+				reduceOnly: true,
 				triggerPrice: SignerClient.NIL_TRIGGER_PRICE,
 				orderExpiry: SignerClient.DEFAULT_IOC_EXPIRY,
 			});

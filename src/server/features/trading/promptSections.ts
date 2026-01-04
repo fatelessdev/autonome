@@ -100,9 +100,9 @@ export function buildOpenPositionsSection(
 			riskPieces.push(`rr_ratio ${position.riskRewardRatio.toFixed(2)}`);
 		}
 
-		const exitPlanLine = `exit_plan: target ${formatNullableNumber(position.exitPlan?.target, 2)} | stop ${formatNullableNumber(position.exitPlan?.stop, 2)} | invalidation ${position.exitPlan?.invalidation ?? "N/A"}`;
+		const exitPlanLine = `exit_plan: target ${formatNullableNumber(position.exitPlan?.target, 2)} | stop ${formatNullableNumber(position.exitPlan?.stop, 2)} | invalidation ${position.exitPlan?.invalidation ?? "N/A"} | time_exit ${position.exitPlan?.timeExit ?? "N/A"} | cooldown_until ${position.exitPlan?.cooldownUntil ?? "N/A"}`;
 
-		const intentLine = `intent: signal ${position.signal ?? position.sign} | confidence ${formatConfidence(position.confidence)} | decision_status ${position.decisionStatus ?? "N/A"} | last_decision_at ${formatIsoDate(position.lastDecisionAt)}`;
+		const intentLine = `intent: signal ${position.signal ?? position.sign} | confidence ${formatConfidence(position.confidence)} | decision_status ${position.decisionStatus ?? "N/A"} | last_decision_at ${formatIsoDate(position.lastDecisionAt)} | invalidation_price ${formatNullableNumber(position.exitPlan?.stop, 2)} | time_exit ${position.exitPlan?.timeExit ?? "N/A"} | cooldown_until ${position.exitPlan?.cooldownUntil ?? "N/A"}`;
 
 		return [mainLine, riskPieces.join(" | "), exitPlanLine, intentLine].join(
 			"\n",

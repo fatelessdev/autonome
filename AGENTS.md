@@ -9,7 +9,7 @@ The application is split into two deployable units:
 1. **Frontend (Vercel)**: TanStack Start SPA at `src/` - deploys to Vercel
 2. **Backend (VPS)**: Hono API server at `api/src/index.ts` - runs on VPS
 
-**Communication**: Frontend calls API via oRPC over HTTP. In development, Vite proxies `/api/*` to `localhost:8080`.
+**Communication**: Frontend calls API via oRPC over HTTP. In development, Vite proxies `/api/*` to `localhost:8081`.
 
 
 ## Team culture
@@ -53,7 +53,7 @@ surface intact and stub/annotate it instead of deleting it.
 ```bash
 # Development (run both servers)
 bun run dev:all            # Start API + Frontend concurrently
-bun run dev:api            # Start API server only (port 8080)
+bun run dev:api            # Start API server only (port 8081)
 bun run dev                # Start Frontend only (port 5173)
 
 # Production

@@ -14,9 +14,8 @@ import {
 } from "@/server/db/ordersRepository.server";
 import { API_KEY_INDEX, BASE_URL, DEFAULT_SIMULATOR_OPTIONS, IS_SIMULATION_ENABLED } from "@/env";
 import { ExchangeSimulator } from "@/server/features/simulator/exchangeSimulator";
-import { SignerClient } from "@/server/features/trading/signerClient";
+import { SignerClientFactory } from "@/server/features/trading/signerClient";
 import { updateSlTpOrdersOnExchange } from "@/server/features/trading/slTpOrderManager";
-import { NonceManagerType } from "../../../../../../lighter-sdk-ts/nonce_manager";
 import {
 	computeRiskMetrics,
 	resolveNotionalUsd,
@@ -220,12 +219,11 @@ export function updateExitPlanTool(ctx: ToolContext) {
 							normalizedSymbol,
 						);
 						if (dbOrder && ctx.account.apiKey) {
-							const client = await SignerClient.create({
+							const client = await SignerClientFactory.create({
 								url: BASE_URL,
 								privateKey: ctx.account.apiKey,
 								apiKeyIndex: API_KEY_INDEX,
 								accountIndex: Number(ctx.account.accountIndex),
-								nonceManagementType: NonceManagerType.API,
 							});
 
 							await updateSlTpOrdersOnExchange(

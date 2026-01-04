@@ -15,7 +15,7 @@ export interface SignerClientConfig {
 }
 
 /**
- * Factory for creating SignerClient instances with the new @reservoir0x/lighter-ts-sdk.
+ * Factory for creating SignerClient instances with the local lighter-ts SDK.
  * Handles WASM initialization automatically.
  */
 export class SignerClientFactory {
