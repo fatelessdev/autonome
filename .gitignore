@@ -16,4 +16,5 @@ drizzle/*.json
 .env.docker
 .env.local
 drizzle
-.netlify
+.netlify# Lighter SDK reference folder (npm package is used instead)
+lighter-ts/
