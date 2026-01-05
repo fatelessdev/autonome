@@ -72,7 +72,7 @@ Trade with discipline. Cut losers instantly. Let winners run.
 `;
 
 export const USER_PROMPT = `
-Session: {{TOTAL_MINUTES}} min | Invocations: {{INVOCATION_COUNT}} | {{CURRENT_TIME}}
+Session: {{TOTAL_MINUTES}} min | Invocations: {{INVOKATION_TIMES}} | {{CURRENT_TIME}}
 
 Cash: \${{AVAILABLE_CASH}} | Equity: \${{TOTAL_EQUITY}} | **Risk Budget: \${{MAX_NEW_TRADE_RISK_USD}}**
 
