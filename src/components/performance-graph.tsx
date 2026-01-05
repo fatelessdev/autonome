@@ -29,7 +29,7 @@ export default function PerformanceGraph() {
 	const queryClient = useQueryClient();
 
 	// Server-side variant filtering - pass variant to query
-	const variantParam = selectedVariant === "all" ? undefined : selectedVariant as "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign";
+	const variantParam = selectedVariant === "all" ? undefined : selectedVariant as "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian";
 
 	const {
 		data: portfolioData,

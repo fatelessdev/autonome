@@ -4,34 +4,52 @@
  * Maps variant names to their corresponding system prompts and parameters.
  * Each variant represents a different trading strategy/personality that
  * can be tested in parallel.
+ *
+ * Variants:
+ * 1. Guardian (The Fortress) - Capital preservation, Ichimoku Cloud filter
+ * 2. Apex (The Kelly Engine) - Aggressive, VWAP momentum validation
+ * 3. Gladiator (Tournament) - Game theory, leaderboard-aware
+ * 4. Sniper (Precision) - Confluence trading, Rule of Three
+ * 5. Trendsurfer (Momentum) - Trend following, ADX filter
+ * 6. Contrarian (Mean Reversion) - Fade extremes in ranging markets
  */
 
 import {
-	SYSTEM_PROMPT as SYSTEM_PROMPT_SITUATIONAL,
-	USER_PROMPT as USER_PROMPT_SITUATIONAL,
-} from "./prompt1";
-import {
-	SYSTEM_PROMPT as SYSTEM_PROMPT_MINIMAL,
-	USER_PROMPT as USER_PROMPT_MINIMAL,
-} from "./prompt2";
-import {
 	SYSTEM_PROMPT as SYSTEM_PROMPT_GUARDIAN,
 	USER_PROMPT as USER_PROMPT_GUARDIAN,
-} from "./prompt3";
+} from "./guardian";
 import {
-	SYSTEM_PROMPT as SYSTEM_PROMPT_MAX,
-	USER_PROMPT as USER_PROMPT_MAX,
-} from "./prompt4";
+	SYSTEM_PROMPT as SYSTEM_PROMPT_APEX,
+	USER_PROMPT as USER_PROMPT_APEX,
+} from "./apex";
 import {
-	SYSTEM_PROMPT as SYSTEM_PROMPT_SOVEREIGN,
-	USER_PROMPT as USER_PROMPT_SOVEREIGN,
-} from "./prompt5";
+	SYSTEM_PROMPT as SYSTEM_PROMPT_GLADIATOR,
+	USER_PROMPT as USER_PROMPT_GLADIATOR,
+} from "./gladiator";
+import {
+	SYSTEM_PROMPT as SYSTEM_PROMPT_SNIPER,
+	USER_PROMPT as USER_PROMPT_SNIPER,
+} from "./sniper";
+import {
+	SYSTEM_PROMPT as SYSTEM_PROMPT_TRENDSURFER,
+	USER_PROMPT as USER_PROMPT_TRENDSURFER,
+} from "./trendsurfer";
+import {
+	SYSTEM_PROMPT as SYSTEM_PROMPT_CONTRARIAN,
+	USER_PROMPT as USER_PROMPT_CONTRARIAN,
+} from "./contrarian";
 
 // ==========================================
 // Types
 // ==========================================
 
-export type VariantId = "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign";
+export type VariantId =
+	| "Guardian"
+	| "Apex"
+	| "Gladiator"
+	| "Sniper"
+	| "Trendsurfer"
+	| "Contrarian";
 
 export interface VariantConfig {
 	/** Unique variant identifier */
@@ -50,54 +68,62 @@ export interface VariantConfig {
 	color: string;
 }
 
-
 // ==========================================
 // Variant Configurations
 // ==========================================
 
 export const VARIANTS: Record<VariantId, VariantConfig> = {
-	Situational: {
-		id: "Situational",
-		label: "Situational Awareness",
-		description: "Leaderboard-aware attack/defend posture with adaptive risk",
-		systemPrompt: SYSTEM_PROMPT_SITUATIONAL,
-		userPrompt: USER_PROMPT_SITUATIONAL,
-		temperature: 0,
-		color: "#22c55e", // green-500
-	},
-	Minimal: {
-		id: "Minimal",
-		label: "Minimal Discipline",
-		description: "Concise hygiene-first prompts",
-		systemPrompt: SYSTEM_PROMPT_MINIMAL,
-		userPrompt: USER_PROMPT_MINIMAL,
-		temperature: 0,
-		color: "#3b82f6", // blue-500
-	},
 	Guardian: {
 		id: "Guardian",
-		label: "Guardian (Survival)",
-		description: "Monk Mode survival: do nothing by default, strict drawdown brakes",
+		label: "Guardian (Fortress)",
+		description: "Capital preservation, Ichimoku Cloud hard filter, ADX safety",
 		systemPrompt: SYSTEM_PROMPT_GUARDIAN,
 		userPrompt: USER_PROMPT_GUARDIAN,
 		temperature: 0,
 		color: "#a855f7", // purple-500
 	},
-	Max: {
-		id: "Max",
-		label: "Max Leverage",
-		description: "ApexTrader 10x leverage with tight risk discipline",
-		systemPrompt: SYSTEM_PROMPT_MAX,
-		userPrompt: USER_PROMPT_MAX,
+	Apex: {
+		id: "Apex",
+		label: "Apex (Kelly Engine)",
+		description: "Aggressive 10x leverage, VWAP momentum validation, squeeze trading",
+		systemPrompt: SYSTEM_PROMPT_APEX,
+		userPrompt: USER_PROMPT_APEX,
 		temperature: 0,
 		color: "#f59e0b", // amber-500
 	},
-	Sovereign: {
-		id: "Sovereign",
-		label: "Sovereign (Elite)",
-		description: "High Agency Alpha with strict mathematical safety and thesis validation",
-		systemPrompt: SYSTEM_PROMPT_SOVEREIGN,
-		userPrompt: USER_PROMPT_SOVEREIGN,
+	Gladiator: {
+		id: "Gladiator",
+		label: "Gladiator (Tournament)",
+		description: "Game theory based, leaderboard-aware attack/defend posture",
+		systemPrompt: SYSTEM_PROMPT_GLADIATOR,
+		userPrompt: USER_PROMPT_GLADIATOR,
+		temperature: 0,
+		color: "#22c55e", // green-500
+	},
+	Sniper: {
+		id: "Sniper",
+		label: "Sniper (Precision)",
+		description: "Confluence specialist, Rule of Three, VWAP + RSI + Pattern",
+		systemPrompt: SYSTEM_PROMPT_SNIPER,
+		userPrompt: USER_PROMPT_SNIPER,
+		temperature: 0,
+		color: "#3b82f6", // blue-500
+	},
+	Trendsurfer: {
+		id: "Trendsurfer",
+		label: "Trendsurfer (Momentum)",
+		description: "Trend follower, ADX > 25 filter, Kijun-Sen trailing stops",
+		systemPrompt: SYSTEM_PROMPT_TRENDSURFER,
+		userPrompt: USER_PROMPT_TRENDSURFER,
+		temperature: 0,
+		color: "#06b6d4", // cyan-500
+	},
+	Contrarian: {
+		id: "Contrarian",
+		label: "Contrarian (Reverter)",
+		description: "Mean reversion in ranging markets, ADX < 25, fade to VWAP",
+		systemPrompt: SYSTEM_PROMPT_CONTRARIAN,
+		userPrompt: USER_PROMPT_CONTRARIAN,
 		temperature: 0,
 		color: "#e11d48", // rose-600
 	},
@@ -107,11 +133,12 @@ export const VARIANTS: Record<VariantId, VariantConfig> = {
  * All variant IDs in display order
  */
 export const VARIANT_IDS: VariantId[] = [
-	"Situational",
-	"Minimal",
 	"Guardian",
-	"Max",
-	"Sovereign",
+	"Apex",
+	"Gladiator",
+	"Sniper",
+	"Trendsurfer",
+	"Contrarian",
 ];
 
 /**
@@ -135,4 +162,4 @@ export function getAllVariants(): VariantConfig[] {
 /**
  * Default variant for backward compatibility
  */
-export const DEFAULT_VARIANT: VariantId = "Situational";
+export const DEFAULT_VARIANT: VariantId = "Guardian";

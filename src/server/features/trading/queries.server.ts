@@ -141,7 +141,7 @@ type TradeRecord = {
 };
 
 export type FetchTradesOptions = {
-	variant?: "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign";
+	variant?: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian";
 	limit?: number;
 };
 
@@ -151,7 +151,7 @@ export async function fetchTrades(options?: FetchTradesOptions): Promise<TradeRe
 	// If a specific variant is requested, fetch only for that variant
 	const variants = variant
 		? [variant]
-		: (["Situational", "Minimal", "Guardian", "Max", "Sovereign"] as const);
+		: (["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"] as const);
 	const LIMIT_PER_VARIANT = Math.ceil(limit / variants.length);
 
 	const variantQueries = variants.map((v) =>
@@ -201,7 +201,7 @@ export async function fetchTrades(options?: FetchTradesOptions): Promise<TradeRe
 			modelId: order.modelId,
 			modelName: order.model?.name ?? "Unknown",
 			modelRouterName: order.model?.openRouterModelName ?? null,
-			modelVariant: order.model?.variant ?? "Situational",
+			modelVariant: order.model?.variant ?? "Guardian",
 			symbol: order.symbol,
 			side: order.side,
 			quantity,
@@ -272,7 +272,7 @@ async function reconcilePositionsWithLive(
 }
 
 export type FetchPositionsOptions = {
-	variant?: "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign";
+	variant?: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian";
 };
 
 export async function fetchPositions(options?: FetchPositionsOptions) {

@@ -14,7 +14,7 @@ import {
 
 // ==================== Internal Types ====================
 
-type Variant = "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign";
+type Variant = "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian";
 
 // These mirror the server-side types to avoid importing from server module
 interface TradeRecord {
@@ -91,14 +91,14 @@ interface PortfolioHistoryEntry {
 
 // Helper to safely cast variant
 function toVariant(v: string | undefined): Variant | undefined {
-	const variants: Variant[] = ["Situational", "Minimal", "Guardian", "Max", "Sovereign"];
+	const variants: Variant[] = ["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"];
 	return variants.includes(v as Variant) ? (v as Variant) : undefined;
 }
 
 // ==================== Trades ====================
 
 const TradesInputSchema = z.object({
-	variant: z.enum(["Situational", "Minimal", "Guardian", "Max", "Sovereign"]).optional(),
+	variant: z.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"]).optional(),
 	limit: z.number().int().min(1).max(500).optional(),
 });
 
@@ -160,7 +160,7 @@ export const getTrades = os
 // ==================== Positions ====================
 
 const PositionsInputSchema = z.object({
-	variant: z.enum(["Situational", "Minimal", "Guardian", "Max", "Sovereign"]).optional(),
+	variant: z.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"]).optional(),
 });
 
 export const getPositions = os
@@ -296,7 +296,7 @@ export const getCryptoPrices = os
 // ==================== Portfolio History ====================
 
 const PortfolioHistoryInputSchema = z.object({
-	variant: z.enum(["Situational", "Minimal", "Guardian", "Max", "Sovereign"]).optional(),
+	variant: z.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"]).optional(),
 	startDate: z.string().datetime().optional(),
 	endDate: z.string().datetime().optional(),
 	maxPoints: z.number().int().min(100).max(10000).optional(),
@@ -342,13 +342,14 @@ export const getPortfolioHistory = os
 									variant:
 										typeof entry.model.variant === "string" &&
 										[
-											"Situational",
-											"Minimal",
 											"Guardian",
-											"Max",
-											"Sovereign",
+											"Apex",
+											"Gladiator",
+											"Sniper",
+											"Trendsurfer",
+											"Contrarian",
 										].includes(entry.model.variant)
-											? (entry.model.variant as "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign")
+											? (entry.model.variant as "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian")
 											: undefined,
 									openRouterModelName:
 										typeof entry.model.openRouterModelName === "string"

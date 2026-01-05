@@ -61,8 +61,8 @@ function normalizeTrades(payload: TradesResponse): Trade[] {
 				modelName: typeof record.modelName === "string" ? record.modelName : "",
 				modelVariant:
 					typeof record.modelVariant === "string" &&
-					["Situational", "Minimal", "Guardian", "Max", "Sovereign"].includes(record.modelVariant)
-						? (record.modelVariant as "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign")
+					["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"].includes(record.modelVariant)
+						? (record.modelVariant as "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian")
 						: undefined,
 				modelRouterName:
 					typeof record.modelRouterName === "string"
@@ -191,8 +191,8 @@ function normalizePositions(payload: PositionsResponse): ModelPositions[] {
 				modelName,
 				modelVariant:
 					typeof record.modelVariant === "string" &&
-					["Situational", "Minimal", "Guardian", "Max", "Sovereign"].includes(record.modelVariant)
-						? (record.modelVariant as "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign")
+					["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"].includes(record.modelVariant)
+						? (record.modelVariant as "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian")
 						: undefined,
 				modelLogo:
 					typeof record.modelLogo === "string" ? record.modelLogo : modelName,
@@ -280,8 +280,8 @@ function normalizeConversations(
 					typeof record.modelName === "string" ? record.modelName : "Unknown",
 				modelVariant:
 					typeof record.modelVariant === "string" &&
-					["Situational", "Minimal", "Guardian", "Max", "Sovereign"].includes(record.modelVariant)
-						? (record.modelVariant as "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign")
+					["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"].includes(record.modelVariant)
+						? (record.modelVariant as "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian")
 						: undefined,
 				modelLogo:
 					typeof record.modelLogo === "string"

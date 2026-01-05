@@ -15,11 +15,12 @@ import {
 // ==================== Schema Definitions ====================
 
 const VariantIdSchema = z.enum([
-	"Situational",
-	"Minimal",
 	"Guardian",
-	"Max",
-	"Sovereign",
+	"Apex",
+	"Gladiator",
+	"Sniper",
+	"Trendsurfer",
+	"Contrarian",
 ]);
 
 const VariantSchema = z.object({

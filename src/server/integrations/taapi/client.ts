@@ -14,6 +14,8 @@ import type {
 	BBandsResult,
 	ADXResult,
 	SupertrendResult,
+	IchimokuResult,
+	VWAPResult,
 } from "./types";
 import { TAAPI_FREE_PLAN_SYMBOLS } from "./types";
 
@@ -150,7 +152,7 @@ export class TaapiClient {
 	}
 
 	/**
-	 * Pre-fetch the standard supplementary indicators (BBands, ADX, Supertrend).
+	 * Pre-fetch the standard supplementary indicators (BBands, ADX, Supertrend, Ichimoku, VWAP).
 	 * Called once per asset before AI runs. EMA50 is now calculated locally.
 	 */
 	async preFetchSupplementaryIndicators(
@@ -175,6 +177,8 @@ export class TaapiClient {
 			{ id: "bbands", indicator: "bbands", period: 20 }, // Standard 20-period BBands
 			{ id: "adx", indicator: "adx", period: 14 }, // 14-period ADX with +DI/-DI
 			{ id: "supertrend", indicator: "supertrend", period: 10 }, // Supertrend with signal
+			{ id: "ichimoku", indicator: "ichimoku" }, // Ichimoku Cloud (default periods: 9, 26, 52)
+			{ id: "vwap", indicator: "vwap" }, // Volume Weighted Average Price
 		];
 
 		try {
@@ -189,6 +193,8 @@ export class TaapiClient {
 				bbands: results.bbands as BBandsResult | null,
 				adx: results.adx as ADXResult | null,
 				supertrend: results.supertrend as SupertrendResult | null,
+				ichimoku: results.ichimoku as IchimokuResult | null,
+				vwap: results.vwap as VWAPResult | null,
 				fetchedAt: Date.now(),
 			};
 
@@ -200,6 +206,8 @@ export class TaapiClient {
 				bbands: null,
 				adx: null,
 				supertrend: null,
+				ichimoku: null,
+				vwap: null,
 				fetchedAt: Date.now(),
 			};
 		}
@@ -274,6 +282,8 @@ export class TaapiClient {
 					bbands: null,
 					adx: null,
 					supertrend: null,
+					ichimoku: null,
+					vwap: null,
 					fetchedAt: Date.now(),
 				});
 			}

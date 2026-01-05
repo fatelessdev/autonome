@@ -506,11 +506,12 @@ function FailuresRoute() {
 													<TableCell>
 														<span className={cn(
 															"px-2 py-0.5 rounded text-xs font-medium",
-															stat.variant === "Situational" && "bg-green-500/20 text-green-600",
-															stat.variant === "Minimal" && "bg-blue-500/20 text-blue-600",
 															stat.variant === "Guardian" && "bg-purple-500/20 text-purple-600",
-															stat.variant === "Max" && "bg-amber-500/20 text-amber-600",
-															stat.variant === "Sovereign" && "bg-rose-500/20 text-rose-600",
+															stat.variant === "Apex" && "bg-amber-500/20 text-amber-600",
+															stat.variant === "Gladiator" && "bg-green-500/20 text-green-600",
+															stat.variant === "Sniper" && "bg-blue-500/20 text-blue-600",
+															stat.variant === "Trendsurfer" && "bg-cyan-500/20 text-cyan-600",
+															stat.variant === "Contrarian" && "bg-rose-500/20 text-rose-600",
 														)}>
 															{stat.variant}
 														</span>

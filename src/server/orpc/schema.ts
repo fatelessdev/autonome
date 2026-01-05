@@ -14,7 +14,7 @@ export const TradeSchema = z.object({
 	modelId: z.string(),
 	modelName: z.string(),
 	modelVariant: z
-		.enum(["Situational", "Minimal", "Guardian", "Max", "Sovereign"])
+		.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"])
 		.optional(),
 	modelRouterName: z.string().optional(),
 	modelKey: z.string().optional(),
@@ -66,7 +66,7 @@ export const AccountPositionsSchema = z.object({
 	modelId: z.string(),
 	modelName: z.string(),
 	modelVariant: z
-		.enum(["Situational", "Minimal", "Guardian", "Max", "Sovereign"])
+		.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"])
 		.optional(),
 	modelLogo: z.string().optional(),
 	positions: z.array(PositionSchema),
@@ -106,7 +106,7 @@ export const PortfolioSnapshotSchema = z.object({
 		.object({
 			name: z.string(),
 			variant: z
-				.enum(["Situational", "Minimal", "Guardian", "Max", "Sovereign"])
+				.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"])
 				.optional(),
 			openRouterModelName: z.string().optional(),
 		})
@@ -134,7 +134,7 @@ export const InvocationSchema = z.object({
 	modelId: z.string(),
 	modelName: z.string(),
 	modelVariant: z
-		.enum(["Situational", "Minimal", "Guardian", "Max", "Sovereign"])
+		.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"])
 		.optional(),
 	modelLogo: z.string(),
 	response: z.string().nullable(),

@@ -31,7 +31,7 @@ const pool = new Pool({ connectionString: DATABASE_URL });
 const db = drizzle(pool);
 
 // All variants to create for each model
-const VARIANTS = ["Situational", "Minimal", "Guardian", "Max", "Sovereign"] as const;
+const VARIANTS = ["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"] as const;
 
 // Model definitions - openRouterModelName
 const MODEL_DEFINITIONS = [

@@ -115,11 +115,13 @@ export interface StochResult {
 	valueD: number;
 }
 
-// Pre-fetch result structure (for BBands, ADX, Supertrend)
+// Pre-fetch result structure (for BBands, ADX, Supertrend, Ichimoku, VWAP)
 export interface TaapiPreFetchResult {
 	bbands: BBandsResult | null;
 	adx: ADXResult | null;
 	supertrend: SupertrendResult | null;
+	ichimoku: IchimokuResult | null;
+	vwap: VWAPResult | null;
 	fetchedAt: number;
 }
 
