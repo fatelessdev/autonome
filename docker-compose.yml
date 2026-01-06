@@ -15,7 +15,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      migrate:
+      seed:
         condition: service_completed_successfully
 
   # Migration Runner (Runs once on startup to ensure DB schema exists)
@@ -33,6 +33,20 @@ services:
     # Using 'db:push' for rapid prototyping/safe-ish schema updates. 
     # Use 'db:migrate' if you rely on migration files.
     command: ["bun", "run", "db:push"]
+
+  # Seed Runner (Seeds the database with initial models after migration)
+  seed:
+    image: smoggyowo/autonome-api:latest
+    container_name: autonome-seed
+    restart: "no"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://autonome:autonome_secret@db:5432/autonome
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: ["bun", "run", "db:seed"]
 
   # Postgres Database
   db:
