@@ -59,8 +59,13 @@ export default {
 			});
 		}
 
-		const staticResponse = await serveStatic(request);
-		if (staticResponse) return staticResponse;
+		// When running on Vercel (Nitro), static assets are handled by the platform/CDN.
+		// We can skip the potentially fragile Bun.file() logic.
+		if (!process.env.VERCEL) {
+			const staticResponse = await serveStatic(request);
+			if (staticResponse) return staticResponse;
+		}
+		
 		return startHandler(request);
 	},
 };
