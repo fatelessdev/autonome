@@ -1,8 +1,12 @@
 import { createStartHandler, defaultStreamHandler } from "@tanstack/react-start/server";
-import { FRONTEND_PORT, API_URL } from "@/env";
 import { stat } from "node:fs/promises";
 import { join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
+
+// Use import.meta.env directly to avoid loading backend-only env validation
+// On Vercel, backend env vars don't exist - frontend proxies to VPS API
+const FRONTEND_PORT = Number(import.meta.env.FRONTEND_PORT) || 5173;
+const API_URL = import.meta.env.VITE_API_URL || import.meta.env.API_URL || "http://localhost:8081";
 
 declare const Bun: any;
 
