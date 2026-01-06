@@ -43,8 +43,14 @@ export default {
 	async fetch(request: Request) {
 		const url = new URL(request.url);
 
-		// Proxy /api requests to the backend
-		if (url.pathname.startsWith("/api")) {
+		// Proxy ONLY backend-owned routes to the VPS API.
+		// TanStack Start also serves its own server routes under `/api/*` (e.g. `/api/chat`).
+		const shouldProxyToApi =
+			url.pathname.startsWith("/api/rpc") ||
+			url.pathname.startsWith("/api/events") ||
+			url.pathname === "/api/health" ||
+			url.pathname === "/api/health/schedulers";
+		if (shouldProxyToApi) {
 			const targetUrl = new URL(url.pathname + url.search, API_URL);
 			return fetch(targetUrl, {
 				method: request.method,
