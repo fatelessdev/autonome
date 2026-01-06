@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import { devtools } from "@tanstack/devtools-vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+import { nitro } from "nitro/vite";
 import react from "@vitejs/plugin-react";
 import viteTsConfigPaths from "vite-tsconfig-paths";
 import tailwindcss from "@tailwindcss/vite";
@@ -24,12 +25,17 @@ export default defineConfig({
         maxRedirects: 5,
       },
     }),
+    nitro(),
     react({
       babel: {
         plugins: ["babel-plugin-react-compiler"],
       },
     }),
   ],
+  // Nitro configuration for Vercel deployment
+  nitro: {
+    preset: "vercel",
+  },
   server: {
     port: 5173,
     proxy: {
