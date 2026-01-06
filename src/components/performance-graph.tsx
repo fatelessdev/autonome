@@ -5,6 +5,7 @@ import type { ChartConfig } from "@/components/ui/chart";
 import { GlowingLineChart } from "@/components/ui/glowing-line";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useVariant } from "@/components/variant-context";
+import { getSseUrl } from "@/core/shared/api/apiConfig";
 import { PORTFOLIO_QUERIES } from "@/core/shared/markets/marketQueries";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { getModelInfo } from "@/shared/models/modelConfig";
@@ -48,7 +49,7 @@ export default function PerformanceGraph() {
 		const connect = () => {
 			if (!mounted) return;
 			
-			source = new EventSource("/api/events/portfolio");
+			source = new EventSource(getSseUrl("/api/events/portfolio"));
 
 			source.onopen = () => {
 				reconnectAttempts = 0; // Reset on successful connection

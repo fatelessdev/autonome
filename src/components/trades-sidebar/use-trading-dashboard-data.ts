@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 
+import { getSseUrl } from "@/core/shared/api/apiConfig";
 import {
 	createDashboardSseUpdaters,
 	DASHBOARD_QUERIES,
@@ -19,11 +20,11 @@ type UseTradingDashboardDataOptions = {
 };
 
 const SSE_STREAMS = [
-	{ type: "trades", url: "/api/events/trades", updater: "trades" },
-	{ type: "positions", url: "/api/events/positions", updater: "positions" },
+	{ type: "trades", path: "/api/events/trades", updater: "trades" },
+	{ type: "positions", path: "/api/events/positions", updater: "positions" },
 	{
 		type: "conversations",
-		url: "/api/events/conversations",
+		path: "/api/events/conversations",
 		updater: "conversations",
 	},
 ] as const;
@@ -64,7 +65,7 @@ export function useTradingDashboardData({
 		const connectStream = (stream: typeof SSE_STREAMS[number]) => {
 			if (!mounted) return;
 
-			const source = new EventSource(stream.url);
+			const source = new EventSource(getSseUrl(stream.path));
 			sources.set(stream.type, source);
 
 			source.onopen = () => {
