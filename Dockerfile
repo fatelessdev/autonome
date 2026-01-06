@@ -1,10 +1,10 @@
-# Autonome - AI Cryptocurrency Trading Platform
-# Multi-stage Docker build for TanStack Start + Bun
+# Dockerfile.backend
+# Specific Dockerfile for the Hono API Backend (VPS)
 
 # ============================================
-# Stage 1: Dependencies
+# Stage 1: Builder
 # ============================================
-FROM oven/bun:1.2-alpine AS deps
+FROM oven/bun:latest AS builder
 
 WORKDIR /app
 
@@ -14,46 +14,16 @@ COPY package.json bun.lock ./
 # Install dependencies
 RUN bun install --frozen-lockfile
 
-# ============================================
-# Stage 2: Builder
-# ============================================
-FROM oven/bun:latest AS builder
-
-WORKDIR /app
-
-# Copy dependencies from deps stage
-COPY --from=deps /app/node_modules ./node_modules
-
 # Copy source code
 COPY . .
 
-# Build arguments for environment variables needed at build time
-# Note: These are placeholder values for build-time only
-# Runtime values are set via environment variables
-ARG VITE_APP_TITLE=Autonome
-
-# Set environment variables for build
-# Use placeholder values that satisfy validation but won't be used at runtime
-ENV DATABASE_URL=postgresql://autonome:autonome_secret@localhost:5432/autonome
-ENV NIM_API_KEY=placeholder_nim_key
-ENV OPENROUTER_API_KEY=placeholder_openrouter_key
-ENV MISTRAL_API_KEY=placeholder_mistral_key
-ENV LIGHTER_API_KEY_INDEX=2
-ENV LIGHTER_BASE_URL=https://mainnet.zklighter.elliot.ai
-ENV TRADING_MODE=simulated
-ENV SIM_INITIAL_CAPITAL=10000
-ENV SIM_QUOTE_CURRENCY=USDT
-ENV SIM_REFRESH_INTERVAL_MS=30000
-ENV VITE_APP_TITLE=${VITE_APP_TITLE}
-
-# Disable prerendering during Docker build (no network/DB access)
-ENV VITE_PRERENDER_DISABLED=true
-
-# Build the application using the project's build script
-RUN bun run build
+# Build the API server
+# This bundles the source code (including src/) into api/dist/index.js
+# External dependencies (node_modules) are excluded and must be installed in runner
+RUN bun run build:api
 
 # ============================================
-# Stage 3: Production Runner
+# Stage 2: Production Runner
 # ============================================
 FROM oven/bun:latest AS runner
 
@@ -63,12 +33,16 @@ WORKDIR /app
 RUN groupadd --system --gid 1001 nodejs && \
     useradd --system --uid 1001 --gid nodejs bunjs
 
-# Copy built output from builder stage (Nitro outputs to .output/)
-# .output/public/ contains static assets, .output/server/ contains the server
-COPY --from=builder --chown=bunjs:nodejs /app/.output ./.output
-COPY --from=builder --chown=bunjs:nodejs /app/package.json ./package.json
+# Copy package files for production install
+COPY package.json bun.lock ./
 
-# Copy migration and seed related files
+# Install dependencies (includes drizzle-kit for migrations and dotenv for env loading)
+RUN bun install --frozen-lockfile
+
+# Copy built API from builder
+COPY --from=builder --chown=bunjs:nodejs /app/api/dist ./api/dist
+
+# Copy migrations and database scripts (so you can run migrations on VPS)
 COPY --from=builder --chown=bunjs:nodejs /app/drizzle ./drizzle
 COPY --from=builder --chown=bunjs:nodejs /app/drizzle.config.ts ./drizzle.config.ts
 COPY --from=builder --chown=bunjs:nodejs /app/scripts ./scripts
@@ -76,26 +50,19 @@ COPY --from=builder --chown=bunjs:nodejs /app/src/db ./src/db
 COPY --from=builder --chown=bunjs:nodejs /app/src/env.ts ./src/env.ts
 COPY --from=builder --chown=bunjs:nodejs /app/tsconfig.json ./tsconfig.json
 
-# Install only production dependencies
-COPY --from=builder /app/node_modules ./node_modules
-
 # Create logs directory
 RUN mkdir -p /app/logs && chown bunjs:nodejs /app/logs
 
 # Switch to non-root user
 USER bunjs
 
-# Expose port
-EXPOSE 3000
-
-# Set runtime environment variables (can be overridden)
-ENV NODE_ENV=production
-ENV HOST=0.0.0.0
-ENV PORT=3000
+# Expose API port (matches api/src/index.ts default)
+ENV PORT=8081
+EXPOSE 8081
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8081/health || exit 1
 
-# Start the application and log all output to file
-CMD ["sh", "-c", "bun run start 2>&1 | tee /app/logs/log.txt"]
+# Start the API server
+CMD ["bun", "api/dist/index.js"]

@@ -299,7 +299,8 @@ const PortfolioHistoryInputSchema = z.object({
 	variant: z.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"]).optional(),
 	startDate: z.string().datetime().optional(),
 	endDate: z.string().datetime().optional(),
-	maxPoints: z.number().int().min(100).max(10000).optional(),
+	// Aggregate mode (no variant) needs more points since data spans all model-variant combinations
+	maxPoints: z.number().int().min(100).max(15000).optional(),
 });
 
 export const getPortfolioHistory = os

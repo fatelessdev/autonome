@@ -159,6 +159,11 @@ const { data } = useQuery(orpc.trading.getPositions.queryOptions({ input: {} }))
 - Server QueryClient: Use `getServerQueryClient()` singleton from `serverQueryClient.ts` for server-side TanStack Query operations. Avoids creating multiple instances.
 - Error boundaries: Wrap chart/graph components with `withErrorBoundary` HOC from `error-boundary.tsx` for graceful failure handling.
 - Real-time portfolio updates: SSE endpoint at `/api/events/portfolio` emits `portfolio:updated` events. Client subscribes and invalidates `["portfolio", "history"]` query. See `priceTracker.ts` → `emitPortfolioEvent()` → `performance-graph.tsx` SSE subscription.
+- SSE auto-reconnect: All frontend SSE connections (`EventSource`) use exponential backoff reconnection (1s, 2s, 4s, ... up to 30s). Prevents permanent disconnection when backend restarts.
+- Scheduler health monitoring: Check `/health` for scheduler status. Use `/health/schedulers` for detailed info including last run timestamps and models currently running.
+- Scheduler error isolation: All scheduler callbacks wrapped in try-catch to prevent unhandled rejections from stopping the scheduler loops.
+- Model stuck detection: Trade scheduler auto-clears models stuck in "running" state for >10 minutes. Tracked via `modelsRunningStartTime` map.
+- Graph bucketing: `calculateAdaptiveBucketTolerance()` caps at 1-hour intervals max (prevents line disappearing with large datasets).
 
 ## Code Style (Biome)
 

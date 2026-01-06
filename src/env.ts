@@ -34,8 +34,10 @@ export const env = createEnv({
 	server: {
 		// General server configuration
 		SERVER_URL: z.string().url().optional(),
+		PORT: z.coerce.number().default(8081),
 		FRONTEND_PORT: z.coerce.number().default(5173),
 		API_URL: z.string().url().default("http://localhost:8081"),
+		CORS_ORIGINS: z.string().optional(),
 		DATABASE_URL: z.string().url(),
 		NIM_API_KEY: z.string(),
 		OPENROUTER_API_KEY: z.string(),
@@ -68,6 +70,7 @@ export const env = createEnv({
 
 	client: {
 		VITE_APP_TITLE: z.string().min(1).optional(),
+		VITE_API_URL: z.string().url().optional(),
 	},
 
 	/**

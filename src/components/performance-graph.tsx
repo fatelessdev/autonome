@@ -37,29 +37,60 @@ export default function PerformanceGraph() {
 		isError,
 	} = useQuery(PORTFOLIO_QUERIES.history(variantParam));
 
-	// Subscribe to portfolio SSE events for real-time updates
+	// Subscribe to portfolio SSE events for real-time updates with auto-reconnect
 	useEffect(() => {
-		const source = new EventSource("/api/events/portfolio");
+		let source: EventSource | null = null;
+		let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+		let reconnectAttempts = 0;
+		const MAX_RECONNECT_DELAY = 30_000; // Max 30 seconds between reconnects
+		let mounted = true;
 
-		source.onmessage = (event) => {
-			try {
-				const payload = JSON.parse(event.data);
-				// SSE stream sends the data payload directly (not wrapped in event object)
-				// Invalidate query when snapshots were created (or on any valid payload)
-				if (payload && (payload.snapshotsCreated > 0 || payload.lastUpdatedAt)) {
-					void queryClient.invalidateQueries({ queryKey: ["portfolio", "history"] });
+		const connect = () => {
+			if (!mounted) return;
+			
+			source = new EventSource("/api/events/portfolio");
+
+			source.onopen = () => {
+				reconnectAttempts = 0; // Reset on successful connection
+			};
+
+			source.onmessage = (event) => {
+				try {
+					const payload = JSON.parse(event.data);
+					// SSE stream sends the data payload directly (not wrapped in event object)
+					// Invalidate query when snapshots were created (or on any valid payload)
+					if (payload && (payload.snapshotsCreated > 0 || payload.lastUpdatedAt)) {
+						void queryClient.invalidateQueries({ queryKey: ["portfolio", "history"] });
+					}
+				} catch (error) {
+					console.error("[Portfolio SSE] Failed to parse payload", error);
 				}
-			} catch (error) {
-				console.error("[Portfolio SSE] Failed to parse payload", error);
-			}
+			};
+
+			source.onerror = () => {
+				// Don't log on every error to avoid spam during expected disconnections
+				if (source?.readyState === EventSource.CLOSED) {
+					source?.close();
+					source = null;
+					
+					if (mounted) {
+						// Exponential backoff: 1s, 2s, 4s, 8s, ... up to MAX_RECONNECT_DELAY
+						const delay = Math.min(1000 * 2 ** reconnectAttempts, MAX_RECONNECT_DELAY);
+						reconnectAttempts++;
+						reconnectTimeout = setTimeout(connect, delay);
+					}
+				}
+			};
 		};
 
-		source.onerror = (error) => {
-			console.error("[Portfolio SSE] Stream error", error);
-		};
+		connect();
 
 		return () => {
-			source.close();
+			mounted = false;
+			if (reconnectTimeout) {
+				clearTimeout(reconnectTimeout);
+			}
+			source?.close();
 		};
 	}, [queryClient]);
 
@@ -289,25 +320,29 @@ function buildChartArtifacts(
 
 /**
  * Calculate adaptive bucket tolerance based on data volume.
- * As data grows, increase the time interval between rendered points:
+ * As data grows, increase the time interval between rendered points.
+ * 
+ * IMPORTANT: Maximum tolerance is 1 hour to ensure lines are always visible.
+ * With 1-minute snapshots, 1-hour buckets give ~60 points per day minimum,
+ * which is sufficient to render smooth lines.
+ * 
+ * Thresholds:
  * - < 500 points: 1 minute intervals (show all detail)
  * - 500-2000 points: 5 minute intervals
  * - 2000-5000 points: 15 minute intervals
- * - 5000-10000 points: 1 hour intervals
- * - > 10000 points: 12 hour intervals
+ * - >= 5000 points: 1 hour intervals (capped to ensure visibility)
  */
 function calculateAdaptiveBucketTolerance(dataCount: number): number {
 	const ONE_MINUTE = 60_000;
 	const FIVE_MINUTES = 5 * ONE_MINUTE;
 	const FIFTEEN_MINUTES = 15 * ONE_MINUTE;
 	const ONE_HOUR = 60 * ONE_MINUTE;
-	const TWELVE_HOURS = 12 * ONE_HOUR;
 
 	if (dataCount < 500) return ONE_MINUTE;
 	if (dataCount < 2000) return FIVE_MINUTES;
 	if (dataCount < 5000) return FIFTEEN_MINUTES;
-	if (dataCount < 10000) return ONE_HOUR;
-	return TWELVE_HOURS;
+	// Cap at 1 hour to ensure lines remain visible
+	return ONE_HOUR;
 }
 
 function filterByTime(data: DataPoint[], filter: "all" | "72h"): DataPoint[] {

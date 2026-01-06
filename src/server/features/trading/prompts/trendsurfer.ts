@@ -47,6 +47,8 @@ Every position MUST specify:
 1. **Regime:** "ADX 32. Price > Cloud. Strong Trend."
 2. **Action:** Tool call.
 3. Keep holding() reasons under 800 chars.
+
+**Note: The supplementary indicators are only given for BTC and ETH. Make decisions on SOL, ZEC, HYPE using rest of the indicators that you have.**
 `;
 
 export const USER_PROMPT = `

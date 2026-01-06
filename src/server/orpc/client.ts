@@ -10,12 +10,22 @@ import type router from "@/server/orpc/router";
  * In production, use VITE_API_URL env var.
  * In development, vite proxy handles /api/* routes.
  */
+function toRpcUrl(url: string): string {
+	const trimmed = url.trim().replace(/\/$/, "");
+	return trimmed.endsWith("/api/rpc") ? trimmed : `${trimmed}/api/rpc`;
+}
+
 function getApiUrl(): string {
-	if (typeof window === "undefined") {
-		// Server-side: shouldn't be called, but fallback to env
-		return process.env.VITE_API_URL || "http://localhost:8081";
+	// Check for environment variable first (works for both client and server if configured correctly)
+	if (import.meta.env.VITE_API_URL) {
+		return toRpcUrl(import.meta.env.VITE_API_URL);
 	}
-	
+
+	if (typeof window === "undefined") {
+		// Server-side: shouldn't be called in normal usage, but keep a safe fallback
+		return toRpcUrl("http://localhost:8081");
+	}
+
 	// Client-side: use relative path (proxied in dev, same origin in prod)
 	return `${window.location.origin}/api/rpc`;
 }

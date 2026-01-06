@@ -48,6 +48,7 @@ if (typeof globalThis.__marketIntelligenceFetchPromise === "undefined") {
 function formatTaapiIndicators(
 	_symbol: string,
 	data: TaapiPreFetchResult | undefined,
+	currentPrice?: number,
 ): string {
 	if (!data) return "";
 
@@ -73,6 +74,48 @@ function formatTaapiIndicators(
 		lines.push(
 			`Supertrend(10): ${data.supertrend.value.toFixed(2)} → ${data.supertrend.valueAdvice.toUpperCase()}`
 		);
+	}
+
+	// Ichimoku Cloud - key levels and cloud status
+	if (data.ichimoku) {
+		const ich = data.ichimoku;
+		lines.push(
+			`Ichimoku: Tenkan=${ich.conversion.toFixed(2)}, Kijun=${ich.base.toFixed(2)}`
+		);
+		lines.push(
+			`  Cloud: SpanA=${ich.spanA.toFixed(2)}, SpanB=${ich.spanB.toFixed(2)}`
+		);
+		
+		// Determine cloud status if we have current price
+		if (currentPrice !== undefined && currentPrice !== null) {
+			const cloudTop = Math.max(ich.spanA, ich.spanB);
+			const cloudBottom = Math.min(ich.spanA, ich.spanB);
+			
+			let cloudStatus: string;
+			if (currentPrice > cloudTop) {
+				cloudStatus = "ABOVE CLOUD (Bullish)";
+			} else if (currentPrice < cloudBottom) {
+				cloudStatus = "BELOW CLOUD (Bearish)";
+			} else {
+				cloudStatus = "INSIDE CLOUD (Choppy/Neutral)";
+			}
+			lines.push(`  Cloud Status: ${cloudStatus}`);
+		}
+	}
+
+	// VWAP - Volume Weighted Average Price
+	if (data.vwap && data.vwap.value !== undefined) {
+		let vwapStatus = "";
+		if (currentPrice !== undefined && currentPrice !== null) {
+			const diff = currentPrice - data.vwap.value;
+			const diffPct = (diff / data.vwap.value) * 100;
+			if (currentPrice > data.vwap.value) {
+				vwapStatus = ` | Price > VWAP (+${diffPct.toFixed(2)}%, Bullish)`;
+			} else {
+				vwapStatus = ` | Price < VWAP (${diffPct.toFixed(2)}%, Bearish)`;
+			}
+		}
+		lines.push(`VWAP: ${data.vwap.value.toFixed(2)}${vwapStatus}`);
 	}
 
 	// If no indicators were added, return empty
@@ -121,11 +164,20 @@ export async function getSharedMarketIntelligence(): Promise<{
 		// Build formatted output with TAAPI data integrated
 		let formatted = formatMarketSnapshots(snapshots);
 
+		// Build a price map from snapshots for TAAPI formatting
+		const priceMap = new Map<string, number>();
+		for (const snapshot of snapshots) {
+			if (snapshot.price && Number.isFinite(snapshot.price)) {
+				priceMap.set(snapshot.symbol, snapshot.price);
+			}
+		}
+
 		// Append TAAPI data for BTC/ETH if available
 		for (const symbol of TAAPI_FREE_PLAN_SYMBOLS) {
 			const taapiIndicators = taapiData.get(symbol);
 			if (taapiIndicators) {
-				const taapiSection = formatTaapiIndicators(symbol, taapiIndicators);
+				const currentPrice = priceMap.get(symbol);
+				const taapiSection = formatTaapiIndicators(symbol, taapiIndicators, currentPrice);
 				if (taapiSection) {
 					// Insert TAAPI section after the symbol's market data header
 					const marker = `### ${symbol} MARKET DATA`;
