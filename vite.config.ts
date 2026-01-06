@@ -4,12 +4,16 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import react from "@vitejs/plugin-react";
 import viteTsConfigPaths from "vite-tsconfig-paths";
 import tailwindcss from "@tailwindcss/vite";
+import { nitro } from "nitro/vite";
 
 const API_URL = process.env.VITE_API_URL || "http://localhost:8081";
 
 export default defineConfig({
   plugins: [
     devtools(),
+    nitro({
+      preset: "vercel",
+    }),
     viteTsConfigPaths({
       projects: ["./tsconfig.json"],
     }),
