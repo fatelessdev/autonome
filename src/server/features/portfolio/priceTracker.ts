@@ -95,6 +95,11 @@ async function recordPortfolios() {
 	// Batch fetch all models in one query (fixes N+1)
 	const allModels = await db.select().from(models);
 
+	// Early exit if no models exist (fresh database)
+	if (allModels.length === 0) {
+		return;
+	}
+
 	// Batch check which models need initial seeding
 	const modelIds = allModels.map((m) => m.id);
 	const existingCounts = await db

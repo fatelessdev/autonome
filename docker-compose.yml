@@ -1,7 +1,7 @@
 services:
   # The Autonome API Server (Backend)
   api:
-    image: ${AUTONOME_API_IMAGE:-autonome-api:latest}
+    image: smoggyowo/autonome-api:latest
     container_name: autonome-api
     restart: always
     ports:
@@ -20,7 +20,7 @@ services:
 
   # Migration Runner (Runs once on startup to ensure DB schema exists)
   migrate:
-    image: ${AUTONOME_API_IMAGE:-autonome-api:latest}
+    image: smoggyowo/autonome-api:latest
     container_name: autonome-migrate
     restart: "no"
     env_file:
