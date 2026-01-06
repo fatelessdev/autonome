@@ -35,8 +35,8 @@ const VARIANTS = ["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Con
 
 // Model definitions - openRouterModelName
 const MODEL_DEFINITIONS = [
-	// "deepseek-ai/deepseek-v3.2",
-	"deepseek-ai/deepseek-v3.1-terminus",
+	"deepseek-ai/deepseek-v3.2",
+	// "deepseek-ai/deepseek-v3.1-terminus",
 	"minimaxai/minimax-m2",
 	"moonshotai/kimi-k2-thinking",
 	// "xiaomi/mimo-v2-flash:free",
