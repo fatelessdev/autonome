@@ -47,6 +47,7 @@ const MARKET_QUERY_KEYS = {
 
 const PORTFOLIO_QUERY_KEYS = {
 	history: (variant?: string) => ["portfolio", "history", variant ?? "all"] as const,
+	latest: (variant?: string) => ["portfolio", "latest", variant ?? "all"] as const,
 } as const;
 
 function normalizeMarketPrice(
@@ -218,13 +219,15 @@ function normalizePortfolioHistory(
 }
 
 async function requestPortfolioHistory(variant?: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian") {
-	// When fetching aggregate (all variants), request more points since they're spread across all model-variant combinations
-	// With 7 models × 6 variants = 42 combinations, we need ~6x more points to maintain the same time resolution
-	const maxPoints = variant ? 2000 : 12000;
-	
+	// Server handles time-based downsampling automatically
+	// Resolution is auto-detected from data time range:
+	// - ≤24h: 1-minute buckets
+	// - ≤3d: 5-minute buckets
+	// - ≤7d: 15-minute buckets
+	// - ≤30d: 1-hour buckets
+	// - >30d: 4-hour buckets
 	const data = await orpc.trading.getPortfolioHistory.call({
 		variant,
-		maxPoints,
 	});
 	// Transform the data to match the expected format
 	const transformedData = data.map((entry) => ({
@@ -238,6 +241,108 @@ async function requestPortfolioHistory(variant?: "Guardian" | "Apex" | "Gladiato
 	return normalizePortfolioHistory({ history: transformedData });
 }
 
+type PortfolioHistoryWindowOptions = {
+	variant?: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian";
+	startDate: Date;
+	endDate: Date;
+	maxPoints?: number;
+};
+
+async function requestPortfolioHistoryWindow(options: PortfolioHistoryWindowOptions) {
+	const data = await orpc.trading.getPortfolioHistory.call({
+		variant: options.variant,
+		startDate: options.startDate.toISOString(),
+		endDate: options.endDate.toISOString(),
+		maxPoints: options.maxPoints,
+	});
+
+	const transformedData = data.map((entry) => ({
+		...entry,
+		model: {
+			name: entry.model?.name || "Unknown Model",
+			variant: entry.model?.variant || undefined,
+			openRouterModelName: entry.model?.openRouterModelName || "unknown-model",
+		},
+	}));
+
+	return normalizePortfolioHistory({ history: transformedData });
+}
+
+export type PortfolioLatestValue = {
+	modelName: string;
+	value: number;
+	timestamp: string;
+};
+
+const ALL_VARIANTS = [
+	"Guardian",
+	"Apex",
+	"Gladiator",
+	"Sniper",
+	"Trendsurfer",
+	"Contrarian",
+] as const;
+
+function computeLatestValues(entries: PortfolioHistoryEntry[]): Map<string, PortfolioLatestValue> {
+	const latestByModel = new Map<string, PortfolioLatestValue>();
+
+	for (const entry of entries) {
+		const modelName = entry.model.name;
+		const ts = Date.parse(entry.createdAt);
+		const value = Number(entry.netPortfolio);
+		if (!Number.isFinite(ts) || !Number.isFinite(value)) continue;
+
+		const existing = latestByModel.get(modelName);
+		if (!existing || Date.parse(existing.timestamp) < ts) {
+			latestByModel.set(modelName, {
+				modelName,
+				value,
+				timestamp: entry.createdAt,
+			});
+		}
+	}
+
+	return latestByModel;
+}
+
+async function requestPortfolioLatest(variant?: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian") {
+	// Frontend-only approach: reuse existing backend endpoint with a short time window.
+	// This avoids depending on downsampled chart last-points for "current" values.
+	// 12-hour window provides smooth transition from coarse history to fine-grained tail
+	const now = new Date();
+	const startDate = new Date(now.getTime() - 12 * 60 * 60 * 1000); // last 12h
+
+	if (variant) {
+		const entries = await requestPortfolioHistoryWindow({
+			variant,
+			startDate,
+			endDate: now,
+			maxPoints: 5000,
+		});
+		return Array.from(computeLatestValues(entries).values());
+	}
+
+	// Aggregate mode: fetch all variants, merge entries, then compute latest per model
+	// This ensures consistent timestamps across all models in aggregate view
+	const allEntries: PortfolioHistoryEntry[] = [];
+	
+	await Promise.all(
+		ALL_VARIANTS.map(async (v) => {
+			const entries = await requestPortfolioHistoryWindow({
+				variant: v,
+				startDate,
+				endDate: now,
+				maxPoints: 5000,
+			});
+			allEntries.push(...entries);
+		}),
+	);
+
+	// Group by model name and compute latest value per model
+	// In aggregate mode, we average values across variants for each model at each timestamp
+	return Array.from(computeLatestValues(allEntries).values());
+}
+
 export const portfolioHistoryQueryOptions = (variant?: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian") =>
 	queryOptions({
 		queryKey: PORTFOLIO_QUERY_KEYS.history(variant),
@@ -245,6 +350,15 @@ export const portfolioHistoryQueryOptions = (variant?: "Guardian" | "Apex" | "Gl
 		staleTime: 3 * 60_000,
 		gcTime: 15 * 60_000,
 		refetchInterval: 3 * 60_000,
+	});
+
+export const portfolioLatestQueryOptions = (variant?: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian") =>
+	queryOptions({
+		queryKey: PORTFOLIO_QUERY_KEYS.latest(variant),
+		queryFn: () => requestPortfolioLatest(variant),
+		staleTime: 30_000,
+		gcTime: 5 * 60_000,
+		refetchInterval: 60_000,
 	});
 
 export async function prefetchPortfolioHistory(queryClient: QueryClient, variant?: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian") {
@@ -271,6 +385,7 @@ export function useMarketPrices(symbols: readonly MarketSymbol[] = SUPPORTED_MAR
 export const PORTFOLIO_QUERIES = {
 	history: portfolioHistoryQueryOptions,
 	prefetchHistory: prefetchPortfolioHistory,
+	latest: portfolioLatestQueryOptions,
 };
 
 // ==================== Variant History ====================

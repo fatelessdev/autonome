@@ -1,7 +1,10 @@
 import NumberFlow from "@number-flow/react";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import type { ChartConfig } from "@/components/ui/chart";
+import { useVariant } from "@/components/variant-context";
 import { cn } from "@/core/lib/utils";
+import { PORTFOLIO_QUERIES } from "@/core/shared/markets/marketQueries";
 import { formatCurrencyValue } from "@/shared/formatting/numberFormat";
 import { getModelInfo } from "@/shared/models/modelConfig";
 
@@ -28,12 +31,44 @@ export default function ModelLegend({
 	compact = false,
 }: ModelLegendProps) {
 	const [imagesLoaded, setImagesLoaded] = useState(false);
+	const { selectedVariant } = useVariant();
+	const variantParam =
+		selectedVariant === "all"
+			? undefined
+			: (selectedVariant as
+					| "Guardian"
+					| "Apex"
+					| "Gladiator"
+					| "Sniper"
+					| "Trendsurfer"
+					| "Contrarian");
+
+	const { data: latestValues } = useQuery({
+		...PORTFOLIO_QUERIES.latest(variantParam),
+		placeholderData: (prev) => prev, // Keep previous data during variant switch to prevent layout shift
+	});
+	const latestByModelName = new Map(
+		(latestValues ?? []).map((v) => [v.modelName, v]),
+	);
 
 	const modelKeys = Object.keys(chartConfig).filter((key) =>
 		Boolean(seriesMeta[key]),
 	);
-	const lastPoint = chartData.at(-1) ?? { month: "" };
 	const isPercent = valueMode === "percent";
+
+	const baseBySeriesKey = (() => {
+		const base: Record<string, number | undefined> = {};
+		for (const key of modelKeys) {
+			for (const row of chartData) {
+				const value = row[key];
+				if (typeof value === "number" && Number.isFinite(value)) {
+					base[key] = value;
+					break;
+				}
+			}
+		}
+		return base;
+	})();
 
 	// Preload all model logos
 	useEffect(() => {
@@ -99,10 +134,12 @@ export default function ModelLegend({
 
 	// Sort model keys by current value (descending)
 	const sortedModelKeys = [...modelKeys].sort((a, b) => {
-		const aValue =
-			typeof lastPoint[a] === "number" ? (lastPoint[a] as number) : 0;
-		const bValue =
-			typeof lastPoint[b] === "number" ? (lastPoint[b] as number) : 0;
+		const aOriginalKey = seriesMeta[a]?.originalKey ?? a;
+		const bOriginalKey = seriesMeta[b]?.originalKey ?? b;
+		const aLatest = latestByModelName.get(aOriginalKey)?.value;
+		const bLatest = latestByModelName.get(bOriginalKey)?.value;
+		const aValue = typeof aLatest === "number" && Number.isFinite(aLatest) ? aLatest : 0;
+		const bValue = typeof bLatest === "number" && Number.isFinite(bLatest) ? bLatest : 0;
 		return bValue - aValue;
 	});
 
@@ -129,16 +166,20 @@ export default function ModelLegend({
 						"hsl(var(--chart-1))";
 					const label = modelInfo?.label || chartConfig[key]?.label || key;
 					const logo = modelInfo?.logo;
+					const latest = latestByModelName.get(originalKey)?.value;
 					const value =
-						typeof lastPoint[key] === "number"
-							? Number(lastPoint[key])
+						typeof latest === "number" && Number.isFinite(latest)
+							? latest
 							: undefined;
-					const displayValue =
-						typeof value === "number"
-							? isPercent
-								? value / 100
-								: value
-							: undefined;
+					const displayValue = (() => {
+						if (typeof value !== "number") return undefined;
+						if (!isPercent) return value;
+						const base = baseBySeriesKey[key];
+						if (typeof base === "number" && Number.isFinite(base) && base !== 0) {
+							return ((value - base) / Math.abs(base)) as number;
+						}
+						return undefined;
+					})();
 					const isHovered = hoveredLine === key;
 					const isDimmed = hoveredLine && hoveredLine !== key;
 

@@ -153,6 +153,7 @@ const { data } = useQuery(orpc.trading.getPositions.queryOptions({ input: {} }))
 - Dashboard UX: crypto tracker has desktop dropdown + mobile pill selector; performance graph shows active variant badge and hides filters on mobile.
 - Exposure prompts now use deployed equity (total value minus available cash) via `calculateExposureToEquityPct` to avoid leverage-inflated percentages.
 - Portfolio data retention: Use `retentionService.ts` for tiered aggregation (7d raw → hourly → daily). Call `getPortfolioHistoryWithResolution()` for server-side downsampling.
+- Portfolio chart downsampling: Server-side time-based downsampling in `downsampleForChart()`. Resolution auto-detected from data range: ≤24h→1min, ≤3d→5min, ≤7d→15min, ≤30d→1hour, >30d→4hour. Aggregate mode averages across all variants per model.
 - Server-side variant filtering: All trading queries (`fetchTrades`, `fetchPositions`, `fetchPortfolioHistory`) accept `variant` parameter. Filter at DB level, not client.
 - Cache timing tiers: Import from `@/core/shared/cache/cacheConfig.ts`. Use `CACHE_TIMING.REALTIME` (10s), `STANDARD` (60s), `SLOW` (3min), `STATIC` (Infinity).
 - Virtual scrolling: Use `@tanstack/react-virtual` for lists with 100+ items. See `trades-tab.tsx` for implementation pattern.

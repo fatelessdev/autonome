@@ -255,7 +255,7 @@ async function deleteAggregatedRawRecords(cutoffDate: Date, preservedIds: Set<st
  * @param options.variant - Filter by variant (optional)
  * @param options.startDate - Start of time range (optional)
  * @param options.endDate - End of time range (optional)
- * @param options.maxPoints - Maximum data points to return (for client-side performance)
+ * @param options.maxPoints - Maximum data points to return (optional, no limit if undefined)
  */
 export async function getPortfolioHistoryWithResolution(options?: {
 	modelId?: string;
@@ -277,7 +277,7 @@ export async function getPortfolioHistoryWithResolution(options?: {
 		};
 	}>
 > {
-	const { modelId, variant, startDate, endDate, maxPoints = 2000 } = options ?? {};
+	const { modelId, variant, startDate, endDate, maxPoints } = options ?? {};
 
 	// Build where conditions
 	const conditions = [];
@@ -299,7 +299,7 @@ export async function getPortfolioHistoryWithResolution(options?: {
 		// Cast variant string to the enum type
 		const variantValue = variant as Variant;
 		// Join with models to filter by variant
-		const entries = await db
+		const query = db
 			.select({
 				id: portfolioSize.id,
 				modelId: portfolioSize.modelId,
@@ -317,8 +317,9 @@ export async function getPortfolioHistoryWithResolution(options?: {
 					? and(...conditions, eq(models.variant, variantValue))
 					: eq(models.variant, variantValue),
 			)
-			.orderBy(portfolioSize.createdAt)
-			.limit(maxPoints);
+			.orderBy(portfolioSize.createdAt);
+
+		const entries = maxPoints ? await query.limit(maxPoints) : await query;
 
 		return entries.map((entry) => ({
 			id: entry.id,
@@ -347,7 +348,7 @@ export async function getPortfolioHistoryWithResolution(options?: {
 			},
 		},
 		orderBy: (row, { asc: ascHelper }) => ascHelper(row.createdAt),
-		limit: maxPoints,
+		...(maxPoints ? { limit: maxPoints } : {}),
 	});
 
 	return entries.map((entry) => ({
@@ -365,35 +366,159 @@ export async function getPortfolioHistoryWithResolution(options?: {
 }
 
 /**
- * Downsample data points for chart rendering.
- * Uses adaptive intervals based on total data points:
- * - < 500 points: show all (1 min intervals)
- * - 500-2000 points: 5 min intervals
- * - 2000-5000 points: 15 min intervals
- * - 5000-10000 points: 1 hour intervals
- * - > 10000 points: 12 hour intervals
+ * Time-based downsampling resolution tiers.
+ * Resolution is auto-detected from data time range.
+ * 
+ * Time Range → Bucket Size → Approx Points (for 7 days)
+ * - ≤24h      → 1 min      → 1,440 points
+ * - ≤3d       → 5 min      → 864 points
+ * - ≤7d       → 15 min     → 672 points
+ * - ≤30d      → 1 hour     → 720 points
+ * - >30d      → 4 hours    → ~180-360 points
  */
-export function downsampleForChart<T extends { createdAt: string }>(
-	data: T[],
-	targetPoints: number = 500,
-): T[] {
-	if (data.length <= targetPoints) {
-		return data;
+export type DownsampleResolution = "1m" | "5m" | "15m" | "1h" | "4h";
+
+const RESOLUTION_MS: Record<DownsampleResolution, number> = {
+	"1m": 60_000,
+	"5m": 5 * 60_000,
+	"15m": 15 * 60_000,
+	"1h": 60 * 60_000,
+	"4h": 4 * 60 * 60_000,
+};
+
+/**
+ * Auto-detect appropriate resolution from data time range.
+ */
+function detectResolutionFromTimeRange(startMs: number, endMs: number): DownsampleResolution {
+	const rangeMs = endMs - startMs;
+	const ONE_DAY = 24 * 60 * 60_000;
+	
+	if (rangeMs <= ONE_DAY) return "1m";           // ≤1 day: 1-minute buckets
+	if (rangeMs <= 3 * ONE_DAY) return "5m";       // ≤3 days: 5-minute buckets
+	if (rangeMs <= 7 * ONE_DAY) return "15m";      // ≤7 days: 15-minute buckets
+	if (rangeMs <= 30 * ONE_DAY) return "1h";      // ≤30 days: 1-hour buckets
+	return "4h";                                    // >30 days: 4-hour buckets
+}
+
+type PortfolioEntry = {
+	id: string;
+	modelId: string;
+	netPortfolio: string;
+	createdAt: string;
+	updatedAt: string;
+	model: {
+		name: string;
+		variant: string | undefined;
+		openRouterModelName: string;
+	};
+};
+
+/**
+ * Time-based downsampling for chart rendering.
+ * Groups data into time buckets and uses the LAST value per model per bucket.
+ * 
+ * This is similar to how OHLC charts use the "close" price - we want the value
+ * at the END of each time bucket, not the average. This ensures:
+ * 1. Chart lines accurately show portfolio progression over time
+ * 2. Legend values match the actual current portfolio values
+ * 3. No data loss from averaging that could hide gains/losses
+ * 
+ * @param data - Raw portfolio entries sorted by createdAt ascending
+ * @param resolution - Optional forced resolution, auto-detected if not provided
+ * @param averageAcrossVariants - If true, average the last values across all variants per model name (for aggregate view)
+ */
+export function downsampleForChart(
+	data: PortfolioEntry[],
+	resolution?: DownsampleResolution,
+	averageAcrossVariants = false,
+): PortfolioEntry[] {
+	if (data.length === 0) return [];
+	if (data.length === 1) return data;
+
+	// Parse timestamps and sort
+	const withTimestamps = data
+		.map((entry) => ({
+			entry,
+			timestamp: new Date(entry.createdAt).getTime(),
+		}))
+		.filter((item) => Number.isFinite(item.timestamp))
+		.sort((a, b) => a.timestamp - b.timestamp);
+
+	if (withTimestamps.length === 0) return [];
+
+	const startMs = withTimestamps[0]!.timestamp;
+	const endMs = withTimestamps[withTimestamps.length - 1]!.timestamp;
+
+	// Auto-detect resolution if not provided
+	const bucketSizeMs = RESOLUTION_MS[resolution ?? detectResolutionFromTimeRange(startMs, endMs)];
+
+	// Group entries into time buckets
+	// For single variant: Key by modelId, track last value
+	// For aggregate: Key by model name, collect last values from each variant to average
+	type BucketData = {
+		lastEntry: PortfolioEntry;
+		lastValue: number;
+		// For aggregate mode: track last value per variant (modelId)
+		variantValues: Map<string, number>;
+	};
+	const buckets = new Map<number, Map<string, BucketData>>();
+
+	for (const { entry, timestamp } of withTimestamps) {
+		const bucketStart = Math.floor(timestamp / bucketSizeMs) * bucketSizeMs;
+		
+		// Model key: model name (for grouping display)
+		const modelKey = entry.model.name;
+
+		if (!buckets.has(bucketStart)) {
+			buckets.set(bucketStart, new Map());
+		}
+		const bucketModels = buckets.get(bucketStart)!;
+
+		const value = Number(entry.netPortfolio);
+		if (!Number.isFinite(value)) continue;
+
+		if (!bucketModels.has(modelKey)) {
+			const variantValues = new Map<string, number>();
+			variantValues.set(entry.modelId, value);
+			bucketModels.set(modelKey, { lastEntry: entry, lastValue: value, variantValues });
+		} else {
+			const existing = bucketModels.get(modelKey)!;
+			existing.lastEntry = entry;
+			existing.lastValue = value;
+			// Track each variant's last value separately for aggregate mode
+			existing.variantValues.set(entry.modelId, value);
+		}
 	}
 
-	// Calculate the step size to achieve target points
-	const step = Math.ceil(data.length / targetPoints);
+	// Build output: one entry per model per bucket
+	const result: PortfolioEntry[] = [];
+	const sortedBuckets = Array.from(buckets.keys()).sort((a, b) => a - b);
 
-	// Always include first and last points
-	const result: T[] = [data[0]!];
+	for (const bucketStart of sortedBuckets) {
+		const bucketModels = buckets.get(bucketStart)!;
+		const bucketTime = new Date(bucketStart).toISOString();
 
-	for (let i = step; i < data.length - 1; i += step) {
-		result.push(data[i]!);
-	}
-
-	// Always include last point
-	if (data.length > 1) {
-		result.push(data[data.length - 1]!);
+		for (const [_modelKey, { lastEntry, lastValue, variantValues }] of bucketModels) {
+			let outputValue: number;
+			
+			if (averageAcrossVariants && variantValues.size > 1) {
+				// Aggregate mode: average the last values from each variant
+				const values = Array.from(variantValues.values());
+				outputValue = values.reduce((sum, v) => sum + v, 0) / values.length;
+			} else {
+				// Single variant mode: use the last value directly (like OHLC close price)
+				outputValue = lastValue;
+			}
+			
+			result.push({
+				id: lastEntry.id,
+				modelId: lastEntry.modelId,
+				netPortfolio: outputValue.toFixed(2),
+				createdAt: bucketTime,
+				updatedAt: lastEntry.updatedAt,
+				model: lastEntry.model,
+			});
+		}
 	}
 
 	return result;

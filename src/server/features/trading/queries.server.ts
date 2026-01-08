@@ -555,25 +555,36 @@ export const positionsQuery = () =>
 import {
 	getPortfolioHistoryWithResolution,
 	downsampleForChart,
+	type DownsampleResolution,
 } from "@/server/features/portfolio/retentionService";
 
 export type PortfolioHistoryOptions = {
 	variant?: string;
 	startDate?: Date;
 	endDate?: Date;
+	/** Ignored - resolution is now auto-detected from time range */
 	maxPoints?: number;
+	/** Force a specific resolution (auto-detected if not provided) */
+	resolution?: DownsampleResolution;
 };
 
 export async function fetchPortfolioHistory(options?: PortfolioHistoryOptions) {
+	// When no variant is specified (aggregate mode), we're averaging across all variants
+	const isAggregateMode = !options?.variant;
+	
+	// Fetch all raw data from DB (retention policy already handles old data aggregation)
+	// We don't limit at DB level anymore - time-based downsampling handles reduction
 	const entries = await getPortfolioHistoryWithResolution({
 		variant: options?.variant,
 		startDate: options?.startDate,
 		endDate: options?.endDate,
-		maxPoints: options?.maxPoints ?? 2000,
+		// Remove maxPoints limit - let time-based downsampling handle it
+		maxPoints: undefined,
 	});
 
-	// Apply client-side downsampling for chart performance
-	return downsampleForChart(entries, 500);
+	// Apply time-based downsampling (auto-detects resolution from data range)
+	// In aggregate mode, average across all variants per model
+	return downsampleForChart(entries, options?.resolution, isAggregateMode);
 }
 
 /**
