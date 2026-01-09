@@ -14,8 +14,11 @@ import type {
 
 const BASE_REFRESH_MS = 5 * 60 * 1000;
 
+type VariantFilter = Trade["modelVariant"] | "all" | undefined;
+
 export const DASHBOARD_QUERY_KEYS = {
-	trades: () => ["dashboard", "trades"] as const,
+	trades: (variant?: VariantFilter) =>
+		["dashboard", "trades", variant ?? "all"] as const,
 	positions: () => ["dashboard", "positions"] as const,
 	conversations: () => ["dashboard", "conversations"] as const,
 } as const;
@@ -335,8 +338,11 @@ export const DASHBOARD_NORMALIZERS = {
 		normalizeConversations(coerceConversationsResponse(payload)),
 } as const;
 
-async function fetchTrades(): Promise<Trade[]> {
-	const data = await orpc.trading.getTrades.call({});
+async function fetchTrades(variant?: VariantFilter): Promise<Trade[]> {
+	const data = await orpc.trading.getTrades.call({
+		limit: 100,
+		variant: variant && variant !== "all" ? variant : undefined,
+	});
 	return normalizeTrades({ trades: data.trades });
 }
 
@@ -360,10 +366,10 @@ async function fetchConversations(): Promise<Conversation[]> {
 	return normalizeConversations({ conversations: transformed });
 }
 
-export const tradesQueryOptions = () =>
+export const tradesQueryOptions = (variant?: VariantFilter) =>
 	queryOptions({
-		queryKey: DASHBOARD_QUERY_KEYS.trades(),
-		queryFn: fetchTrades,
+		queryKey: DASHBOARD_QUERY_KEYS.trades(variant),
+		queryFn: () => fetchTrades(variant),
 		staleTime: BASE_REFRESH_MS / 2,
 		gcTime: BASE_REFRESH_MS * 2,
 		refetchInterval: BASE_REFRESH_MS,
@@ -398,10 +404,24 @@ export type DashboardSseUpdaters = ReturnType<
 >;
 
 export function createDashboardSseUpdaters(queryClient: QueryClient) {
+	const isTradesKey = (
+		queryKey: unknown,
+	): queryKey is ReturnType<(typeof DASHBOARD_QUERY_KEYS)["trades"]> =>
+		Array.isArray(queryKey) &&
+		queryKey[0] === "dashboard" &&
+		queryKey[1] === "trades";
+
 	return {
 		trades: (payload: unknown) => {
 			const normalized = DASHBOARD_NORMALIZERS.trades(payload);
-			queryClient.setQueryData(DASHBOARD_QUERY_KEYS.trades(), normalized);
+			queryClient.setQueryData(
+				DASHBOARD_QUERY_KEYS.trades("all"),
+				normalized,
+			);
+			queryClient.invalidateQueries({
+				predicate: ({ queryKey }) =>
+					isTradesKey(queryKey) && (queryKey[2] as VariantFilter) !== "all",
+			});
 			return normalized;
 		},
 		positions: (payload: unknown) => {

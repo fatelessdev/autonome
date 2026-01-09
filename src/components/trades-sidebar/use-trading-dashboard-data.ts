@@ -14,9 +14,11 @@ import type {
 	TradingDashboardData,
 } from "./types";
 import { resolveModelIdentity } from "./utils";
+import type { VariantId } from "../variant-context";
 
 type UseTradingDashboardDataOptions = {
 	enabled?: boolean;
+	variant?: VariantId;
 };
 
 const SSE_STREAMS = [
@@ -31,6 +33,7 @@ const SSE_STREAMS = [
 
 export function useTradingDashboardData({
 	enabled = true,
+	variant = "all",
 }: UseTradingDashboardDataOptions = {}): TradingDashboardData {
 	const queryClient = useQueryClient();
 	const sseUpdaters = useMemo(
@@ -39,7 +42,7 @@ export function useTradingDashboardData({
 	);
 
 	const tradesQuery = useQuery({
-		...DASHBOARD_QUERIES.trades(),
+		...DASHBOARD_QUERIES.trades(variant),
 		enabled,
 	});
 	const positionsQuery = useQuery({

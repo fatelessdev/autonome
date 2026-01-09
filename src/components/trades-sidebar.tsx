@@ -91,7 +91,7 @@ export default function TradesSidebar({
 	const { selectedVariant } = useVariant();
 
 	const { trades, conversations, positions, modelOptions, loading } =
-		useTradingDashboardData();
+		useTradingDashboardData({ variant: selectedVariant });
 
 	const filterOptions = useMemo(() => {
 		if (selectedVariant === "all") {
