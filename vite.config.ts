@@ -6,7 +6,20 @@ import react from "@vitejs/plugin-react";
 import viteTsConfigPaths from "vite-tsconfig-paths";
 import tailwindcss from "@tailwindcss/vite";
 
-const API_URL = process.env.VITE_API_URL || "http://localhost:8081";
+// Port configuration - read from env with defaults
+const API_PORT = Number(process.env.PORT) || 8081;
+const FRONTEND_PORT = Number(process.env.FRONTEND_PORT) || 5173;
+const API_URL = process.env.VITE_API_URL || `http://localhost:${API_PORT}`;
+
+// Prevent Vite from picking up the backend PORT env var (8081) which overrides `server.port`
+if (process.env.PORT && normalizePort(process.env.PORT) === API_PORT) {
+  delete process.env.PORT;
+}
+
+function normalizePort(val: string | number) {
+  const port = parseInt(String(val), 10);
+  return isNaN(port) ? val : port;
+}
 
 export default defineConfig({
   plugins: [
@@ -37,7 +50,7 @@ export default defineConfig({
     preset: "vercel",
   },
   server: {
-    port: 5173,
+    port: FRONTEND_PORT,
     proxy: {
       "/api": {
         target: API_URL,

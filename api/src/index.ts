@@ -59,6 +59,9 @@ process.on("uncaughtException", (error) => {
 	// Don't exit - keep the server running
 });
 
+// Track server start time for uptime calculation
+globalThis.__serverStartTime = Date.now();
+
 // ==================== Server Setup ====================
 
 const app = new Hono();
@@ -283,6 +286,7 @@ const healthHandler = (c: Context) => {
 	const now = Date.now();
 	const tradeSchedulerLastRun = globalThis.tradeSchedulerLastRun;
 	const portfolioSchedulerLastRun = globalThis.__portfolioSchedulerLastRun;
+	const serverStartTime = globalThis.__serverStartTime ?? now;
 
 	// Check if schedulers have run recently (within 2x their interval)
 	const TRADE_INTERVAL_MS = 5 * 60 * 1000;
@@ -296,10 +300,13 @@ const healthHandler = (c: Context) => {
 		: false;
 
 	const allHealthy = tradeSchedulerHealthy && portfolioSchedulerHealthy;
+	const uptimeSeconds = Math.floor((now - serverStartTime) / 1000);
 
 	return c.json({
 		status: allHealthy ? "ok" : "degraded",
 		timestamp: new Date().toISOString(),
+		serverStartedAt: new Date(serverStartTime).toISOString(),
+		uptimeSeconds,
 		schedulers: {
 			trade: {
 				healthy: tradeSchedulerHealthy,
@@ -328,6 +335,7 @@ app.get("/api/health", healthHandler);
 declare global {
 	var tradeSchedulerLastRun: number | undefined;
 	var __portfolioSchedulerLastRun: number | undefined;
+	var __serverStartTime: number | undefined;
 }
 
 app.get("/", (c) => {
@@ -354,6 +362,7 @@ const schedulersHealthHandler = (c: Context) => {
 	const portfolioSchedulerLastRun = globalThis.__portfolioSchedulerLastRun;
 	const modelsRunning = globalThis.modelsRunning;
 	const modelsRunningStartTime = globalThis.modelsRunningStartTime;
+	const serverStartTime = globalThis.__serverStartTime ?? now;
 
 	// Build detailed running models info with duration
 	const runningModelsInfo = modelsRunning
@@ -367,8 +376,12 @@ const schedulersHealthHandler = (c: Context) => {
 				}))
 		: [];
 
+	const uptimeSeconds = Math.floor((now - serverStartTime) / 1000);
+
 	return c.json({
 		timestamp: new Date().toISOString(),
+		serverStartedAt: new Date(serverStartTime).toISOString(),
+		uptimeSeconds,
 		tradeScheduler: {
 			lastRun: tradeSchedulerLastRun
 				? new Date(tradeSchedulerLastRun).toISOString()

@@ -26,8 +26,12 @@ class OrderBook {
 		const bestBid = price - spread / 2;
 		const bestAsk = price + spread / 2;
 
-		const bids: OrderBookLevel[] = [{ price: bestBid, quantity: 1 }];
-		const asks: OrderBookLevel[] = [{ price: bestAsk, quantity: 1 }];
+		// Provide deep liquidity for simulation - allow up to ~$100M notional
+		// This prevents partial fills due to insufficient order book depth
+		const depthQuantity = 100_000_000 / price;
+
+		const bids: OrderBookLevel[] = [{ price: bestBid, quantity: depthQuantity }];
+		const asks: OrderBookLevel[] = [{ price: bestAsk, quantity: depthQuantity }];
 
 		this.snapshot = {
 			symbol: this.metadata.symbol,

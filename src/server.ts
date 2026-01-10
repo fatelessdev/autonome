@@ -3,10 +3,12 @@ import { stat } from "node:fs/promises";
 import { join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// Use import.meta.env directly to avoid loading backend-only env validation
-// On Vercel, backend env vars don't exist - frontend proxies to VPS API
-const FRONTEND_PORT = Number(import.meta.env.FRONTEND_PORT) || 5173;
-const API_URL = import.meta.env.VITE_API_URL || import.meta.env.API_URL || "http://localhost:8081";
+// Port configuration for TanStack Start SSR server
+// FRONTEND_PORT: server-side only, read from process.env
+// VITE_API_URL: client-exposed, read from import.meta.env
+const API_PORT = Number(process.env.PORT) || 8081;
+const FRONTEND_PORT = Number(process.env.FRONTEND_PORT) || 5173;
+const API_URL = import.meta.env.VITE_API_URL || `http://localhost:${API_PORT}`;
 
 declare const Bun: any;
 

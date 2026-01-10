@@ -512,6 +512,7 @@ function FailuresRoute() {
 															stat.variant === "Sniper" && "bg-blue-500/20 text-blue-600",
 															stat.variant === "Trendsurfer" && "bg-cyan-500/20 text-cyan-600",
 															stat.variant === "Contrarian" && "bg-rose-500/20 text-rose-600",
+															stat.variant === "Sovereign" && "bg-yellow-500/20 text-yellow-600",
 														)}>
 															{stat.variant}
 														</span>

@@ -64,8 +64,8 @@ function normalizeTrades(payload: TradesResponse): Trade[] {
 				modelName: typeof record.modelName === "string" ? record.modelName : "",
 				modelVariant:
 					typeof record.modelVariant === "string" &&
-					["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"].includes(record.modelVariant)
-						? (record.modelVariant as "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian")
+					["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"].includes(record.modelVariant)
+						? (record.modelVariant as "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign")
 						: undefined,
 				modelRouterName:
 					typeof record.modelRouterName === "string"
@@ -194,8 +194,8 @@ function normalizePositions(payload: PositionsResponse): ModelPositions[] {
 				modelName,
 				modelVariant:
 					typeof record.modelVariant === "string" &&
-					["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"].includes(record.modelVariant)
-						? (record.modelVariant as "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian")
+					["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"].includes(record.modelVariant)
+						? (record.modelVariant as "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign")
 						: undefined,
 				modelLogo:
 					typeof record.modelLogo === "string" ? record.modelLogo : modelName,
@@ -283,8 +283,8 @@ function normalizeConversations(
 					typeof record.modelName === "string" ? record.modelName : "Unknown",
 				modelVariant:
 					typeof record.modelVariant === "string" &&
-					["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"].includes(record.modelVariant)
-						? (record.modelVariant as "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian")
+					["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"].includes(record.modelVariant)
+						? (record.modelVariant as "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign")
 						: undefined,
 				modelLogo:
 					typeof record.modelLogo === "string"

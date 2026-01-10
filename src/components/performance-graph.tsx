@@ -10,7 +10,7 @@ import { sampleForViewport } from "@/core/shared/charts/chartSampler";
 import {
 	PORTFOLIO_QUERIES,
 	type PortfolioHistoryEntry,
-	type PortfolioLatestValue,
+	type DownsampleResolution,
 } from "@/core/shared/markets/marketQueries";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { getModelInfo } from "@/shared/models/modelConfig";
@@ -35,31 +35,26 @@ export default function PerformanceGraph() {
 	const queryClient = useQueryClient();
 
 	// Server-side variant filtering - pass variant to query
-	const variantParam = selectedVariant === "all" ? undefined : selectedVariant as "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian";
+	const variantParam = selectedVariant === "all" ? undefined : selectedVariant as "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign";
 
 	const {
-		data: portfolioData,
+		data: portfolioResult,
 		isPending: isHistoryPending,
 		isError,
-		isPlaceholderData: isHistoryPlaceholder,
 	} = useQuery({
 		...PORTFOLIO_QUERIES.history(variantParam),
 		placeholderData: (prev) => prev, // Keep previous data during variant switch
 	});
 
-	// Fetch latest high-resolution data to patch the gap at the chart's tail
-	// This ensures the chart ends at the true current value even if history is downsampled
-	const { data: latestData, isPlaceholderData: isLatestPlaceholder } = useQuery({
-		...PORTFOLIO_QUERIES.latest(variantParam),
-		placeholderData: (prev) => prev, // Keep previous data during variant switch
-	});
+	// Extract history and resolution from the result
+	const portfolioData = portfolioResult?.history;
+	const resolution = portfolioResult?.resolution ?? "1m";
 
 	// Only show skeleton on initial load, not during variant transitions
 	const isPending = isHistoryPending && !portfolioData;
 
 	// Subscribe to portfolio SSE events for real-time updates with auto-reconnect
-	// For 24h/72h view: append new data points for smoother updates
-	// For longer ranges: trigger refetch to get properly downsampled data
+	// Triggers refetch to get properly downsampled data from server
 	useEffect(() => {
 		let source: EventSource | null = null;
 		let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -82,10 +77,7 @@ export default function PerformanceGraph() {
 					// SSE stream sends the data payload directly (not wrapped in event object)
 					// Invalidate query when snapshots were created (or on any valid payload)
 					if (payload && (payload.snapshotsCreated > 0 || payload.lastUpdatedAt)) {
-						// For short time filters (72h), invalidate triggers refetch
-						// Server handles proper time-based downsampling
 						void queryClient.invalidateQueries({ queryKey: ["portfolio", "history"] });
-							void queryClient.invalidateQueries({ queryKey: ["portfolio", "latest"] });
 					}
 				} catch (error) {
 					console.error("[Portfolio SSE] Failed to parse payload", error);
@@ -128,9 +120,10 @@ export default function PerformanceGraph() {
 			};
 		}
 		// Average values across variants when showing all variants (aggregate mode)
+		// Server now handles this, but we pass the flag for any client-side processing
 		const shouldAverage = selectedVariant === "all";
-		return buildChartArtifacts(portfolioData, latestData, shouldAverage);
-	}, [portfolioData, latestData, selectedVariant]);
+		return buildChartArtifacts(portfolioData, resolution, shouldAverage);
+	}, [portfolioData, resolution, selectedVariant]);
 
 	const filteredData = useMemo(
 		() => filterByTime(chartData, timeFilter),
@@ -217,44 +210,70 @@ export default function PerformanceGraph() {
 	);
 }
 
+/**
+ * Format timestamp for x-axis based on resolution.
+ * - 1m, 5m, 15m: "14:35" (time only - data is within a day or few days)
+ * - 1h: "Jan 10 14:00" (date + time - data spans days)
+ * - 4h: "Jan 10" (date only - data spans weeks/months)
+ */
+function formatTimestampForResolution(timestamp: number, resolution: DownsampleResolution): string {
+	const date = new Date(timestamp);
+	
+	switch (resolution) {
+		case "1m":
+		case "5m":
+		case "15m":
+			// Short timeframes: time only
+			return date.toLocaleTimeString("en-US", {
+				hour: "2-digit",
+				minute: "2-digit",
+			});
+		case "1h":
+			// Medium timeframes: date + time
+			return date.toLocaleDateString("en-US", {
+				month: "short",
+				day: "numeric",
+				hour: "2-digit",
+				minute: "2-digit",
+			});
+		case "4h":
+			// Long timeframes: date only
+			return date.toLocaleDateString("en-US", {
+				month: "short",
+				day: "numeric",
+			});
+		default:
+			return date.toLocaleTimeString("en-US", {
+				hour: "2-digit",
+				minute: "2-digit",
+			});
+	}
+}
+
 function buildChartArtifacts(
 	portfolioData: PortfolioHistoryEntry[],
-	latestData: PortfolioLatestValue[] | undefined,
+	resolution: DownsampleResolution,
 	_shouldAverage = false, // Server now handles averaging
 ): {
 	chartData: DataPoint[];
 	chartConfig: ChartConfig;
 	seriesMeta: SeriesMeta;
 } {
-	// Server returns pre-downsampled data with time-based buckets
+	// Server returns pre-downsampled data with time-based buckets and latest entries appended
 	// Each entry is already averaged per model per time bucket
 	// Client just converts to chart format without further aggregation
 	
 	const points = portfolioData
+		.filter((entry) => entry.model) // Filter out entries without model
 		.map((entry) => ({
 			t: new Date(entry.createdAt).getTime(),
-			name: entry.model.name,
+			name: entry.model!.name,
 			modelId: entry.modelId,
 			v: Number(entry.netPortfolio),
 		}))
 		.filter((point) => Number.isFinite(point.v));
 
-	// Merge latest data to ensure chart ends with live values
-	// This bridges the gap between downsampled history and current state
-	if (latestData && latestData.length > 0) {
-		for (const latest of latestData) {
-			if (Number.isFinite(latest.value)) {
-				points.push({
-					t: new Date(latest.timestamp).getTime(),
-					name: latest.modelName,
-					modelId: "",
-					v: latest.value,
-				});
-			}
-		}
-	}
-
-	// Sort globally by time after merging
+	// Sort globally by time
 	points.sort((a, b) => a.t - b.t);
 
 	if (points.length === 0) {
@@ -296,10 +315,8 @@ function buildChartArtifacts(
 
 	for (const timestamp of sortedTimes) {
 		const group = timeGroups.get(timestamp)!;
-		const timeLabel = new Date(timestamp).toLocaleTimeString("en-US", {
-			hour: "2-digit",
-			minute: "2-digit",
-		});
+		// Use resolution-based formatting for x-axis labels
+		const timeLabel = formatTimestampForResolution(timestamp, resolution);
 
 		const row: DataPoint = { month: timeLabel, timestamp };
 

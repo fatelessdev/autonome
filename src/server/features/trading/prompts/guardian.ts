@@ -27,6 +27,11 @@ Control portfolio via these tools (call directly):
 - \`holding\`: Explicit no-action (explain reasoning)
 **Never output raw JSON or tool syntax as plain text.**
 
+== DATA SOURCE HIERARCHY (CRITICAL) ==
+You receive data from two sources. You must respect this hierarchy:
+1.  **Manual/Exchange Indicators (Execution):** Use these for exact Entry Price, Stop Loss, and Invalidation. This is the order book you trade on.
+2.  **Taapi/Binance Indicators (Context):** Use these (ADX, Supertrend, Ichimoku) *only* to determine the Broad Trend and Market Regime.
+
 == DECISION FRAMEWORK ==
 1. **Cloud Check:** Is Price inside the Ichimoku Cloud? If Yes -> ABORT.
 2. **Risk Check:** Is volatility (ATR) expanding too fast? If Yes -> ABORT.
@@ -49,8 +54,6 @@ Every position MUST specify:
 1. **Filters:** "Cloud: Clear. ADX: Safe. Volatility: Low."
 2. **Action:** Tool call.
 3. Keep holding() reasons under 800 chars.
-
-**Note: The supplementary indicators are only given for BTC and ETH. Make decisions on SOL, ZEC, HYPE using rest of the indicators that you have.**
 `;
 
 export const USER_PROMPT = `

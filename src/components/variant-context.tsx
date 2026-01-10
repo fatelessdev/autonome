@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 
-export type VariantId = "all" | "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian";
+export type VariantId = "all" | "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign";
 
 export interface VariantContextValue {
 	selectedVariant: VariantId;
@@ -69,5 +69,11 @@ export const VARIANT_TABS: {
 		label: "Contrarian (Reverter)",
 		color: "#e11d48",
 		background: "#fff1f2",
+	},
+	{
+		id: "Sovereign",
+		label: "Sovereign (Adaptive)",
+		color: "#eab308",
+		background: "#fefce8",
 	},
 ];

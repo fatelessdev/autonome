@@ -30,16 +30,11 @@ const nodeEnv =
 		: {};
 const runtimeEnv = { ...nodeEnv, ...importMetaEnv };
 
-// On Vercel (frontend-only), backend env vars won't exist.
-// Skip validation to prevent SSR crashes - backend runs separately on VPS.
-const isVercel = Boolean(runtimeEnv.VERCEL);
-
 export const env = createEnv({
 	server: {
 		// General server configuration
 		SERVER_URL: z.string().url().optional(),
 		PORT: z.coerce.number().default(8081),
-		FRONTEND_PORT: z.coerce.number().default(5173),
 		API_URL: z.string().url().default("http://localhost:8081"),
 		CORS_ORIGINS: z.string().optional(),
 		// Backend-only variables - optional on Vercel frontend deployment
@@ -101,7 +96,6 @@ export const env = createEnv({
 });
 
 // Export convenient aliases for backwards compatibility and cleaner imports
-export const FRONTEND_PORT = env.FRONTEND_PORT;
 export const API_URL = env.API_URL;
 export const API_KEY_INDEX = env.LIGHTER_API_KEY_INDEX;
 export const BASE_URL = env.LIGHTER_BASE_URL;

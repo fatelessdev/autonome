@@ -141,7 +141,7 @@ type TradeRecord = {
 };
 
 export type FetchTradesOptions = {
-	variant?: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian";
+	variant?: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign";
 	limit?: number;
 };
 
@@ -151,7 +151,7 @@ export async function fetchTrades(options?: FetchTradesOptions): Promise<TradeRe
 	// If a specific variant is requested, fetch only for that variant
 	const variants = variant
 		? [variant]
-		: (["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"] as const);
+		: (["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"] as const);
 	const LIMIT_PER_VARIANT = Math.ceil(limit / variants.length);
 
 	const variantQueries = variants.map((v) =>
@@ -272,7 +272,7 @@ async function reconcilePositionsWithLive(
 }
 
 export type FetchPositionsOptions = {
-	variant?: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian";
+	variant?: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign";
 };
 
 export async function fetchPositions(options?: FetchPositionsOptions) {
@@ -556,7 +556,10 @@ import {
 	getPortfolioHistoryWithResolution,
 	downsampleForChart,
 	type DownsampleResolution,
+	type DownsampleResult,
 } from "@/server/features/portfolio/retentionService";
+
+export type { DownsampleResolution };
 
 export type PortfolioHistoryOptions = {
 	variant?: string;
@@ -568,7 +571,12 @@ export type PortfolioHistoryOptions = {
 	resolution?: DownsampleResolution;
 };
 
-export async function fetchPortfolioHistory(options?: PortfolioHistoryOptions) {
+export type PortfolioHistoryResult = {
+	history: DownsampleResult["entries"];
+	resolution: DownsampleResolution;
+};
+
+export async function fetchPortfolioHistory(options?: PortfolioHistoryOptions): Promise<PortfolioHistoryResult> {
 	// When no variant is specified (aggregate mode), we're averaging across all variants
 	const isAggregateMode = !options?.variant;
 	
@@ -584,7 +592,12 @@ export async function fetchPortfolioHistory(options?: PortfolioHistoryOptions) {
 
 	// Apply time-based downsampling (auto-detects resolution from data range)
 	// In aggregate mode, average across all variants per model
-	return downsampleForChart(entries, options?.resolution, isAggregateMode);
+	const result = downsampleForChart(entries, options?.resolution, isAggregateMode);
+	
+	return {
+		history: result.entries,
+		resolution: result.resolution,
+	};
 }
 
 /**

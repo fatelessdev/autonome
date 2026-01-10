@@ -1,16 +1,14 @@
 import NumberFlow from "@number-flow/react";
-import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import type { ChartConfig } from "@/components/ui/chart";
-import { useVariant } from "@/components/variant-context";
 import { cn } from "@/core/lib/utils";
-import { PORTFOLIO_QUERIES } from "@/core/shared/markets/marketQueries";
 import { formatCurrencyValue } from "@/shared/formatting/numberFormat";
 import { getModelInfo } from "@/shared/models/modelConfig";
 
 type ModelLegendProps = {
 	chartData: Array<{
 		month: string;
+		timestamp?: number;
 		[key: string]: number | string | null | undefined;
 	}>;
 	chartConfig: ChartConfig;
@@ -31,25 +29,34 @@ export default function ModelLegend({
 	compact = false,
 }: ModelLegendProps) {
 	const [imagesLoaded, setImagesLoaded] = useState(false);
-	const { selectedVariant } = useVariant();
-	const variantParam =
-		selectedVariant === "all"
-			? undefined
-			: (selectedVariant as
-					| "Guardian"
-					| "Apex"
-					| "Gladiator"
-					| "Sniper"
-					| "Trendsurfer"
-					| "Contrarian");
 
-	const { data: latestValues } = useQuery({
-		...PORTFOLIO_QUERIES.latest(variantParam),
-		placeholderData: (prev) => prev, // Keep previous data during variant switch to prevent layout shift
-	});
-	const latestByModelName = new Map(
-		(latestValues ?? []).map((v) => [v.modelName, v]),
-	);
+	// Derive latest values from chartData (last row with valid values per model)
+	// Server now includes latest entries, so chart data ends at current value
+	const latestBySeriesKey = useMemo(() => {
+		const latest: Record<string, number> = {};
+		const modelKeys = Object.keys(chartConfig).filter((key) =>
+			Boolean(seriesMeta[key]),
+		);
+
+		// Iterate from end to find latest valid value for each model
+		for (let i = chartData.length - 1; i >= 0; i--) {
+			const row = chartData[i];
+			if (!row) continue;
+			
+			for (const key of modelKeys) {
+				if (key in latest) continue; // Already found latest for this model
+				const value = row[key];
+				if (typeof value === "number" && Number.isFinite(value)) {
+					latest[key] = value;
+				}
+			}
+			
+			// Early exit if all models have latest values
+			if (Object.keys(latest).length === modelKeys.length) break;
+		}
+		
+		return latest;
+	}, [chartData, chartConfig, seriesMeta]);
 
 	const modelKeys = Object.keys(chartConfig).filter((key) =>
 		Boolean(seriesMeta[key]),
@@ -134,12 +141,8 @@ export default function ModelLegend({
 
 	// Sort model keys by current value (descending)
 	const sortedModelKeys = [...modelKeys].sort((a, b) => {
-		const aOriginalKey = seriesMeta[a]?.originalKey ?? a;
-		const bOriginalKey = seriesMeta[b]?.originalKey ?? b;
-		const aLatest = latestByModelName.get(aOriginalKey)?.value;
-		const bLatest = latestByModelName.get(bOriginalKey)?.value;
-		const aValue = typeof aLatest === "number" && Number.isFinite(aLatest) ? aLatest : 0;
-		const bValue = typeof bLatest === "number" && Number.isFinite(bLatest) ? bLatest : 0;
+		const aValue = latestBySeriesKey[a] ?? 0;
+		const bValue = latestBySeriesKey[b] ?? 0;
 		return bValue - aValue;
 	});
 
@@ -166,11 +169,7 @@ export default function ModelLegend({
 						"hsl(var(--chart-1))";
 					const label = modelInfo?.label || chartConfig[key]?.label || key;
 					const logo = modelInfo?.logo;
-					const latest = latestByModelName.get(originalKey)?.value;
-					const value =
-						typeof latest === "number" && Number.isFinite(latest)
-							? latest
-							: undefined;
+					const value = latestBySeriesKey[key];
 					const displayValue = (() => {
 						if (typeof value !== "number") return undefined;
 						if (!isPercent) return value;

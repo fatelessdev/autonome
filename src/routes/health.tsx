@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/core/lib/utils";
+import { getApiBaseUrl } from "@/core/shared/api/apiConfig";
 
 export const Route = createFileRoute("/health")({
 	component: HealthRoute,
@@ -22,6 +23,8 @@ type RunningModel = {
 type HealthResponse = {
 	status: "ok" | "degraded";
 	timestamp: string;
+	serverStartedAt?: string;
+	uptimeSeconds?: number;
 	schedulers: {
 		trade: SchedulerHealth;
 		portfolio: SchedulerHealth;
@@ -30,6 +33,8 @@ type HealthResponse = {
 
 type DetailedHealthResponse = {
 	timestamp: string;
+	serverStartedAt?: string;
+	uptimeSeconds?: number;
 	tradeScheduler: {
 		lastRun: string | null;
 		ageSeconds: number | null;
@@ -45,15 +50,32 @@ type DetailedHealthResponse = {
 };
 
 async function fetchHealth(): Promise<HealthResponse> {
-	const res = await fetch("/api/health");
+	const baseUrl = getApiBaseUrl();
+	const res = await fetch(`${baseUrl}/health`);
 	if (!res.ok) throw new Error("Failed to fetch health");
 	return res.json();
 }
 
 async function fetchDetailedHealth(): Promise<DetailedHealthResponse> {
-	const res = await fetch("/api/health/schedulers");
+	const baseUrl = getApiBaseUrl();
+	const res = await fetch(`${baseUrl}/health/schedulers`);
 	if (!res.ok) throw new Error("Failed to fetch detailed health");
 	return res.json();
+}
+
+function formatUptime(seconds: number): string {
+	const days = Math.floor(seconds / 86400);
+	const hours = Math.floor((seconds % 86400) / 3600);
+	const minutes = Math.floor((seconds % 3600) / 60);
+	const secs = seconds % 60;
+
+	const parts: string[] = [];
+	if (days > 0) parts.push(`${days}d`);
+	if (hours > 0) parts.push(`${hours}h`);
+	if (minutes > 0) parts.push(`${minutes}m`);
+	if (secs > 0 || parts.length === 0) parts.push(`${secs}s`);
+
+	return parts.join(" ");
 }
 
 function HealthRoute() {
@@ -106,7 +128,36 @@ function HealthRoute() {
 				)}
 
 				{health && detailed && (
-					<div className="grid gap-6 md:grid-cols-2">
+					<>
+						{/* Server Uptime Card */}
+						<Card>
+							<CardHeader>
+								<CardTitle>Server Status</CardTitle>
+								<CardDescription>
+									API server uptime and start information
+								</CardDescription>
+							</CardHeader>
+							<CardContent className="space-y-2 text-sm">
+								<div className="flex justify-between">
+									<span className="text-muted-foreground">Started At:</span>
+									<span className="font-mono">
+										{detailed.serverStartedAt
+											? new Date(detailed.serverStartedAt).toLocaleString()
+											: "Unknown"}
+									</span>
+								</div>
+								<div className="flex justify-between">
+									<span className="text-muted-foreground">Uptime:</span>
+									<span className="font-mono">
+										{detailed.uptimeSeconds != null
+											? formatUptime(detailed.uptimeSeconds)
+											: "Unknown"}
+									</span>
+								</div>
+							</CardContent>
+						</Card>
+
+						<div className="grid gap-6 md:grid-cols-2">
 						{/* Trade Scheduler */}
 						<Card>
 							<CardHeader>
@@ -227,6 +278,7 @@ function HealthRoute() {
 							</CardContent>
 						</Card>
 					</div>
+					</>
 				)}
 
 				{/* Timestamp */}

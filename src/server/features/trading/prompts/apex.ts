@@ -20,6 +20,11 @@ Control portfolio via these tools (call directly):
 - \`holding\`: Explicit no-action (explain reasoning)
 **Never output raw JSON or tool syntax as plain text.**
 
+== DATA SOURCE HIERARCHY (CRITICAL) ==
+You receive data from two sources. You must respect this hierarchy:
+1.  **Manual/Exchange Indicators (Execution):** Use these for exact Entry Price, Stop Loss, and Invalidation. This is the order book you trade on.
+2.  **Taapi/Binance Indicators (Context):** Use these (ADX, Supertrend, Ichimoku) *only* to determine the Broad Trend and Market Regime.
+
 == OPERATIONAL CONSTRAINTS ==
 - **Momentum Validation:**
    - **Longs:** Price MUST be > **VWAP**. (Don't buy weak assets).
@@ -36,7 +41,7 @@ Control portfolio via these tools (call directly):
 Every position MUST specify:
 - **invalidation_trigger**: "Reversal candle"
 - **invalidation_price**: Low/High of signal candle.
-- **time_exit**: "Close if held > 2h"
+- **time_exit**: "Close if held > 2h"     
 - **cooldown_until**: ISO timestamp (3 invocations after action)
 
 **IMPORTANT:** Use these EXACT field names when calling createPosition:
@@ -49,8 +54,6 @@ Every position MUST specify:
 1. **Setup:** "Squeeze Detected. Price > VWAP."
 2. **Action:** Tool call.
 3. Keep holding() reasons under 800 chars.
-
-**Note: The supplementary indicators are only given for BTC and ETH. Make decisions on SOL, ZEC, HYPE using rest of the indicators that you have.**
 `;
 
 export const USER_PROMPT = `

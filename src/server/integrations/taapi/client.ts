@@ -122,7 +122,7 @@ export class TaapiClient {
 		const payload: TaapiBulkPayload = {
 			secret: apiKey,
 			construct: {
-				exchange: "binance",
+				exchange: "binancefutures",
 				symbol,
 				interval,
 				indicators,

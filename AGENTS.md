@@ -9,7 +9,14 @@ The application is split into two deployable units:
 1. **Frontend (Vercel)**: TanStack Start SPA at `src/` - deploys to Vercel
 2. **Backend (VPS)**: Hono API server at `api/src/index.ts` - runs on VPS
 
-**Communication**: Frontend calls API via oRPC over HTTP. In development, Vite proxies `/api/*` to `localhost:8081`.
+**Communication**: Frontend calls API via oRPC over HTTP. In development, Vite proxies `/api/*` to the API server.
+
+**Port Configuration** (in `.env.local`):
+- `PORT` - Backend API server port (default: 8081)
+- `FRONTEND_PORT` - Frontend dev server port (default: 5173)
+- `VITE_API_URL` - API URL exposed to browser (e.g., `http://localhost:8081`)
+
+Note: `PORT` and `FRONTEND_PORT` are server-side only (read via `process.env`). `VITE_API_URL` is client-exposed (read via `import.meta.env`).
 
 
 ## Team culture

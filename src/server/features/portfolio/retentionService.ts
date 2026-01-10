@@ -423,17 +423,26 @@ type PortfolioEntry = {
  * 2. Legend values match the actual current portfolio values
  * 3. No data loss from averaging that could hide gains/losses
  * 
+ * After bucketing, appends the absolute latest entry per model to ensure the
+ * chart always ends at the current portfolio value (not a stale bucket value).
+ * 
  * @param data - Raw portfolio entries sorted by createdAt ascending
  * @param resolution - Optional forced resolution, auto-detected if not provided
  * @param averageAcrossVariants - If true, average the last values across all variants per model name (for aggregate view)
+ * @returns Object containing downsampled entries and the resolution used
  */
+export type DownsampleResult = {
+	entries: PortfolioEntry[];
+	resolution: DownsampleResolution;
+};
+
 export function downsampleForChart(
 	data: PortfolioEntry[],
 	resolution?: DownsampleResolution,
 	averageAcrossVariants = false,
-): PortfolioEntry[] {
-	if (data.length === 0) return [];
-	if (data.length === 1) return data;
+): DownsampleResult {
+	if (data.length === 0) return { entries: [], resolution: resolution ?? "1m" };
+	if (data.length === 1) return { entries: data, resolution: resolution ?? "1m" };
 
 	// Parse timestamps and sort
 	const withTimestamps = data
@@ -444,13 +453,25 @@ export function downsampleForChart(
 		.filter((item) => Number.isFinite(item.timestamp))
 		.sort((a, b) => a.timestamp - b.timestamp);
 
-	if (withTimestamps.length === 0) return [];
+	if (withTimestamps.length === 0) return { entries: [], resolution: resolution ?? "1m" };
 
 	const startMs = withTimestamps[0]!.timestamp;
 	const endMs = withTimestamps[withTimestamps.length - 1]!.timestamp;
 
 	// Auto-detect resolution if not provided
-	const bucketSizeMs = RESOLUTION_MS[resolution ?? detectResolutionFromTimeRange(startMs, endMs)];
+	const detectedResolution = resolution ?? detectResolutionFromTimeRange(startMs, endMs);
+	const bucketSizeMs = RESOLUTION_MS[detectedResolution];
+
+	// Track the absolute latest entry per model (before bucketing)
+	// These will be appended at the end to ensure chart ends at current value
+	const latestPerModel = new Map<string, { entry: PortfolioEntry; timestamp: number }>();
+	for (const { entry, timestamp } of withTimestamps) {
+		const modelKey = entry.model.name;
+		const existing = latestPerModel.get(modelKey);
+		if (!existing || timestamp > existing.timestamp) {
+			latestPerModel.set(modelKey, { entry, timestamp });
+		}
+	}
 
 	// Group entries into time buckets
 	// For single variant: Key by modelId, track last value
@@ -458,6 +479,7 @@ export function downsampleForChart(
 	type BucketData = {
 		lastEntry: PortfolioEntry;
 		lastValue: number;
+		lastTimestamp: number;
 		// For aggregate mode: track last value per variant (modelId)
 		variantValues: Map<string, number>;
 	};
@@ -480,11 +502,12 @@ export function downsampleForChart(
 		if (!bucketModels.has(modelKey)) {
 			const variantValues = new Map<string, number>();
 			variantValues.set(entry.modelId, value);
-			bucketModels.set(modelKey, { lastEntry: entry, lastValue: value, variantValues });
+			bucketModels.set(modelKey, { lastEntry: entry, lastValue: value, lastTimestamp: timestamp, variantValues });
 		} else {
 			const existing = bucketModels.get(modelKey)!;
 			existing.lastEntry = entry;
 			existing.lastValue = value;
+			existing.lastTimestamp = timestamp;
 			// Track each variant's last value separately for aggregate mode
 			existing.variantValues.set(entry.modelId, value);
 		}
@@ -494,11 +517,14 @@ export function downsampleForChart(
 	const result: PortfolioEntry[] = [];
 	const sortedBuckets = Array.from(buckets.keys()).sort((a, b) => a - b);
 
+	// Track the last bucket timestamp per model (to avoid duplicates when appending latest)
+	const lastBucketTimePerModel = new Map<string, number>();
+
 	for (const bucketStart of sortedBuckets) {
 		const bucketModels = buckets.get(bucketStart)!;
 		const bucketTime = new Date(bucketStart).toISOString();
 
-		for (const [_modelKey, { lastEntry, lastValue, variantValues }] of bucketModels) {
+		for (const [modelKey, { lastEntry, lastValue, variantValues }] of bucketModels) {
 			let outputValue: number;
 			
 			if (averageAcrossVariants && variantValues.size > 1) {
@@ -518,8 +544,33 @@ export function downsampleForChart(
 				updatedAt: lastEntry.updatedAt,
 				model: lastEntry.model,
 			});
+
+			lastBucketTimePerModel.set(modelKey, bucketStart);
 		}
 	}
 
-	return result;
+	// Append the absolute latest entry per model if it's newer than the last bucket
+	// This ensures the chart always ends at the actual current portfolio value
+	for (const [modelKey, { entry, timestamp }] of latestPerModel) {
+		const lastBucketTime = lastBucketTimePerModel.get(modelKey) ?? 0;
+		
+		// Only append if the latest entry is after the last bucket's aligned time
+		// This prevents duplicating data that's already in the last bucket
+		if (timestamp > lastBucketTime) {
+			// Use the actual timestamp, not bucket-aligned time
+			result.push({
+				id: entry.id,
+				modelId: entry.modelId,
+				netPortfolio: entry.netPortfolio,
+				createdAt: entry.createdAt, // Keep original timestamp
+				updatedAt: entry.updatedAt,
+				model: entry.model,
+			});
+		}
+	}
+
+	// Re-sort after appending latest entries
+	result.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+	return { entries: result, resolution: detectedResolution };
 }

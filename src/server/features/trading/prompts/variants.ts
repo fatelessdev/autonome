@@ -38,6 +38,10 @@ import {
 	SYSTEM_PROMPT as SYSTEM_PROMPT_CONTRARIAN,
 	USER_PROMPT as USER_PROMPT_CONTRARIAN,
 } from "./contrarian";
+import {
+	SYSTEM_PROMPT as SYSTEM_PROMPT_SOVEREIGN,
+	USER_PROMPT as USER_PROMPT_SOVEREIGN,
+} from "./sovereign";
 
 // ==========================================
 // Types
@@ -49,7 +53,8 @@ export type VariantId =
 	| "Gladiator"
 	| "Sniper"
 	| "Trendsurfer"
-	| "Contrarian";
+	| "Contrarian"
+	| "Sovereign";
 
 export interface VariantConfig {
 	/** Unique variant identifier */
@@ -127,6 +132,15 @@ export const VARIANTS: Record<VariantId, VariantConfig> = {
 		temperature: 0,
 		color: "#e11d48", // rose-600
 	},
+	Sovereign: {
+		id: "Sovereign",
+		label: "Sovereign (Adaptive)",
+		description: "Flexible regime-adaptive allocator, blends trend & range strategies",
+		systemPrompt: SYSTEM_PROMPT_SOVEREIGN,
+		userPrompt: USER_PROMPT_SOVEREIGN,
+		temperature: 0,
+		color: "#eab308", // yellow-500
+	},
 };
 
 /**
@@ -139,6 +153,7 @@ export const VARIANT_IDS: VariantId[] = [
 	"Sniper",
 	"Trendsurfer",
 	"Contrarian",
+	"Sovereign",
 ];
 
 /**

@@ -14,7 +14,7 @@ export const TradeSchema = z.object({
 	modelId: z.string(),
 	modelName: z.string(),
 	modelVariant: z
-		.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"])
+		.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"])
 		.optional(),
 	modelRouterName: z.string().optional(),
 	modelKey: z.string().optional(),
@@ -66,7 +66,7 @@ export const AccountPositionsSchema = z.object({
 	modelId: z.string(),
 	modelName: z.string(),
 	modelVariant: z
-		.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"])
+		.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"])
 		.optional(),
 	modelLogo: z.string().optional(),
 	positions: z.array(PositionSchema),
@@ -106,14 +106,19 @@ export const PortfolioSnapshotSchema = z.object({
 		.object({
 			name: z.string(),
 			variant: z
-				.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"])
+				.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"])
 				.optional(),
 			openRouterModelName: z.string().optional(),
 		})
 		.optional(),
 });
 
-export const PortfolioHistoryResponseSchema = z.array(PortfolioSnapshotSchema);
+export const DownsampleResolutionSchema = z.enum(["1m", "5m", "15m", "1h", "4h"]);
+
+export const PortfolioHistoryResponseSchema = z.object({
+	history: z.array(PortfolioSnapshotSchema),
+	resolution: DownsampleResolutionSchema,
+});
 
 // ==================== Models Schemas ====================
 
@@ -134,7 +139,7 @@ export const InvocationSchema = z.object({
 	modelId: z.string(),
 	modelName: z.string(),
 	modelVariant: z
-		.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"])
+		.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"])
 		.optional(),
 	modelLogo: z.string(),
 	response: z.string().nullable(),

@@ -20,10 +20,18 @@ export const decisionSchema = z.object({
 		.enum(Object.keys(MARKETS) as [string, ...string[]])
 		.describe("Trading pair symbol (e.g., BTC, ETH, SOL)"),
 	side: z.enum(["LONG", "SHORT", "HOLD"]).describe("Trade direction"),
-	quantity: z.number().describe("Position size calculated from 2% risk rule"),
-	leverage: z.number().describe("Leverage 1-10x"),
-	profit_target: z.number().describe("Take profit price level"),
-	stop_loss: z.number().describe("Stop loss price level"),
+	quantity: z
+		.number()
+		.positive()
+		.max(100_000)
+		.describe("Position size in base asset units (e.g., 0.5 BTC). Must be positive and ≤100,000."),
+	leverage: z
+		.number()
+		.min(1)
+		.max(20)
+		.describe("Leverage multiplier (1-20x)"),
+	profit_target: z.number().positive().describe("Take profit price level"),
+	stop_loss: z.number().positive().describe("Stop loss price level"),
 	invalidation_condition: z
 		.string()
 		.describe("When to exit if thesis breaks (e.g., '4h close above EMA50')"),
@@ -40,7 +48,11 @@ export const decisionSchema = z.object({
 		.string()
 		.optional()
 		.describe("ISO timestamp when direction change is next allowed on this symbol"),
-	confidence: z.number().describe("Setup quality 0-100"),
+	confidence: z
+		.number()
+		.min(0)
+		.max(100)
+		.describe("Setup quality score from 0 (lowest) to 100 (highest)"),
 });
 
 export type DecisionInput = z.infer<typeof decisionSchema>;

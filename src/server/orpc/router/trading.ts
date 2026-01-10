@@ -14,7 +14,7 @@ import {
 
 // ==================== Internal Types ====================
 
-type Variant = "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian";
+type Variant = "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign";
 
 // These mirror the server-side types to avoid importing from server module
 interface TradeRecord {
@@ -89,16 +89,23 @@ interface PortfolioHistoryEntry {
 	};
 }
 
+type DownsampleResolution = "1m" | "5m" | "15m" | "1h" | "4h";
+
+interface PortfolioHistoryResult {
+	history: PortfolioHistoryEntry[];
+	resolution: DownsampleResolution;
+}
+
 // Helper to safely cast variant
 function toVariant(v: string | undefined): Variant | undefined {
-	const variants: Variant[] = ["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"];
+	const variants: Variant[] = ["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"];
 	return variants.includes(v as Variant) ? (v as Variant) : undefined;
 }
 
 // ==================== Trades ====================
 
 const TradesInputSchema = z.object({
-	variant: z.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"]).optional(),
+	variant: z.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"]).optional(),
 	limit: z.number().int().min(1).max(500).optional(),
 });
 
@@ -160,7 +167,7 @@ export const getTrades = os
 // ==================== Positions ====================
 
 const PositionsInputSchema = z.object({
-	variant: z.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"]).optional(),
+	variant: z.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"]).optional(),
 });
 
 export const getPositions = os
@@ -296,7 +303,7 @@ export const getCryptoPrices = os
 // ==================== Portfolio History ====================
 
 const PortfolioHistoryInputSchema = z.object({
-	variant: z.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"]).optional(),
+	variant: z.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"]).optional(),
 	startDate: z.string().datetime().optional(),
 	endDate: z.string().datetime().optional(),
 	// Aggregate mode (no variant) needs more points since data spans all model-variant combinations
@@ -309,7 +316,7 @@ export const getPortfolioHistory = os
 	.handler(async ({ input }) => {
 		return Sentry.startSpan({ name: "getPortfolioHistory" }, async () => {
 			try {
-				const result: PortfolioHistoryEntry[] = await import(
+				const result: PortfolioHistoryResult = await import(
 					"@/server/features/trading/queries.server"
 				).then((module) =>
 					module.fetchPortfolioHistory({
@@ -320,7 +327,7 @@ export const getPortfolioHistory = os
 					}),
 				);
 				// Transform the result to match the expected schema
-				const history = (result || []).map((entry) => ({
+				const history = (result.history || []).map((entry) => ({
 					id: typeof entry.id === "string" ? entry.id : "",
 					modelId: typeof entry.modelId === "string" ? entry.modelId : "",
 					netPortfolio:
@@ -349,8 +356,9 @@ export const getPortfolioHistory = os
 											"Sniper",
 											"Trendsurfer",
 											"Contrarian",
-										].includes(entry.model.variant)
-											? (entry.model.variant as "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian")
+										"Sovereign",
+									].includes(entry.model.variant)
+										? (entry.model.variant as "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign")
 											: undefined,
 									openRouterModelName:
 										typeof entry.model.openRouterModelName === "string"
@@ -359,7 +367,7 @@ export const getPortfolioHistory = os
 								}
 							: undefined,
 				}));
-				return history;
+				return { history, resolution: result.resolution };
 			} catch (error) {
 				Sentry.captureException(error);
 				throw new Error(

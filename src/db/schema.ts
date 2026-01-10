@@ -28,6 +28,7 @@ export const variantEnum = pgEnum("Variant", [
 	"Sniper",
 	"Trendsurfer",
 	"Contrarian",
+	"Sovereign",
 ]);
 
 export const models = pgTable(

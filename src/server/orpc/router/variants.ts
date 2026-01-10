@@ -21,6 +21,7 @@ const VariantIdSchema = z.enum([
 	"Sniper",
 	"Trendsurfer",
 	"Contrarian",
+	"Sovereign",
 ]);
 
 const VariantSchema = z.object({

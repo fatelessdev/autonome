@@ -243,6 +243,7 @@ function getOverallColumns(showVariant: boolean): ColumnDef<OverallStats>[] {
 						variant === "Sniper" && "bg-blue-500/20 text-blue-600",
 						variant === "Trendsurfer" && "bg-cyan-500/20 text-cyan-600",
 						variant === "Contrarian" && "bg-rose-500/20 text-rose-600",
+						variant === "Sovereign" && "bg-yellow-500/20 text-yellow-600",
 					)}>
 						{variant}
 					</span>
@@ -381,6 +382,7 @@ function getAdvancedColumns(showVariant: boolean): ColumnDef<AdvancedStats>[] {
 						variant === "Sniper" && "bg-blue-500/20 text-blue-600",
 						variant === "Trendsurfer" && "bg-cyan-500/20 text-cyan-600",
 						variant === "Contrarian" && "bg-rose-500/20 text-rose-600",
+						variant === "Sovereign" && "bg-yellow-500/20 text-yellow-600",
 					)}>
 						{variant}
 					</span>
