@@ -332,17 +332,17 @@ export async function runTradeWorkflow(account: Account) {
 	});
 
 	// Analyze tool call failures with Codestral (fire and forget)
-	analyzeToolCallFailure({
-		modelId: account.id,
-		invocationId: modelInvocation.id,
-		responseText,
-		isError: false,
-		toolCalls: toolCallTelemetry,
-		decisions: capturedDecisions,
-		closedPositions: capturedClosedPositions,
-	}).catch((err) => {
-		console.warn("Tool call analysis failed:", err);
-	});
+	// analyzeToolCallFailure({
+	// 	modelId: account.id,
+	// 	invocationId: modelInvocation.id,
+	// 	responseText,
+	// 	isError: false,
+	// 	toolCalls: toolCallTelemetry,
+	// 	decisions: capturedDecisions,
+	// 	closedPositions: capturedClosedPositions,
+	// }).catch((err) => {
+	// 	console.warn("Tool call analysis failed:", err);
+	// });
 
 	// Refresh positions to emit SSE update
 	await fetchPositions();

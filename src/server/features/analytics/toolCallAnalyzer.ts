@@ -2,6 +2,7 @@ import { generateText } from "ai";
 import { incrementModelUsage } from "@/server/db/tradingRepository";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { env } from "@/env";
+import { mistral } from "@ai-sdk/mistral";
 
 interface InvocationAnalysisInput {
 	modelId: string;
@@ -152,7 +153,7 @@ Answer YES or NO:`;
 		});
 
 		const result = await generateText({
-			model: nim.chatModel('qwen/qwen3-next-80b-a3b-instruct') as any,
+			model: mistral('codestral-latest') as any,
 			prompt: analysisPrompt,
 			temperature: 0,
 		});
