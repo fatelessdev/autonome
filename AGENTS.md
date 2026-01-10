@@ -171,6 +171,8 @@ const { data } = useQuery(orpc.trading.getPositions.queryOptions({ input: {} }))
 - Scheduler health monitoring: Check `/health` for scheduler status. Use `/health/schedulers` for detailed info including last run timestamps and models currently running.
 - Scheduler error isolation: All scheduler callbacks wrapped in try-catch to prevent unhandled rejections from stopping the scheduler loops.
 - Model stuck detection: Trade scheduler auto-clears models stuck in "running" state for >10 minutes. Tracked via `modelsRunningStartTime` map.
+- Execution health tracking: Health endpoint now tracks `lastSuccessfulCompletion`, `lastCycleStats` (success/failure counts), and `consecutiveFailedCycles`. Health is "degraded" if no successful completion in 15 minutes or 3+ consecutive failed cycles.
+- NIM API key cycling: Use `getNextNimApiKey()` from `@/env` for round-robin key distribution. Supports `NIM_API_KEY`, `NIM_API_KEY1`, `NIM_API_KEY2`, `NIM_API_KEY3` in `.env.local`.
 
 ## Code Style (Biome)
 

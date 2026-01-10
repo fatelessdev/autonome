@@ -1,7 +1,5 @@
 import { generateText } from "ai";
 import { incrementModelUsage } from "@/server/db/tradingRepository";
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { env } from "@/env";
 import { mistral } from "@ai-sdk/mistral";
 
 interface InvocationAnalysisInput {
@@ -144,13 +142,6 @@ BE LENIENT - only answer YES if:
 - There's no indication the model changed its mind or said "holding" later
 
 Answer YES or NO:`;
-		const nim = createOpenAICompatible({
-			name: "nim",
-			baseURL: "https://integrate.api.nvidia.com/v1",
-			headers: {
-				Authorization: `Bearer ${env.NIM_API_KEY}`,
-			},
-		});
 
 		const result = await generateText({
 			model: mistral('codestral-latest') as any,

@@ -31,6 +31,13 @@ type HealthResponse = {
 	};
 };
 
+type CycleStats = {
+	successCount: number;
+	failureCount: number;
+	totalModels: number;
+	timestamp: string;
+};
+
 type DetailedHealthResponse = {
 	timestamp: string;
 	serverStartedAt?: string;
@@ -40,6 +47,11 @@ type DetailedHealthResponse = {
 		ageSeconds: number | null;
 		modelsCurrentlyRunning: RunningModel[];
 		intervalHandle: boolean;
+		// New execution health metrics
+		lastSuccessfulCompletion: string | null;
+		lastSuccessAge: number | null;
+		lastCycleStats: CycleStats | null;
+		consecutiveFailedCycles: number;
 	};
 	portfolioScheduler: {
 		lastRun: string | null;
@@ -200,6 +212,52 @@ function HealthRoute() {
 											{detailed.tradeScheduler.intervalHandle ? "Active" : "Missing"}
 										</span>
 									</div>
+								</div>
+
+								{/* Execution Health Metrics */}
+								<div className="border-t pt-4 space-y-2 text-sm">
+									<p className="font-medium text-muted-foreground">Execution Health</p>
+									<div className="flex justify-between">
+										<span className="text-muted-foreground">Last Success:</span>
+										<span className={cn(
+											"font-mono",
+											detailed.tradeScheduler.lastSuccessAge && detailed.tradeScheduler.lastSuccessAge > 600 && "text-yellow-500",
+											detailed.tradeScheduler.lastSuccessAge && detailed.tradeScheduler.lastSuccessAge > 900 && "text-red-500"
+										)}>
+											{detailed.tradeScheduler.lastSuccessfulCompletion
+												? new Date(detailed.tradeScheduler.lastSuccessfulCompletion).toLocaleTimeString()
+												: "Never"}
+											{detailed.tradeScheduler.lastSuccessAge != null && (
+												<span className="text-muted-foreground ml-1">
+													({detailed.tradeScheduler.lastSuccessAge}s ago)
+												</span>
+											)}
+										</span>
+									</div>
+									{detailed.tradeScheduler.lastCycleStats && (
+										<div className="flex justify-between">
+											<span className="text-muted-foreground">Last Cycle:</span>
+											<span className={cn(
+												"font-mono",
+												detailed.tradeScheduler.lastCycleStats.successCount === 0 && "text-red-500",
+												detailed.tradeScheduler.lastCycleStats.successCount > 0 &&
+													detailed.tradeScheduler.lastCycleStats.successCount < detailed.tradeScheduler.lastCycleStats.totalModels &&
+													"text-yellow-500",
+												detailed.tradeScheduler.lastCycleStats.successCount === detailed.tradeScheduler.lastCycleStats.totalModels &&
+													"text-green-500"
+											)}>
+												{detailed.tradeScheduler.lastCycleStats.successCount}/{detailed.tradeScheduler.lastCycleStats.totalModels} succeeded
+											</span>
+										</div>
+									)}
+									{detailed.tradeScheduler.consecutiveFailedCycles > 0 && (
+										<div className="flex justify-between">
+											<span className="text-muted-foreground">Failed Cycles:</span>
+											<span className="font-mono text-red-500">
+												{detailed.tradeScheduler.consecutiveFailedCycles} consecutive
+											</span>
+										</div>
+									)}
 								</div>
 
 								{detailed.tradeScheduler.modelsCurrentlyRunning.length > 0 && (

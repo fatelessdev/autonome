@@ -56,6 +56,17 @@ declare global {
 	var modelsRunningStartTime: Map<string, number> | undefined;
 	// eslint-disable-next-line no-var
 	var tradeSchedulerLastRun: number | undefined;
+	// eslint-disable-next-line no-var
+	var tradeSchedulerLastSuccessfulCompletion: number | undefined;
+	// eslint-disable-next-line no-var
+	var tradeSchedulerLastCycleStats: {
+		successCount: number;
+		failureCount: number;
+		totalModels: number;
+		timestamp: number;
+	} | undefined;
+	// eslint-disable-next-line no-var
+	var tradeSchedulerConsecutiveFailedCycles: number | undefined;
 }
 
 // Initialize per-model running state
@@ -64,6 +75,10 @@ if (!globalThis.modelsRunning) {
 }
 if (!globalThis.modelsRunningStartTime) {
 	globalThis.modelsRunningStartTime = new Map();
+}
+// Initialize execution metrics
+if (globalThis.tradeSchedulerConsecutiveFailedCycles === undefined) {
+	globalThis.tradeSchedulerConsecutiveFailedCycles = 0;
 }
 
 const TRADE_INTERVAL_MS = 5 * 60 * 1000;
@@ -457,15 +472,46 @@ async function executeScheduledTradesInternal() {
 		// Invalidate market cache after batch completes so next cycle gets fresh data
 		invalidateMarketIntelligenceCache();
 
-		const successful = results
-			.filter(
-				(r): r is PromiseFulfilledResult<{ modelId: string; success: true }> =>
-					r.status === "fulfilled" && r.value !== null && r.value.success,
-			)
+		// Track success/failure metrics
+		const validResults = results.filter(
+			(r): r is PromiseFulfilledResult<{ modelId: string; success: boolean }> =>
+				r.status === "fulfilled" && r.value !== null,
+		);
+		const successCount = validResults.filter((r) => r.value.success).length;
+		const failureCount = validResults.filter((r) => !r.value.success).length;
+		const totalModels = modelsToRun.length;
+
+		// Update cycle stats
+		globalThis.tradeSchedulerLastCycleStats = {
+			successCount,
+			failureCount,
+			totalModels,
+			timestamp: Date.now(),
+		};
+
+		// Track consecutive failed cycles (all models failed)
+		if (successCount === 0 && totalModels > 0) {
+			globalThis.tradeSchedulerConsecutiveFailedCycles =
+				(globalThis.tradeSchedulerConsecutiveFailedCycles ?? 0) + 1;
+		} else if (successCount > 0) {
+			globalThis.tradeSchedulerConsecutiveFailedCycles = 0;
+			globalThis.tradeSchedulerLastSuccessfulCompletion = Date.now();
+		}
+
+		const successful = validResults
+			.filter((r) => r.value.success)
 			.map((r) => r.value.modelId);
 
 		if (successful.length > 0) {
 			emitBatchComplete(successful);
+		}
+
+		// Log cycle summary
+		if (totalModels > 0) {
+			const status = successCount === totalModels ? "✅" : successCount > 0 ? "⚠️" : "❌";
+			console.log(
+				`[Trade Scheduler] Cycle complete: ${status} ${successCount}/${totalModels} models succeeded`,
+			);
 		}
 	});
 }

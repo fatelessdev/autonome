@@ -40,6 +40,9 @@ export const env = createEnv({
 		// Backend-only variables - optional on Vercel frontend deployment
 		DATABASE_URL: z.string().url().optional(),
 		NIM_API_KEY: z.string().optional(),
+		NIM_API_KEY1: z.string().optional(),
+		NIM_API_KEY2: z.string().optional(),
+		NIM_API_KEY3: z.string().optional(),
 		OPENROUTER_API_KEY: z.string().optional(),
 		MISTRAL_API_KEY: z.string().optional(),
 
@@ -110,3 +113,35 @@ export const DEFAULT_SIMULATOR_OPTIONS: ExchangeSimulatorOptions = {
 
 // TAAPI API key for supplementary indicators (optional)
 export const TAAPI_API_KEY = env.TAAPI_API_KEY;
+
+// ==================== NIM API Key Cycling ====================
+// Collect all available NIM API keys into an array for round-robin cycling
+const nimApiKeys: string[] = [
+	env.NIM_API_KEY,
+	env.NIM_API_KEY1,
+	env.NIM_API_KEY2,
+	env.NIM_API_KEY3,
+].filter((key): key is string => Boolean(key));
+
+// Track request counter for round-robin cycling
+let nimRequestCounter = 0;
+
+/**
+ * Get the next NIM API key using round-robin cycling.
+ * This distributes requests across multiple keys to avoid rate limits.
+ */
+export function getNextNimApiKey(): string {
+	if (nimApiKeys.length === 0) {
+		throw new Error("No NIM API keys configured");
+	}
+	const key = nimApiKeys[nimRequestCounter % nimApiKeys.length]!;
+	nimRequestCounter++;
+	return key;
+}
+
+/**
+ * Get all available NIM API keys count (for logging/debugging)
+ */
+export function getNimApiKeyCount(): number {
+	return nimApiKeys.length;
+}
