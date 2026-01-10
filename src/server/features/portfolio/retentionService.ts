@@ -463,13 +463,43 @@ export function downsampleForChart(
 	const bucketSizeMs = RESOLUTION_MS[detectedResolution];
 
 	// Track the absolute latest entry per model (before bucketing)
-	// These will be appended at the end to ensure chart ends at current value
-	const latestPerModel = new Map<string, { entry: PortfolioEntry; timestamp: number }>();
+	// For aggregate mode, track latest value per variant to average accurately
+	type LatestVariant = { value: number; timestamp: number };
+	const latestPerModel = new Map<
+		string,
+		{
+			representative: PortfolioEntry;
+			timestamp: number;
+			variantValues: Map<string, LatestVariant>;
+		}
+	>();
 	for (const { entry, timestamp } of withTimestamps) {
 		const modelKey = entry.model.name;
+		const value = Number(entry.netPortfolio);
+		if (!Number.isFinite(value)) continue;
+
 		const existing = latestPerModel.get(modelKey);
-		if (!existing || timestamp > existing.timestamp) {
-			latestPerModel.set(modelKey, { entry, timestamp });
+		if (!existing) {
+			const variantValues = new Map<string, LatestVariant>();
+			variantValues.set(entry.modelId, { value, timestamp });
+			latestPerModel.set(modelKey, {
+				representative: entry,
+				timestamp,
+				variantValues,
+			});
+			continue;
+		}
+
+		// Update representative if this entry is newer
+		if (timestamp > existing.timestamp) {
+			existing.representative = entry;
+			existing.timestamp = timestamp;
+		}
+
+		// Track latest per variant
+		const prevVariant = existing.variantValues.get(entry.modelId);
+		if (!prevVariant || timestamp > prevVariant.timestamp) {
+			existing.variantValues.set(entry.modelId, { value, timestamp });
 		}
 	}
 
@@ -550,23 +580,28 @@ export function downsampleForChart(
 	}
 
 	// Append the absolute latest entry per model if it's newer than the last bucket
-	// This ensures the chart always ends at the actual current portfolio value
-	for (const [modelKey, { entry, timestamp }] of latestPerModel) {
+	// This ensures the chart always ends at the actual current (and properly averaged) value
+	for (const [modelKey, latest] of latestPerModel) {
 		const lastBucketTime = lastBucketTimePerModel.get(modelKey) ?? 0;
-		
-		// Only append if the latest entry is after the last bucket's aligned time
-		// This prevents duplicating data that's already in the last bucket
-		if (timestamp > lastBucketTime) {
-			// Use the actual timestamp, not bucket-aligned time
-			result.push({
-				id: entry.id,
-				modelId: entry.modelId,
-				netPortfolio: entry.netPortfolio,
-				createdAt: entry.createdAt, // Keep original timestamp
-				updatedAt: entry.updatedAt,
-				model: entry.model,
-			});
+		const latestTimestamp = latest.timestamp;
+		if (latestTimestamp <= lastBucketTime) continue;
+
+		let latestValue: number;
+		if (averageAcrossVariants && latest.variantValues.size > 1) {
+			const values = Array.from(latest.variantValues.values()).map((v) => v.value);
+			latestValue = values.reduce((sum, v) => sum + v, 0) / values.length;
+		} else {
+			latestValue = latest.variantValues.values().next().value?.value ?? Number(latest.representative.netPortfolio);
 		}
+
+		result.push({
+			id: latest.representative.id,
+			modelId: latest.representative.modelId,
+			netPortfolio: latestValue.toFixed(2),
+			createdAt: new Date(latestTimestamp).toISOString(),
+			updatedAt: latest.representative.updatedAt,
+			model: latest.representative.model,
+		});
 	}
 
 	// Re-sort after appending latest entries
