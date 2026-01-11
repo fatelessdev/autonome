@@ -440,46 +440,57 @@ async function executeScheduledTradesInternal() {
 		globalThis.modelsRunningStartTime?.set(model.id, Date.now());
 	}
 
-	// Run regular model workflow
-	const runModel = async (model: (typeof modelsToRun)[number]) => {
+	// Hard timeout for each model run - ensures every promise settles
+	// Set to 9 minutes (just under the 10-min stale threshold)
+	const MODEL_RUN_TIMEOUT_MS = 9 * 60 * 1000;
+
+	// Run regular model workflow with timeout wrapper
+	const runModel = async (model: (typeof modelsToRun)[number]): Promise<{ modelId: string; success: boolean }> => {
+		const timeoutPromise = new Promise<never>((_, reject) => {
+			setTimeout(() => reject(new Error("Model run timed out after 9 minutes")), MODEL_RUN_TIMEOUT_MS);
+		});
+
 		try {
-			await runTradeWorkflow({
-				apiKey: model.lighterApiKey,
-				modelName: model.openRouterModelName,
-				name: model.name,
-				invocationCount: model.invocationCount,
-				id: model.id,
-				accountIndex: model.accountIndex,
-				totalMinutes: model.totalMinutes,
-				variant: (model.variant as VariantId) ?? DEFAULT_VARIANT,
-			});
-			return { modelId: model.id, success: true as const };
+			await Promise.race([
+				runTradeWorkflow({
+					apiKey: model.lighterApiKey,
+					modelName: model.openRouterModelName,
+					name: model.name,
+					invocationCount: model.invocationCount,
+					id: model.id,
+					accountIndex: model.accountIndex,
+					totalMinutes: model.totalMinutes,
+					variant: (model.variant as VariantId) ?? DEFAULT_VARIANT,
+				}),
+				timeoutPromise,
+			]);
+			return { modelId: model.id, success: true };
 		} catch (error) {
-			console.error(`Model ${model.name} trade workflow failed:`, error);
-			return { modelId: model.id, success: false as const, error };
+			const isTimeout = error instanceof Error && error.message.includes("timed out");
+			console.error(`[Trade Scheduler] Model ${model.name} ${isTimeout ? "timed out" : "failed"}:`, error);
+			return { modelId: model.id, success: false };
 		} finally {
 			globalThis.modelsRunning?.set(model.id, false);
 			globalThis.modelsRunningStartTime?.delete(model.id);
 		}
 	};
 
-	// Fire off all models in parallel
-	const allPromises: Promise<{ modelId: string; success: boolean } | null>[] = [
-		...modelsToRun.map(runModel),
-	];
-
-	Promise.allSettled(allPromises).then((results) => {
+	// Fire off all models in parallel - DON'T await, let them run independently
+	// The per-model timeout ensures they all settle within 9 minutes
+	// This allows the next 5-min cycle to start on schedule
+	const totalModels = modelsToRun.length;
+	
+	Promise.allSettled(modelsToRun.map(runModel)).then((results) => {
 		// Invalidate market cache after batch completes so next cycle gets fresh data
 		invalidateMarketIntelligenceCache();
 
 		// Track success/failure metrics
 		const validResults = results.filter(
 			(r): r is PromiseFulfilledResult<{ modelId: string; success: boolean }> =>
-				r.status === "fulfilled" && r.value !== null,
+				r.status === "fulfilled",
 		);
 		const successCount = validResults.filter((r) => r.value.success).length;
-		const failureCount = validResults.filter((r) => !r.value.success).length;
-		const totalModels = modelsToRun.length;
+		const failureCount = validResults.length - successCount;
 
 		// Update cycle stats
 		globalThis.tradeSchedulerLastCycleStats = {
