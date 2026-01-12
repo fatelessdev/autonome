@@ -141,7 +141,7 @@ type TradeRecord = {
 };
 
 export type FetchTradesOptions = {
-	variant?: "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign";
+	variant?: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign";
 	limit?: number;
 };
 
@@ -151,7 +151,7 @@ export async function fetchTrades(options?: FetchTradesOptions): Promise<TradeRe
 	// If a specific variant is requested, fetch only for that variant
 	const variants = variant
 		? [variant]
-		: (["Situational", "Minimal", "Guardian", "Max", "Sovereign"] as const);
+		: (["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"] as const);
 	const LIMIT_PER_VARIANT = Math.ceil(limit / variants.length);
 
 	const variantQueries = variants.map((v) =>
@@ -201,7 +201,7 @@ export async function fetchTrades(options?: FetchTradesOptions): Promise<TradeRe
 			modelId: order.modelId,
 			modelName: order.model?.name ?? "Unknown",
 			modelRouterName: order.model?.openRouterModelName ?? null,
-			modelVariant: order.model?.variant ?? "Situational",
+			modelVariant: order.model?.variant ?? "Guardian",
 			symbol: order.symbol,
 			side: order.side,
 			quantity,
@@ -272,7 +272,7 @@ async function reconcilePositionsWithLive(
 }
 
 export type FetchPositionsOptions = {
-	variant?: "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign";
+	variant?: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign";
 };
 
 export async function fetchPositions(options?: FetchPositionsOptions) {
@@ -555,25 +555,49 @@ export const positionsQuery = () =>
 import {
 	getPortfolioHistoryWithResolution,
 	downsampleForChart,
+	type DownsampleResolution,
+	type DownsampleResult,
 } from "@/server/features/portfolio/retentionService";
+
+export type { DownsampleResolution };
 
 export type PortfolioHistoryOptions = {
 	variant?: string;
 	startDate?: Date;
 	endDate?: Date;
+	/** Ignored - resolution is now auto-detected from time range */
 	maxPoints?: number;
+	/** Force a specific resolution (auto-detected if not provided) */
+	resolution?: DownsampleResolution;
 };
 
-export async function fetchPortfolioHistory(options?: PortfolioHistoryOptions) {
+export type PortfolioHistoryResult = {
+	history: DownsampleResult["entries"];
+	resolution: DownsampleResolution;
+};
+
+export async function fetchPortfolioHistory(options?: PortfolioHistoryOptions): Promise<PortfolioHistoryResult> {
+	// When no variant is specified (aggregate mode), we're averaging across all variants
+	const isAggregateMode = !options?.variant;
+	
+	// Fetch all raw data from DB (retention policy already handles old data aggregation)
+	// We don't limit at DB level anymore - time-based downsampling handles reduction
 	const entries = await getPortfolioHistoryWithResolution({
 		variant: options?.variant,
 		startDate: options?.startDate,
 		endDate: options?.endDate,
-		maxPoints: options?.maxPoints ?? 2000,
+		// Remove maxPoints limit - let time-based downsampling handle it
+		maxPoints: undefined,
 	});
 
-	// Apply client-side downsampling for chart performance
-	return downsampleForChart(entries, 500);
+	// Apply time-based downsampling (auto-detects resolution from data range)
+	// In aggregate mode, average across all variants per model
+	const result = downsampleForChart(entries, options?.resolution, isAggregateMode);
+	
+	return {
+		history: result.entries,
+		resolution: result.resolution,
+	};
 }
 
 /**

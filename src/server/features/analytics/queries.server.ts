@@ -23,7 +23,7 @@ const WINDOW_MS: Record<LeaderboardWindow, number> = {
 	"30d": 30 * 24 * 60 * 60 * 1000,
 };
 
-type VariantFilter = "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign";
+type VariantFilter = "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign";
 
 /**
  * Fetch closed trades for multiple models and group them
@@ -167,7 +167,7 @@ export async function getAllModelsWithFailureCounts(
 	Array<{
 		id: string;
 		name: string;
-		variant: "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign";
+		variant: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign";
 		failedWorkflowCount: number;
 		failedToolCallCount: number;
 		invocationCount: number;
@@ -207,7 +207,7 @@ function computeMaxDrawdown(values: number[]): number {
 /**
  * Get leaderboard data for all models within a time window
  * @param window - Time window to calculate stats for
- * @param variantFilter - Optional variant to filter by (e.g., "Situational", "Minimal", "Sovereign")
+ * @param variantFilter - Optional variant to filter by (e.g., "Guardian", "Apex", "Contrarian")
  */
 export async function getLeaderboardData(
 	window: LeaderboardWindow,

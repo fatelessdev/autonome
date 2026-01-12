@@ -1,8 +1,14 @@
 import { createStartHandler, defaultStreamHandler } from "@tanstack/react-start/server";
-import { FRONTEND_PORT, API_URL } from "@/env";
 import { stat } from "node:fs/promises";
 import { join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
+
+// Port configuration for TanStack Start SSR server
+// FRONTEND_PORT: server-side only, read from process.env
+// VITE_API_URL: client-exposed, read from import.meta.env
+const API_PORT = Number(process.env.PORT) || 8081;
+const FRONTEND_PORT = Number(process.env.FRONTEND_PORT) || 5173;
+const API_URL = import.meta.env.VITE_API_URL || `http://localhost:${API_PORT}`;
 
 declare const Bun: any;
 
@@ -43,8 +49,14 @@ export default {
 	async fetch(request: Request) {
 		const url = new URL(request.url);
 
-		// Proxy /api requests to the backend
-		if (url.pathname.startsWith("/api")) {
+		// Proxy ONLY backend-owned routes to the VPS API.
+		// TanStack Start also serves its own server routes under `/api/*` (e.g. `/api/chat`).
+		const shouldProxyToApi =
+			url.pathname.startsWith("/api/rpc") ||
+			url.pathname.startsWith("/api/events") ||
+			url.pathname === "/api/health" ||
+			url.pathname === "/api/health/schedulers";
+		if (shouldProxyToApi) {
 			const targetUrl = new URL(url.pathname + url.search, API_URL);
 			return fetch(targetUrl, {
 				method: request.method,
@@ -53,8 +65,13 @@ export default {
 			});
 		}
 
-		const staticResponse = await serveStatic(request);
-		if (staticResponse) return staticResponse;
+		// When running on Vercel (Nitro), static assets are handled by the platform/CDN.
+		// We can skip the potentially fragile Bun.file() logic.
+		if (!process.env.VERCEL) {
+			const staticResponse = await serveStatic(request);
+			if (staticResponse) return staticResponse;
+		}
+		
 		return startHandler(request);
 	},
 };

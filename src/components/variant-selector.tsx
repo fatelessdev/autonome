@@ -108,7 +108,7 @@ export function VariantSelectorMobile({
 	return (
 		<div
 			className={cn(
-				"flex flex-nowrap items-center gap-1 overflow-x-auto scrollbar-hide",
+				"max-w-full min-w-0 flex flex-nowrap items-center gap-1 overflow-x-auto scrollbar-hide p-1",
 				className,
 			)}
 			style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}

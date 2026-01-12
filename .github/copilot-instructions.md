@@ -9,7 +9,14 @@ The application is split into two deployable units:
 1. **Frontend (Vercel)**: TanStack Start SPA at `src/` - deploys to Vercel
 2. **Backend (VPS)**: Hono API server at `api/src/index.ts` - runs on VPS
 
-**Communication**: Frontend calls API via oRPC over HTTP. In development, Vite proxies `/api/*` to `localhost:8080`.
+**Communication**: Frontend calls API via oRPC over HTTP. In development, Vite proxies `/api/*` to the API server.
+
+**Port Configuration** (in `.env.local`):
+- `PORT` - Backend API server port (default: 8081)
+- `FRONTEND_PORT` - Frontend dev server port (default: 5173)
+- `VITE_API_URL` - API URL exposed to browser (e.g., `http://localhost:8081`)
+
+Note: `PORT` and `FRONTEND_PORT` are server-side only (read via `process.env`). `VITE_API_URL` is client-exposed (read via `import.meta.env`).
 
 
 ## Team culture
@@ -153,12 +160,18 @@ const { data } = useQuery(orpc.trading.getPositions.queryOptions({ input: {} }))
 - Dashboard UX: crypto tracker has desktop dropdown + mobile pill selector; performance graph shows active variant badge and hides filters on mobile.
 - Exposure prompts now use deployed equity (total value minus available cash) via `calculateExposureToEquityPct` to avoid leverage-inflated percentages.
 - Portfolio data retention: Use `retentionService.ts` for tiered aggregation (7d raw → hourly → daily). Call `getPortfolioHistoryWithResolution()` for server-side downsampling.
+- Portfolio chart downsampling: Server-side time-based downsampling in `downsampleForChart()`. Resolution auto-detected from data range: ≤24h→1min, ≤3d→5min, ≤7d→15min, ≤30d→1hour, >30d→4hour. Aggregate mode averages across all variants per model.
 - Server-side variant filtering: All trading queries (`fetchTrades`, `fetchPositions`, `fetchPortfolioHistory`) accept `variant` parameter. Filter at DB level, not client.
 - Cache timing tiers: Import from `@/core/shared/cache/cacheConfig.ts`. Use `CACHE_TIMING.REALTIME` (10s), `STANDARD` (60s), `SLOW` (3min), `STATIC` (Infinity).
 - Virtual scrolling: Use `@tanstack/react-virtual` for lists with 100+ items. See `trades-tab.tsx` for implementation pattern.
 - Server QueryClient: Use `getServerQueryClient()` singleton from `serverQueryClient.ts` for server-side TanStack Query operations. Avoids creating multiple instances.
 - Error boundaries: Wrap chart/graph components with `withErrorBoundary` HOC from `error-boundary.tsx` for graceful failure handling.
 - Real-time portfolio updates: SSE endpoint at `/api/events/portfolio` emits `portfolio:updated` events. Client subscribes and invalidates `["portfolio", "history"]` query. See `priceTracker.ts` → `emitPortfolioEvent()` → `performance-graph.tsx` SSE subscription.
+- SSE auto-reconnect: All frontend SSE connections (`EventSource`) use exponential backoff reconnection (1s, 2s, 4s, ... up to 30s). Prevents permanent disconnection when backend restarts.
+- Scheduler health monitoring: Check `/health` for scheduler status. Use `/health/schedulers` for detailed info including last run timestamps and models currently running.
+- Scheduler error isolation: All scheduler callbacks wrapped in try-catch to prevent unhandled rejections from stopping the scheduler loops.
+- Model stuck detection: Trade scheduler auto-clears models stuck in "running" state for >10 minutes. Tracked via `modelsRunningStartTime` map.
+- Execution health tracking: Health endpoint now tracks `lastSuccessfulCompletion`, `lastCycleStats` (success/failure counts), and `consecutiveFailedCycles`. Health is "degraded" if no successful completion in 15 minutes or 3+ consecutive failed cycles.
 
 ## Code Style (Biome)
 

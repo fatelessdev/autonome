@@ -101,9 +101,8 @@ const parseDecisionCandidate = (
 	const signal = normalizeSignal(record.signal ?? record.side ?? record.action);
 	if (!signal) return null;
 
-	const quantity = toNumber(
-		record.quantity ?? record.size ?? record.notional ?? record.amount,
-	);
+	// Only accept explicit base-asset size fields, NOT notional/amount (which may be USD)
+	const quantity = toNumber(record.quantity ?? record.size ?? record.baseAmount);
 	const leverage = toNumber(record.leverage ?? record.leverageRatio);
 	const profitTarget = toNumber(
 		record.profitTarget ?? record.target ?? record.profit_target,

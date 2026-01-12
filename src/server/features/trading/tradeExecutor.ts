@@ -52,11 +52,33 @@ declare global {
 	var tradeIntervalHandle: ReturnType<typeof setInterval> | undefined;
 	// eslint-disable-next-line no-var
 	var modelsRunning: Map<string, boolean> | undefined;
+	// eslint-disable-next-line no-var
+	var modelsRunningStartTime: Map<string, number> | undefined;
+	// eslint-disable-next-line no-var
+	var tradeSchedulerLastRun: number | undefined;
+	// eslint-disable-next-line no-var
+	var tradeSchedulerLastSuccessfulCompletion: number | undefined;
+	// eslint-disable-next-line no-var
+	var tradeSchedulerLastCycleStats: {
+		successCount: number;
+		failureCount: number;
+		totalModels: number;
+		timestamp: number;
+	} | undefined;
+	// eslint-disable-next-line no-var
+	var tradeSchedulerConsecutiveFailedCycles: number | undefined;
 }
 
 // Initialize per-model running state
 if (!globalThis.modelsRunning) {
 	globalThis.modelsRunning = new Map();
+}
+if (!globalThis.modelsRunningStartTime) {
+	globalThis.modelsRunningStartTime = new Map();
+}
+// Initialize execution metrics
+if (globalThis.tradeSchedulerConsecutiveFailedCycles === undefined) {
+	globalThis.tradeSchedulerConsecutiveFailedCycles = 0;
 }
 
 const TRADE_INTERVAL_MS = 5 * 60 * 1000;
@@ -325,17 +347,17 @@ export async function runTradeWorkflow(account: Account) {
 	});
 
 	// Analyze tool call failures with Codestral (fire and forget)
-	analyzeToolCallFailure({
-		modelId: account.id,
-		invocationId: modelInvocation.id,
-		responseText,
-		isError: false,
-		toolCalls: toolCallTelemetry,
-		decisions: capturedDecisions,
-		closedPositions: capturedClosedPositions,
-	}).catch((err) => {
-		console.warn("Tool call analysis failed:", err);
-	});
+	// analyzeToolCallFailure({
+	// 	modelId: account.id,
+	// 	invocationId: modelInvocation.id,
+	// 	responseText,
+	// 	isError: false,
+	// 	toolCalls: toolCallTelemetry,
+	// 	decisions: capturedDecisions,
+	// 	closedPositions: capturedClosedPositions,
+	// }).catch((err) => {
+	// 	console.warn("Tool call analysis failed:", err);
+	// });
 
 	// Refresh positions to emit SSE update
 	await fetchPositions();
@@ -348,8 +370,22 @@ export async function runTradeWorkflow(account: Account) {
 
 /**
  * Executes scheduled trades for all valid models
+ * Wrapped in try-catch to prevent scheduler from stopping
  */
 export async function executeScheduledTrades() {
+	try {
+		globalThis.tradeSchedulerLastRun = Date.now();
+		await executeScheduledTradesInternal();
+	} catch (error) {
+		console.error("[Trade Scheduler] Unhandled error in executeScheduledTrades:", error);
+		// Don't rethrow - scheduler must continue
+	}
+}
+
+/**
+ * Internal implementation of scheduled trade execution
+ */
+async function executeScheduledTradesInternal() {
 	const models = await listModels();
 	
 	// Separate consensus model from regular models
@@ -370,6 +406,19 @@ export async function executeScheduledTrades() {
 		return;
 	}
 
+	// Clear stale running states (models stuck for >10 minutes)
+	const STALE_THRESHOLD_MS = 10 * 60 * 1000;
+	const now = Date.now();
+	if (globalThis.modelsRunningStartTime) {
+		for (const [modelId, startTime] of globalThis.modelsRunningStartTime.entries()) {
+			if (now - startTime > STALE_THRESHOLD_MS) {
+				console.warn(`[Trade Scheduler] Clearing stale running state for model ${modelId} (stuck for ${Math.round((now - startTime) / 1000)}s)`);
+				globalThis.modelsRunning?.set(modelId, false);
+				globalThis.modelsRunningStartTime.delete(modelId);
+			}
+		}
+	}
+
 	// Filter out models that are still running from previous cycle
 	const modelsToRun = validModels.filter((model) => {
 		const isRunning = globalThis.modelsRunning?.get(model.id) ?? false;
@@ -385,51 +434,95 @@ export async function executeScheduledTrades() {
 		return;
 	}
 
-	// Mark models as running
+	// Mark models as running with timestamps
 	for (const model of modelsToRun) {
 		globalThis.modelsRunning?.set(model.id, true);
+		globalThis.modelsRunningStartTime?.set(model.id, Date.now());
 	}
 
-	// Run regular model workflow
-	const runModel = async (model: (typeof modelsToRun)[number]) => {
+	// Hard timeout for each model run - ensures every promise settles
+	// Set to 9 minutes (just under the 10-min stale threshold)
+	const MODEL_RUN_TIMEOUT_MS = 9 * 60 * 1000;
+
+	// Run regular model workflow with timeout wrapper
+	const runModel = async (model: (typeof modelsToRun)[number]): Promise<{ modelId: string; success: boolean }> => {
+		const timeoutPromise = new Promise<never>((_, reject) => {
+			setTimeout(() => reject(new Error("Model run timed out after 9 minutes")), MODEL_RUN_TIMEOUT_MS);
+		});
+
 		try {
-			await runTradeWorkflow({
-				apiKey: model.lighterApiKey,
-				modelName: model.openRouterModelName,
-				name: model.name,
-				invocationCount: model.invocationCount,
-				id: model.id,
-				accountIndex: model.accountIndex,
-				totalMinutes: model.totalMinutes,
-				variant: (model.variant as VariantId) ?? DEFAULT_VARIANT,
-			});
-			return { modelId: model.id, success: true as const };
+			await Promise.race([
+				runTradeWorkflow({
+					apiKey: model.lighterApiKey,
+					modelName: model.openRouterModelName,
+					name: model.name,
+					invocationCount: model.invocationCount,
+					id: model.id,
+					accountIndex: model.accountIndex,
+					totalMinutes: model.totalMinutes,
+					variant: (model.variant as VariantId) ?? DEFAULT_VARIANT,
+				}),
+				timeoutPromise,
+			]);
+			return { modelId: model.id, success: true };
 		} catch (error) {
-			console.error(`Model ${model.name} trade workflow failed:`, error);
-			return { modelId: model.id, success: false as const, error };
+			const isTimeout = error instanceof Error && error.message.includes("timed out");
+			console.error(`[Trade Scheduler] Model ${model.name} ${isTimeout ? "timed out" : "failed"}:`, error);
+			return { modelId: model.id, success: false };
 		} finally {
 			globalThis.modelsRunning?.set(model.id, false);
+			globalThis.modelsRunningStartTime?.delete(model.id);
 		}
 	};
 
-	// Fire off all models in parallel
-	const allPromises: Promise<{ modelId: string; success: boolean } | null>[] = [
-		...modelsToRun.map(runModel),
-	];
-
-	Promise.allSettled(allPromises).then((results) => {
+	// Fire off all models in parallel - DON'T await, let them run independently
+	// The per-model timeout ensures they all settle within 9 minutes
+	// This allows the next 5-min cycle to start on schedule
+	const totalModels = modelsToRun.length;
+	
+	Promise.allSettled(modelsToRun.map(runModel)).then((results) => {
 		// Invalidate market cache after batch completes so next cycle gets fresh data
 		invalidateMarketIntelligenceCache();
 
-		const successful = results
-			.filter(
-				(r): r is PromiseFulfilledResult<{ modelId: string; success: true }> =>
-					r.status === "fulfilled" && r.value !== null && r.value.success,
-			)
+		// Track success/failure metrics
+		const validResults = results.filter(
+			(r): r is PromiseFulfilledResult<{ modelId: string; success: boolean }> =>
+				r.status === "fulfilled",
+		);
+		const successCount = validResults.filter((r) => r.value.success).length;
+		const failureCount = validResults.length - successCount;
+
+		// Update cycle stats
+		globalThis.tradeSchedulerLastCycleStats = {
+			successCount,
+			failureCount,
+			totalModels,
+			timestamp: Date.now(),
+		};
+
+		// Track consecutive failed cycles (all models failed)
+		if (successCount === 0 && totalModels > 0) {
+			globalThis.tradeSchedulerConsecutiveFailedCycles =
+				(globalThis.tradeSchedulerConsecutiveFailedCycles ?? 0) + 1;
+		} else if (successCount > 0) {
+			globalThis.tradeSchedulerConsecutiveFailedCycles = 0;
+			globalThis.tradeSchedulerLastSuccessfulCompletion = Date.now();
+		}
+
+		const successful = validResults
+			.filter((r) => r.value.success)
 			.map((r) => r.value.modelId);
 
 		if (successful.length > 0) {
 			emitBatchComplete(successful);
+		}
+
+		// Log cycle summary
+		if (totalModels > 0) {
+			const status = successCount === totalModels ? "✅" : successCount > 0 ? "⚠️" : "❌";
+			console.log(
+				`[Trade Scheduler] Cycle complete: ${status} ${successCount}/${totalModels} models succeeded`,
+			);
 		}
 	});
 }
@@ -441,6 +534,8 @@ export function ensureTradeScheduler() {
 	if (globalThis.tradeIntervalHandle) {
 		return;
 	}
+
+	console.log("[Trade Scheduler] Starting trade executor...");
 
 	void executeScheduledTrades();
 

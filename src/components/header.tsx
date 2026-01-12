@@ -56,12 +56,12 @@ export default function Header({
 					AI
 				</Link>	
 				)} */}
-				<Link
+				{/* <Link
 					to="/chat"
 					className="text-sm font-light text-muted-foreground hover:text-foreground transition-colors"
 				>
 					AI
-				</Link>	
+				</Link>	 */}
 			</div>
 		</div>
 	);

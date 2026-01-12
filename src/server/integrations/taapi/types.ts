@@ -13,7 +13,7 @@ export interface TaapiIndicatorConfig {
 
 // Single construct for one symbol
 export interface TaapiConstruct {
-	exchange: "binance";
+	exchange: "binance" | "binancefutures";
 	symbol: string; // e.g., "BTC/USDT"
 	interval: string; // e.g., "1h", "4h"
 	indicators: TaapiIndicatorConfig[];
@@ -26,7 +26,7 @@ export interface TaapiBulkPayload {
 }
 
 // Free plan symbols (TAAPI limitation)
-export const TAAPI_FREE_PLAN_SYMBOLS = ["BTC", "ETH"] as const;
+export const TAAPI_FREE_PLAN_SYMBOLS = ["BTC", "ETH", "SOL", "ZEC", "HYPE"] as const;
 export type TaapiFreeSymbol = (typeof TAAPI_FREE_PLAN_SYMBOLS)[number];
 
 export interface TaapiBulkResponseItem {
@@ -115,11 +115,13 @@ export interface StochResult {
 	valueD: number;
 }
 
-// Pre-fetch result structure (for BBands, ADX, Supertrend)
+// Pre-fetch result structure (for BBands, ADX, Supertrend, Ichimoku, VWAP)
 export interface TaapiPreFetchResult {
 	bbands: BBandsResult | null;
 	adx: ADXResult | null;
 	supertrend: SupertrendResult | null;
+	ichimoku: IchimokuResult | null;
+	vwap: VWAPResult | null;
 	fetchedAt: number;
 }
 

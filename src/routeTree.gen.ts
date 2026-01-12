@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LeaderboardRouteImport } from './routes/leaderboard'
+import { Route as HealthRouteImport } from './routes/health'
 import { Route as FailuresRouteImport } from './routes/failures'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
@@ -19,6 +20,11 @@ import { Route as ApiChatRouteImport } from './routes/api/chat'
 const LeaderboardRoute = LeaderboardRouteImport.update({
   id: '/leaderboard',
   path: '/leaderboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HealthRoute = HealthRouteImport.update({
+  id: '/health',
+  path: '/health',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FailuresRoute = FailuresRouteImport.update({
@@ -52,6 +58,7 @@ export interface FileRoutesByFullPath {
   '/analytics': typeof AnalyticsRoute
   '/chat': typeof ChatRoute
   '/failures': typeof FailuresRoute
+  '/health': typeof HealthRoute
   '/leaderboard': typeof LeaderboardRoute
   '/api/chat': typeof ApiChatRoute
 }
@@ -60,6 +67,7 @@ export interface FileRoutesByTo {
   '/analytics': typeof AnalyticsRoute
   '/chat': typeof ChatRoute
   '/failures': typeof FailuresRoute
+  '/health': typeof HealthRoute
   '/leaderboard': typeof LeaderboardRoute
   '/api/chat': typeof ApiChatRoute
 }
@@ -69,6 +77,7 @@ export interface FileRoutesById {
   '/analytics': typeof AnalyticsRoute
   '/chat': typeof ChatRoute
   '/failures': typeof FailuresRoute
+  '/health': typeof HealthRoute
   '/leaderboard': typeof LeaderboardRoute
   '/api/chat': typeof ApiChatRoute
 }
@@ -79,16 +88,25 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/chat'
     | '/failures'
+    | '/health'
     | '/leaderboard'
     | '/api/chat'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/analytics' | '/chat' | '/failures' | '/leaderboard' | '/api/chat'
+  to:
+    | '/'
+    | '/analytics'
+    | '/chat'
+    | '/failures'
+    | '/health'
+    | '/leaderboard'
+    | '/api/chat'
   id:
     | '__root__'
     | '/'
     | '/analytics'
     | '/chat'
     | '/failures'
+    | '/health'
     | '/leaderboard'
     | '/api/chat'
   fileRoutesById: FileRoutesById
@@ -98,6 +116,7 @@ export interface RootRouteChildren {
   AnalyticsRoute: typeof AnalyticsRoute
   ChatRoute: typeof ChatRoute
   FailuresRoute: typeof FailuresRoute
+  HealthRoute: typeof HealthRoute
   LeaderboardRoute: typeof LeaderboardRoute
   ApiChatRoute: typeof ApiChatRoute
 }
@@ -109,6 +128,13 @@ declare module '@tanstack/react-router' {
       path: '/leaderboard'
       fullPath: '/leaderboard'
       preLoaderRoute: typeof LeaderboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/health': {
+      id: '/health'
+      path: '/health'
+      fullPath: '/health'
+      preLoaderRoute: typeof HealthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/failures': {
@@ -154,6 +180,7 @@ const rootRouteChildren: RootRouteChildren = {
   AnalyticsRoute: AnalyticsRoute,
   ChatRoute: ChatRoute,
   FailuresRoute: FailuresRoute,
+  HealthRoute: HealthRoute,
   LeaderboardRoute: LeaderboardRoute,
   ApiChatRoute: ApiChatRoute,
 }

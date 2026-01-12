@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from "react";
+﻿import { useMemo, useState, useEffect, useCallback } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { Loader2, Download } from "lucide-react";
@@ -59,7 +59,7 @@ function LeaderboardRoute() {
 	);
 
 	// Queries for all variants (used for export)
-	const variants = ["Situational", "Minimal", "Guardian", "Max", "Sovereign"] as const;
+	const variants = ["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"] as const;
 	const variantQueries = useQueries({
 		queries: variants.map((variant) =>
 			orpc.analytics.getLeaderboard.queryOptions({
@@ -103,7 +103,7 @@ function LeaderboardRoute() {
 	// Calculate averaged entries when "Average" is checked (only in Aggregate mode)
 	const displayEntries = useMemo(() => {
 		if (!data?.entries) return [];
-		
+
 		if (selectedVariant !== "all" || !showAverage) {
 			return data.entries;
 		}
@@ -174,81 +174,81 @@ function LeaderboardRoute() {
 
 				{/* Table Card */}
 				<div className="rounded-2xl overflow-hidden border bg-card shadow-lg">
-				{/* Controls Header */}
-				<div className="p-4 md:p-6 border-b bg-muted/30">
-					<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-						{/* Left side: Average checkbox + Export button */}
-						<div className="flex items-center gap-3">
-							{selectedVariant === "all" && (
-								<div className="flex items-center gap-2">
-									<Checkbox
-										id="average"
-										checked={showAverage}
-										onCheckedChange={(checked) => setShowAverage(checked === true)}
-									/>
-									<label
-										htmlFor="average"
-										className="text-sm font-medium cursor-pointer"
-									>
-										AVERAGE
-									</label>
-								</div>
-							)}
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={handleExport}
-								disabled={isLoading || isExporting || variantQueries.some((q) => q.isLoading)}
-								className="gap-2"
-							>
-								{isExporting ? (
-									<Loader2 className="h-4 w-4 animate-spin" />
-								) : (
-									<Download className="h-4 w-4" />
+					{/* Controls Header */}
+					<div className="p-4 md:p-6 border-b bg-muted/30">
+						<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+							{/* Left side: Average checkbox + Export button */}
+							<div className="flex items-center gap-3">
+								{selectedVariant === "all" && (
+									<div className="flex items-center gap-2">
+										<Checkbox
+											id="average"
+											checked={showAverage}
+											onCheckedChange={(checked) => setShowAverage(checked === true)}
+										/>
+										<label
+											htmlFor="average"
+											className="text-sm font-medium cursor-pointer"
+										>
+											AVERAGE
+										</label>
+									</div>
 								)}
-								<span className="hidden sm:inline">Export Excel</span>
-								<span className="sm:hidden">Export</span>
-							</Button>
-						</div>
-						{/* Right side: Window + Sort selectors */}
-						<div className="flex items-center gap-4">
-							<div className="flex items-center gap-2">
-								<label className="text-sm text-muted-foreground">
-									Window
-								</label>
-								<Select
-									value={window}
-									onValueChange={(v) => setWindow(v as WindowKey)}
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={handleExport}
+									disabled={isLoading || isExporting || variantQueries.some((q) => q.isLoading)}
+									className="gap-2"
 								>
-									<SelectTrigger className="w-20">
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="24h">24h</SelectItem>
-										<SelectItem value="7d">7d</SelectItem>
-										<SelectItem value="30d">30d</SelectItem>
-									</SelectContent>
-								</Select>
+									{isExporting ? (
+										<Loader2 className="h-4 w-4 animate-spin" />
+									) : (
+										<Download className="h-4 w-4" />
+									)}
+									<span className="hidden sm:inline">Export Excel</span>
+									<span className="sm:hidden">Export</span>
+								</Button>
 							</div>
-							<div className="flex items-center gap-2">
-								<label className="text-sm text-muted-foreground">Sort</label>
-								<Select
-									value={sortBy}
-									onValueChange={(v) => setSortBy(v as SortKey)}
-								>
-									<SelectTrigger className="w-32">
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="pnlPercent">PnL %</SelectItem>
-										<SelectItem value="pnlAbsolute">PnL $</SelectItem>
-										<SelectItem value="maxDrawdown">Drawdown</SelectItem>
-									</SelectContent>
-								</Select>
+							{/* Right side: Window + Sort selectors */}
+							<div className="flex items-center gap-4">
+								<div className="flex items-center gap-2">
+									<label className="text-sm text-muted-foreground">
+										Window
+									</label>
+									<Select
+										value={window}
+										onValueChange={(v) => setWindow(v as WindowKey)}
+									>
+										<SelectTrigger className="w-20">
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="24h">24h</SelectItem>
+											<SelectItem value="7d">7d</SelectItem>
+											<SelectItem value="30d">30d</SelectItem>
+										</SelectContent>
+									</Select>
+								</div>
+								<div className="flex items-center gap-2">
+									<label className="text-sm text-muted-foreground">Sort</label>
+									<Select
+										value={sortBy}
+										onValueChange={(v) => setSortBy(v as SortKey)}
+									>
+										<SelectTrigger className="w-32">
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="pnlPercent">PnL %</SelectItem>
+											<SelectItem value="pnlAbsolute">PnL $</SelectItem>
+											<SelectItem value="maxDrawdown">Drawdown</SelectItem>
+										</SelectContent>
+									</Select>
+								</div>
 							</div>
 						</div>
 					</div>
-				</div>
 
 					{/* Table Content */}
 					<div className="p-0">
@@ -267,7 +267,7 @@ function LeaderboardRoute() {
 						) : (
 							<div className="overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 								<Table className="min-w-[860px]">
-								<TableHeader>
+									<TableHeader>
 										<TableRow className="border-b">
 											<TableHead className="px-4 py-3">Model</TableHead>
 											{selectedVariant === "all" && !showAverage && (
@@ -317,11 +317,13 @@ function LeaderboardRoute() {
 														<TableCell className="px-4 py-3">
 															<span className={cn(
 																"px-2 py-0.5 rounded text-xs font-medium",
-																entry.variant === "Situational" && "bg-green-500/20 text-green-600",
-																entry.variant === "Minimal" && "bg-blue-500/20 text-blue-600",
 																entry.variant === "Guardian" && "bg-purple-500/20 text-purple-600",
-																entry.variant === "Max" && "bg-amber-500/20 text-amber-600",
-																entry.variant === "Sovereign" && "bg-rose-500/20 text-rose-600",
+																entry.variant === "Apex" && "bg-amber-500/20 text-amber-600",
+																entry.variant === "Gladiator" && "bg-green-500/20 text-green-600",
+																entry.variant === "Sniper" && "bg-blue-500/20 text-blue-600",
+																entry.variant === "Trendsurfer" && "bg-cyan-500/20 text-cyan-600",
+																entry.variant === "Contrarian" && "bg-rose-500/20 text-rose-600",
+																entry.variant === "Sovereign" && "bg-yellow-500/20 text-yellow-600",
 															)}>
 																{entry.variant}
 															</span>

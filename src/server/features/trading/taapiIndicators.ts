@@ -9,6 +9,8 @@ import {
 	type BBandsResult,
 	type ADXResult,
 	type SupertrendResult,
+	type IchimokuResult,
+	type VWAPResult,
 } from "@/server/integrations/taapi";
 
 /**
@@ -86,17 +88,81 @@ const formatSupertrend = (supertrend: SupertrendResult | null): string => {
 };
 
 /**
+ * Format Ichimoku Cloud result for prompt
+ * Key levels:
+ * - Conversion (Tenkan-sen): Short-term momentum
+ * - Base (Kijun-sen): Medium-term trend, trailing stop reference
+ * - SpanA/SpanB: Cloud boundaries (kumo)
+ * - Cloud Status: Price above cloud = bullish, below = bearish, inside = neutral/choppy
+ */
+const formatIchimoku = (ichimoku: IchimokuResult | null, currentPrice?: number): string => {
+	if (!ichimoku) return "Ichimoku Cloud: N/A";
+
+	const lines: string[] = [];
+	lines.push(`Ichimoku: Tenkan=${formatValue(ichimoku.conversion)}, Kijun=${formatValue(ichimoku.base)}`);
+	lines.push(`  Cloud: SpanA=${formatValue(ichimoku.spanA)}, SpanB=${formatValue(ichimoku.spanB)}`);
+
+	// Determine cloud status if we have price
+	if (currentPrice !== undefined && currentPrice !== null) {
+		const cloudTop = Math.max(ichimoku.spanA, ichimoku.spanB);
+		const cloudBottom = Math.min(ichimoku.spanA, ichimoku.spanB);
+
+		let cloudStatus: string;
+		if (currentPrice > cloudTop) {
+			cloudStatus = "ABOVE CLOUD (Bullish)";
+		} else if (currentPrice < cloudBottom) {
+			cloudStatus = "BELOW CLOUD (Bearish)";
+		} else {
+			cloudStatus = "INSIDE CLOUD (Choppy/Neutral)";
+		}
+		lines.push(`  Cloud Status: ${cloudStatus}`);
+	}
+
+	return lines.join("\n");
+};
+
+/**
+ * Format VWAP result for prompt
+ * VWAP = Volume Weighted Average Price
+ * - Price > VWAP: Bullish (institutional buying pressure)
+ * - Price < VWAP: Bearish (institutional selling pressure)
+ */
+const formatVWAP = (vwap: VWAPResult | null, currentPrice?: number): string => {
+	if (!vwap || vwap.value === undefined) return "VWAP: N/A";
+
+	let status = "";
+	if (currentPrice !== undefined && currentPrice !== null) {
+		const diff = currentPrice - vwap.value;
+		const diffPct = (diff / vwap.value) * 100;
+		if (currentPrice > vwap.value) {
+			status = ` | Price > VWAP (+${diffPct.toFixed(2)}%, Bullish)`;
+		} else {
+			status = ` | Price < VWAP (${diffPct.toFixed(2)}%, Bearish)`;
+		}
+	}
+
+	return `VWAP: ${formatValue(vwap.value)}${status}`;
+};
+
+/**
  * Format TAAPI data for a single asset to inject into prompt.
  * Returns empty string if no data available.
  */
 export function formatTaapiForPrompt(
 	asset: string,
 	data: TaapiPreFetchResult | undefined,
+	currentPrice?: number,
 ): string {
 	if (!data) return "";
 
 	// Check if all values are null (no data fetched)
-	if (data.bbands === null && data.adx === null && data.supertrend === null) {
+	if (
+		data.bbands === null &&
+		data.adx === null &&
+		data.supertrend === null &&
+		data.ichimoku === null &&
+		data.vwap === null
+	) {
 		return "";
 	}
 
@@ -113,6 +179,14 @@ export function formatTaapiForPrompt(
 
 	if (data.supertrend) {
 		lines.push(`- ${formatSupertrend(data.supertrend)}`);
+	}
+
+	if (data.ichimoku) {
+		lines.push(`- ${formatIchimoku(data.ichimoku, currentPrice)}`);
+	}
+
+	if (data.vwap) {
+		lines.push(`- ${formatVWAP(data.vwap, currentPrice)}`);
 	}
 
 	return lines.join("\n");

@@ -59,7 +59,7 @@ const AdvancedStatsSchema = z.object({
 });
 
 const VariantFilterSchema = z
-	.enum(["all", "Situational", "Minimal", "Guardian", "Max", "Sovereign"])
+	.enum(["all", "Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"])
 	.default("all");
 
 const GetAllModelsStatsInputSchema = z.object({

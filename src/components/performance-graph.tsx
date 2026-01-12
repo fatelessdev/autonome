@@ -5,7 +5,13 @@ import type { ChartConfig } from "@/components/ui/chart";
 import { GlowingLineChart } from "@/components/ui/glowing-line";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useVariant } from "@/components/variant-context";
-import { PORTFOLIO_QUERIES } from "@/core/shared/markets/marketQueries";
+import { getSseUrl } from "@/core/shared/api/apiConfig";
+import { sampleForViewport } from "@/core/shared/charts/chartSampler";
+import {
+	PORTFOLIO_QUERIES,
+	type PortfolioHistoryEntry,
+	type DownsampleResolution,
+} from "@/core/shared/markets/marketQueries";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { getModelInfo } from "@/shared/models/modelConfig";
 
@@ -29,37 +35,79 @@ export default function PerformanceGraph() {
 	const queryClient = useQueryClient();
 
 	// Server-side variant filtering - pass variant to query
-	const variantParam = selectedVariant === "all" ? undefined : selectedVariant as "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign";
+	const variantParam = selectedVariant === "all" ? undefined : selectedVariant as "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign";
 
 	const {
-		data: portfolioData,
-		isPending,
+		data: portfolioResult,
+		isPending: isHistoryPending,
 		isError,
-	} = useQuery(PORTFOLIO_QUERIES.history(variantParam));
+	} = useQuery({
+		...PORTFOLIO_QUERIES.history(variantParam),
+		placeholderData: (prev) => prev, // Keep previous data during variant switch
+	});
 
-	// Subscribe to portfolio SSE events for real-time updates
+	// Extract history and resolution from the result
+	const portfolioData = portfolioResult?.history;
+	const resolution = portfolioResult?.resolution ?? "1m";
+
+	// Only show skeleton on initial load, not during variant transitions
+	const isPending = isHistoryPending && !portfolioData;
+
+	// Subscribe to portfolio SSE events for real-time updates with auto-reconnect
+	// Triggers refetch to get properly downsampled data from server
 	useEffect(() => {
-		const source = new EventSource("/api/events/portfolio");
+		let source: EventSource | null = null;
+		let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+		let reconnectAttempts = 0;
+		const MAX_RECONNECT_DELAY = 30_000; // Max 30 seconds between reconnects
+		let mounted = true;
 
-		source.onmessage = (event) => {
-			try {
-				const payload = JSON.parse(event.data);
-				// SSE stream sends the data payload directly (not wrapped in event object)
-				// Invalidate query when snapshots were created (or on any valid payload)
-				if (payload && (payload.snapshotsCreated > 0 || payload.lastUpdatedAt)) {
-					void queryClient.invalidateQueries({ queryKey: ["portfolio", "history"] });
+		const connect = () => {
+			if (!mounted) return;
+			
+			source = new EventSource(getSseUrl("/api/events/portfolio"));
+
+			source.onopen = () => {
+				reconnectAttempts = 0; // Reset on successful connection
+			};
+
+			source.onmessage = (event) => {
+				try {
+					const payload = JSON.parse(event.data);
+					// SSE stream sends the data payload directly (not wrapped in event object)
+					// Invalidate query when snapshots were created (or on any valid payload)
+					if (payload && (payload.snapshotsCreated > 0 || payload.lastUpdatedAt)) {
+						void queryClient.invalidateQueries({ queryKey: ["portfolio", "history"] });
+					}
+				} catch (error) {
+					console.error("[Portfolio SSE] Failed to parse payload", error);
 				}
-			} catch (error) {
-				console.error("[Portfolio SSE] Failed to parse payload", error);
-			}
+			};
+
+			source.onerror = () => {
+				// Don't log on every error to avoid spam during expected disconnections
+				if (source?.readyState === EventSource.CLOSED) {
+					source?.close();
+					source = null;
+					
+					if (mounted) {
+						// Exponential backoff: 1s, 2s, 4s, 8s, ... up to MAX_RECONNECT_DELAY
+						const delay = Math.min(1000 * 2 ** reconnectAttempts, MAX_RECONNECT_DELAY);
+						reconnectAttempts++;
+						reconnectTimeout = setTimeout(connect, delay);
+					}
+				}
+			};
 		};
 
-		source.onerror = (error) => {
-			console.error("[Portfolio SSE] Stream error", error);
-		};
+		connect();
 
 		return () => {
-			source.close();
+			mounted = false;
+			if (reconnectTimeout) {
+				clearTimeout(reconnectTimeout);
+			}
+			source?.close();
 		};
 	}, [queryClient]);
 
@@ -72,21 +120,30 @@ export default function PerformanceGraph() {
 			};
 		}
 		// Average values across variants when showing all variants (aggregate mode)
+		// Server now handles this, but we pass the flag for any client-side processing
 		const shouldAverage = selectedVariant === "all";
-		return buildChartArtifacts(portfolioData, shouldAverage);
-	}, [portfolioData, selectedVariant]);
+		return buildChartArtifacts(portfolioData, resolution, shouldAverage);
+	}, [portfolioData, resolution, selectedVariant]);
 
 	const filteredData = useMemo(
 		() => filterByTime(chartData, timeFilter),
 		[chartData, timeFilter],
 	);
 
+	// Apply adaptive sampling based on viewport size
+	// Desktop: 800 points, Mobile: 400 points
+	// Preserves first and last points for accurate range display
+	const sampledData = useMemo(
+		() => sampleForViewport(filteredData, isCompact),
+		[filteredData, isCompact],
+	);
+
 	const displayData = useMemo(
 		() =>
 			valueMode === "usd"
-				? filteredData
-				: toPercentData(filteredData, Object.keys(chartConfig)),
-		[valueMode, filteredData, chartConfig],
+				? sampledData
+				: toPercentData(sampledData, Object.keys(chartConfig)),
+		[valueMode, sampledData, chartConfig],
 	);
 
 	if (isPending) {
@@ -153,29 +210,71 @@ export default function PerformanceGraph() {
 	);
 }
 
+/**
+ * Format timestamp for x-axis based on resolution.
+ * - 1m, 5m, 15m: "14:35" (time only - data is within a day or few days)
+ * - 1h: "Jan 10 14:00" (date + time - data spans days)
+ * - 4h: "Jan 10" (date only - data spans weeks/months)
+ */
+function formatTimestampForResolution(timestamp: number, resolution: DownsampleResolution): string {
+	const date = new Date(timestamp);
+	
+	switch (resolution) {
+		case "1m":
+		case "5m":
+		case "15m":
+			// Short timeframes: time only
+			return date.toLocaleTimeString("en-US", {
+				hour: "2-digit",
+				minute: "2-digit",
+			});
+		case "1h":
+			// Medium timeframes: date + time
+			return date.toLocaleDateString("en-US", {
+				month: "short",
+				day: "numeric",
+				hour: "2-digit",
+				minute: "2-digit",
+			});
+		case "4h":
+			// Long timeframes: date only
+			return date.toLocaleDateString("en-US", {
+				month: "short",
+				day: "numeric",
+			});
+		default:
+			return date.toLocaleTimeString("en-US", {
+				hour: "2-digit",
+				minute: "2-digit",
+			});
+	}
+}
+
 function buildChartArtifacts(
-	portfolioData: Array<{
-		id: string;
-		modelId: string;
-		netPortfolio: string;
-		createdAt: string;
-		model: { name: string; variant?: string };
-	}>,
-	shouldAverage = false,
+	portfolioData: PortfolioHistoryEntry[],
+	resolution: DownsampleResolution,
+	_shouldAverage = false, // Server now handles averaging
 ): {
 	chartData: DataPoint[];
 	chartConfig: ChartConfig;
 	seriesMeta: SeriesMeta;
 } {
+	// Server returns pre-downsampled data with time-based buckets and latest entries appended
+	// Each entry is already averaged per model per time bucket
+	// Client just converts to chart format without further aggregation
+	
 	const points = portfolioData
+		.filter((entry) => entry.model) // Filter out entries without model
 		.map((entry) => ({
 			t: new Date(entry.createdAt).getTime(),
-			name: entry.model.name,
+			name: entry.model!.name,
 			modelId: entry.modelId,
 			v: Number(entry.netPortfolio),
 		}))
-		.filter((point) => Number.isFinite(point.v))
-		.sort((a, b) => a.t - b.t);
+		.filter((point) => Number.isFinite(point.v));
+
+	// Sort globally by time
+	points.sort((a, b) => a.t - b.t);
 
 	if (points.length === 0) {
 		return { chartData: [], chartConfig: {}, seriesMeta: {} };
@@ -184,9 +283,6 @@ function buildChartArtifacts(
 	const modelNames = Array.from(
 		new Set(points.map((point) => point.name)),
 	).filter(Boolean);
-
-	// Use adaptive tolerance based on total data volume
-	const tolerance = calculateAdaptiveBucketTolerance(points.length);
 
 	const usedKeys = new Set<string>();
 	const nameToSeriesKey = new Map<string, string>();
@@ -198,39 +294,34 @@ function buildChartArtifacts(
 		seriesMeta[safeKey] = { originalKey: modelName };
 	}
 
-	const rows: DataPoint[] = [];
-	let bucketStart = points[0].t;
-	let bucketEnd = points[0].t;
-	// Track multiple values per series for averaging
-	let bucketValues: Record<string, { values: number[]; modelIds: Set<string> }> = {};
-	const lastKnown: Record<string, number | null | undefined> = {};
-
-	const flush = () => {
-		if (!Object.keys(bucketValues).length) {
-			return;
+	// Group by timestamp (server already bucketed, so same timestamps = same bucket)
+	const timeGroups = new Map<number, Map<string, number>>();
+	
+	for (const point of points) {
+		if (!timeGroups.has(point.t)) {
+			timeGroups.set(point.t, new Map());
 		}
+		const group = timeGroups.get(point.t)!;
+		const safeKey = nameToSeriesKey.get(point.name);
+		if (safeKey) {
+			group.set(safeKey, point.v);
+		}
+	}
 
-		const center = Math.round((bucketStart + bucketEnd) / 2);
-		const timestamp = new Date(center).toLocaleTimeString("en-US", {
-			hour: "2-digit",
-			minute: "2-digit",
-		});
+	// Build rows from time groups
+	const lastKnown: Record<string, number | null | undefined> = {};
+	const rows: DataPoint[] = [];
+	const sortedTimes = Array.from(timeGroups.keys()).sort((a, b) => a - b);
 
-		const row: DataPoint = { month: timestamp, timestamp: center };
+	for (const timestamp of sortedTimes) {
+		const group = timeGroups.get(timestamp)!;
+		// Use resolution-based formatting for x-axis labels
+		const timeLabel = formatTimestampForResolution(timestamp, resolution);
+
+		const row: DataPoint = { month: timeLabel, timestamp };
 
 		for (const [_originalName, safeKey] of nameToSeriesKey.entries()) {
-			const bucket = bucketValues[safeKey];
-			let value: number | null = null;
-			
-			if (bucket && bucket.values.length > 0) {
-				if (shouldAverage && bucket.values.length > 1) {
-					// Average across all variants for this model
-					value = bucket.values.reduce((sum, v) => sum + v, 0) / bucket.values.length;
-				} else {
-					// Use the last value (original behavior for single variant mode)
-					value = bucket.values[bucket.values.length - 1];
-				}
-			}
+			const value = group.get(safeKey);
 			
 			if (typeof value === "number" && Number.isFinite(value)) {
 				row[safeKey] = value;
@@ -243,37 +334,7 @@ function buildChartArtifacts(
 		}
 
 		rows.push(row);
-		bucketValues = {};
-	};
-
-	for (const point of points) {
-		if (point.t - bucketEnd > tolerance) {
-			flush();
-			bucketStart = point.t;
-			bucketEnd = point.t;
-		}
-		bucketEnd = Math.max(bucketEnd, point.t);
-		const safeKey = nameToSeriesKey.get(point.name);
-		if (!safeKey) continue;
-		
-		// Collect all values per model name for averaging
-		if (!bucketValues[safeKey]) {
-			bucketValues[safeKey] = { values: [], modelIds: new Set() };
-		}
-		// Only add value if we haven't seen this modelId in this bucket yet
-		// This ensures we don't double-count the same variant
-		if (!bucketValues[safeKey].modelIds.has(point.modelId)) {
-			bucketValues[safeKey].values.push(point.v);
-			bucketValues[safeKey].modelIds.add(point.modelId);
-		} else {
-			// Update the value for this modelId (take the latest)
-			const idx = Array.from(bucketValues[safeKey].modelIds).indexOf(point.modelId);
-			if (idx >= 0) {
-				bucketValues[safeKey].values[idx] = point.v;
-			}
-		}
 	}
-	flush();
 
 	const chartConfig: ChartConfig = {};
 	for (const [originalName, safeKey] of nameToSeriesKey.entries()) {
@@ -285,29 +346,6 @@ function buildChartArtifacts(
 	}
 
 	return { chartData: rows, chartConfig, seriesMeta };
-}
-
-/**
- * Calculate adaptive bucket tolerance based on data volume.
- * As data grows, increase the time interval between rendered points:
- * - < 500 points: 1 minute intervals (show all detail)
- * - 500-2000 points: 5 minute intervals
- * - 2000-5000 points: 15 minute intervals
- * - 5000-10000 points: 1 hour intervals
- * - > 10000 points: 12 hour intervals
- */
-function calculateAdaptiveBucketTolerance(dataCount: number): number {
-	const ONE_MINUTE = 60_000;
-	const FIVE_MINUTES = 5 * ONE_MINUTE;
-	const FIFTEEN_MINUTES = 15 * ONE_MINUTE;
-	const ONE_HOUR = 60 * ONE_MINUTE;
-	const TWELVE_HOURS = 12 * ONE_HOUR;
-
-	if (dataCount < 500) return ONE_MINUTE;
-	if (dataCount < 2000) return FIVE_MINUTES;
-	if (dataCount < 5000) return FIFTEEN_MINUTES;
-	if (dataCount < 10000) return ONE_HOUR;
-	return TWELVE_HOURS;
 }
 
 function filterByTime(data: DataPoint[], filter: "all" | "72h"): DataPoint[] {

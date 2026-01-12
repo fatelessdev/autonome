@@ -107,6 +107,8 @@ export async function createPosition(
 					});
 				} else {
 					const entryPrice = execution.averagePrice ?? 0;
+					// Use the actual filled quantity, not the requested quantity
+					const filledQuantity = execution.totalQuantity;
 
 					// Check for existing open order to scale into
 					try {
@@ -119,7 +121,7 @@ export async function createPosition(
 							// Scale into existing position using weighted avg formula
 							const prevQty = parseFloat(existingOrder.quantity);
 							const prevEntry = parseFloat(existingOrder.entryPrice);
-							const newQty = orderQuantity;
+							const newQty = filledQuantity;
 							const prevNotional = prevEntry * prevQty;
 							const newNotional = entryPrice * newQty;
 							const totalQty = prevQty + newQty;
@@ -128,26 +130,22 @@ export async function createPosition(
 									? (prevNotional + newNotional) / totalQty
 									: entryPrice;
 
+							// When scaling in, new exit plan values REPLACE old ones (not fallback)
+							// AI provides fresh analysis, so use new values when provided
 							const updatedOrder = await scaleIntoOrder({
 								orderId: existingOrder.id,
 								additionalQuantity: newQty.toString(),
 								newEntryPrice: entryPrice.toString(),
 								newAvgEntryPrice: newAvgEntry.toString(),
-							exitPlan: {
-								stop: stopLoss ?? existingOrder.exitPlan?.stop ?? null,
-								target:
-									profitTarget ?? existingOrder.exitPlan?.target ?? null,
-								invalidation:
-									invalidationCondition ??
-									existingOrder.exitPlan?.invalidation ??
-									null,
-								invalidationPrice:
-									existingOrder.exitPlan?.invalidationPrice ?? null,
-								confidence:
-									confidence ?? existingOrder.exitPlan?.confidence ?? null,
-								timeExit: existingOrder.exitPlan?.timeExit ?? null,
-								cooldownUntil: existingOrder.exitPlan?.cooldownUntil ?? null,
-							},
+								exitPlan: {
+									stop: stopLoss ?? existingOrder.exitPlan?.stop ?? null,
+									target: profitTarget ?? existingOrder.exitPlan?.target ?? null,
+									invalidation: invalidationCondition ?? existingOrder.exitPlan?.invalidation ?? null,
+									invalidationPrice: existingOrder.exitPlan?.invalidationPrice ?? null,
+									confidence: confidence ?? existingOrder.exitPlan?.confidence ?? null,
+									timeExit: existingOrder.exitPlan?.timeExit ?? null,
+									cooldownUntil: existingOrder.exitPlan?.cooldownUntil ?? null,
+								},
 							});
 
 							results.push({
@@ -165,7 +163,7 @@ export async function createPosition(
 								modelId: accountId,
 								symbol: symbol.toUpperCase(),
 								side,
-								quantity: orderQuantity.toString(),
+								quantity: filledQuantity.toString(),
 								entryPrice: entryPrice.toString(),
 								leverage: leverage?.toString() ?? null,
 							exitPlan: {
@@ -182,7 +180,7 @@ export async function createPosition(
 							results.push({
 								symbol,
 								side,
-								quantity,
+								quantity: filledQuantity,
 								leverage,
 								entryPrice,
 								success: true,
@@ -198,7 +196,7 @@ export async function createPosition(
 						results.push({
 							symbol,
 							side,
-							quantity,
+							quantity: filledQuantity,
 							leverage,
 							entryPrice,
 							success: true,
@@ -324,6 +322,7 @@ export async function createPosition(
 							? (prevNotional + newNotional) / totalQty
 							: latestPrice;
 
+				// When scaling in, new exit plan values REPLACE old ones
 				const updatedOrder = await scaleIntoOrder({
 						orderId: existingOrder.id,
 						additionalQuantity: newQty.toString(),
@@ -332,14 +331,9 @@ export async function createPosition(
 						exitPlan: {
 							stop: stopLoss ?? existingOrder.exitPlan?.stop ?? null,
 							target: profitTarget ?? existingOrder.exitPlan?.target ?? null,
-							invalidation:
-								invalidationCondition ??
-								existingOrder.exitPlan?.invalidation ??
-								null,
-							invalidationPrice:
-								existingOrder.exitPlan?.invalidationPrice ?? null,
-							confidence:
-								confidence ?? existingOrder.exitPlan?.confidence ?? null,
+							invalidation: invalidationCondition ?? existingOrder.exitPlan?.invalidation ?? null,
+							invalidationPrice: existingOrder.exitPlan?.invalidationPrice ?? null,
+							confidence: confidence ?? existingOrder.exitPlan?.confidence ?? null,
 							timeExit: existingOrder.exitPlan?.timeExit ?? null,
 							cooldownUntil: existingOrder.exitPlan?.cooldownUntil ?? null,
 						},
@@ -381,6 +375,8 @@ export async function createPosition(
 					});
 				} else {
 				// Create new order (either no existing position or opposite side)
+					// TODO: In live trading, we should fetch the actual fill quantity from the exchange
+					// For now, we assume the market order fills completely at the requested quantity
 					const dbOrder = await createOrder({
 						modelId: account.id,
 						symbol: symbol.toUpperCase(),

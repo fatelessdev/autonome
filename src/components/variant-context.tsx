@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 
-export type VariantId = "all" | "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign";
+export type VariantId = "all" | "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign";
 
 export interface VariantContextValue {
 	selectedVariant: VariantId;
@@ -35,33 +35,45 @@ export const VARIANT_TABS: {
 }[] = [
 	{ id: "all", label: "Aggregate Index", color: "#0f172a", background: "#f8fafc" },
 	{
-		id: "Situational",
-		label: "Situational Awareness",
-		color: "#22c55e",
-		background: "#f0fdf4",
-	},
-	{
-		id: "Minimal",
-		label: "Minimal Discipline",
-		color: "#3b82f6",
-		background: "#eff6ff",
-	},
-	{
 		id: "Guardian",
-		label: "Guardian (Survival)",
+		label: "Guardian (Fortress)",
 		color: "#a855f7",
 		background: "#faf5ff",
 	},
 	{
-		id: "Max",
-		label: "Max Leverage",
+		id: "Apex",
+		label: "Apex (Kelly Engine)",
 		color: "#f59e0b",
 		background: "#fffbeb",
 	},
 	{
-		id: "Sovereign",
-		label: "Sovereign (Elite)",
+		id: "Gladiator",
+		label: "Gladiator (Tournament)",
+		color: "#22c55e",
+		background: "#f0fdf4",
+	},
+	{
+		id: "Sniper",
+		label: "Sniper (Precision)",
+		color: "#3b82f6",
+		background: "#eff6ff",
+	},
+	{
+		id: "Trendsurfer",
+		label: "Trendsurfer (Momentum)",
+		color: "#06b6d4",
+		background: "#ecfeff",
+	},
+	{
+		id: "Contrarian",
+		label: "Contrarian (Reverter)",
 		color: "#e11d48",
 		background: "#fff1f2",
+	},
+	{
+		id: "Sovereign",
+		label: "Sovereign (Adaptive)",
+		color: "#eab308",
+		background: "#fefce8",
 	},
 ];

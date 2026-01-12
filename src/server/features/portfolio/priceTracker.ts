@@ -16,6 +16,7 @@ declare global {
 	var __portfolioIntervalHandle: ReturnType<typeof setInterval> | undefined;
 	var __retentionIntervalHandle: ReturnType<typeof setInterval> | undefined;
 	var __portfolioQueryClient: QueryClient | undefined;
+	var __portfolioSchedulerLastRun: number | undefined;
 }
 
 /**
@@ -43,11 +44,13 @@ export function ensurePortfolioScheduler() {
 	}
 
 	globalThis.__portfolioSchedulerInitialized = true;
+	console.log("[Portfolio Scheduler] Starting portfolio tracker...");
 
-	void recordPortfolios();
+	// Initial run
+	void safeRecordPortfolios();
 
 	globalThis.__portfolioIntervalHandle = setInterval(() => {
-		void recordPortfolios();
+		void safeRecordPortfolios();
 	}, PORTFOLIO_INTERVAL_MS);
 
 	// Run retention policy hourly
@@ -59,6 +62,20 @@ export function ensurePortfolioScheduler() {
 	setTimeout(() => {
 		void runRetentionPolicyJob();
 	}, 60_000); // 1 minute after startup
+}
+
+/**
+ * Safe wrapper for recordPortfolios that catches all errors
+ * to prevent the scheduler from stopping
+ */
+async function safeRecordPortfolios() {
+	try {
+		globalThis.__portfolioSchedulerLastRun = Date.now();
+		await recordPortfolios();
+	} catch (error) {
+		console.error("[Portfolio Scheduler] Error in recordPortfolios:", error);
+		// Don't rethrow - scheduler must continue
+	}
 }
 
 async function runRetentionPolicyJob() {
@@ -77,6 +94,11 @@ async function recordPortfolios() {
 
 	// Batch fetch all models in one query (fixes N+1)
 	const allModels = await db.select().from(models);
+
+	// Early exit if no models exist (fresh database)
+	if (allModels.length === 0) {
+		return;
+	}
 
 	// Batch check which models need initial seeding
 	const modelIds = allModels.map((m) => m.id);

@@ -141,6 +141,11 @@ export class AccountState {
 			position.margin = inferredNotional;
 		}
 
+		// Reset realized PnL if this is a new position (starting from 0 quantity)
+		if (position.quantity === 0) {
+			position.realizedPnl = 0;
+		}
+
 		for (const fill of execution.fills) {
 			const signedQty = direction * fill.quantity;
 			const notional = fill.quantity * fill.price;
@@ -201,6 +206,8 @@ export class AccountState {
 					position.quantity = remainingQty;
 					position.avgEntryPrice = fill.price;
 					position.margin = marginForFlip;
+					// Reset realized PnL for the new flipped position
+					position.realizedPnl = 0;
 				}
 			}
 

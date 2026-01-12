@@ -16,7 +16,7 @@ import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { generateObject } from "ai";
 import { z } from "zod";
 
-import { env } from "@/env";
+import { env, getNextNimApiKey } from "@/env";
 import { getModelProvider } from "@/core/shared/models/modelConfig";
 import { MARKETS } from "@/shared/markets/marketMetadata";
 import type { PortfolioSnapshot } from "@/server/features/trading/getPortfolio";
@@ -134,11 +134,13 @@ const voterDecisionSchema = z.object({
 // ==================== Provider Setup ====================
 
 function createProviders() {
+	// Use cycling API key for NIM to avoid rate limits
+	const nimApiKey = getNextNimApiKey();
 	const nim = createOpenAICompatible({
 		name: "nim",
 		baseURL: "https://integrate.api.nvidia.com/v1",
 		headers: {
-			Authorization: `Bearer ${env.NIM_API_KEY}`,
+			Authorization: `Bearer ${nimApiKey}`,
 		},
 	});
 

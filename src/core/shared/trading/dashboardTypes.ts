@@ -9,7 +9,7 @@ export type Trade = {
 	id: string;
 	modelId: string;
 	modelName: string;
-	modelVariant?: "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign";
+	modelVariant?: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign";
 	modelRouterName: string;
 	modelKey: string;
 	symbol: string;
@@ -51,7 +51,7 @@ export type Position = {
 export type ModelPositions = {
 	modelId: string;
 	modelName: string;
-	modelVariant?: "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign";
+	modelVariant?: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign";
 	modelLogo: string;
 	positions: Position[];
 	totalUnrealizedPnl?: number;
@@ -62,7 +62,7 @@ export type Conversation = {
 	id: string;
 	modelId: string;
 	modelName: string;
-	modelVariant?: "Situational" | "Minimal" | "Guardian" | "Max" | "Sovereign";
+	modelVariant?: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign";
 	modelLogo: string;
 	response: string;
 	prompt?: string | null;

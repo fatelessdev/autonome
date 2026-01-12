@@ -251,8 +251,8 @@ export function exportLeaderboardToExcel(
 	// Create workbook
 	const wb = XLSX.utils.book_new();
 
-	// Add a sheet for each variant (Situational, Minimal, Guardian, Max, Sovereign)
-	const variants = ["Situational", "Minimal", "Guardian", "Max", "Sovereign"];
+	// Add a sheet for each variant (Guardian, Apex, Gladiator, Sniper, Trendsurfer, Contrarian)
+	const variants = ["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"];
 	for (const variant of variants) {
 		const data = variantData.find((d) => d.variant === variant);
 		if (data && data.entries.length > 0) {

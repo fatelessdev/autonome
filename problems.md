@@ -1,6 +1,6 @@
 # Architectural Analysis & Technical Debt Report
 
-**Date:** 2026-01-05
+**Date:** 2025-01-15
 **Reviewer:** Claude (Senior SWE Persona)
 **Scope:** `src/*`, `scripts/*` (Focus on Trading, Variants, and Data Flow)
 
@@ -12,22 +12,27 @@ The project demonstrates a high velocity of feature addition ("vibecoded"), but 
 ## 1. Violation of "Single Source of Truth" (SSOT)
 
 ### The "Variant" Problem
-Adding the "Sovereign" variant required touching ~40 files. This is a red flag for high coupling and low cohesion.
+Adding or changing variants (e.g., changing from "Situational/Minimal/Guardian/Max/Sovereign" to "Guardian/Apex/Gladiator/Sniper/Trendsurfer/Contrarian") required touching **40+ files**. This is a red flag for high coupling and low cohesion.
 
-*   **Issue:** The list of variants (`Situational`, `Minimal`, `Guardian`, `Max`, `Sovereign`) is repeated manually as:
+*   **Issue:** The list of variants is repeated manually as:
     1.  **Database Enum:** `src/db/schema.ts`
     2.  **API Validation:** `src/server/orpc/schema.ts` (Zod enums)
     3.  **Backend Config:** `src/server/features/trading/prompts/variants.ts` (Keys in object)
     4.  **Frontend Normalization:** `src/core/shared/trading/dashboardQueries.ts` (String array checks)
-    5.  **UI Components:** `src/routes/leaderboard.tsx` (Tabs list)
+    5.  **UI Components:** `src/routes/leaderboard.tsx`, `src/routes/analytics.tsx`, `src/routes/failures.tsx` (Tabs list, color styling)
     6.  **Utilities:** `src/core/utils/excelExport.ts` (Export logic)
-    7.  **Styling Logic:** Distributed `if (variant === 'Sovereign')` checks for Tailwind classes across `analytics.tsx`, `leaderboard.tsx`, etc.
+    7.  **Styling Logic:** Distributed `if (variant === 'X')` checks for Tailwind classes across route files
+    8.  **Seeder:** `scripts/seed.ts`
+    9.  **Context Providers:** `src/components/variant-context.tsx`
+    10. **Market Queries:** `src/core/shared/markets/marketQueries.ts`
+    11. **Dashboard Types:** `src/core/shared/trading/dashboardTypes.ts`
 
 *   **Recommendation:**
-    *   Define a single `const VARIANTS` array or object in a shared core library.
-    *   Derive the TypeScript type `Variant` from this const.
-    *   Derive the Zod schema from this const.
-    *   Pass this configuration to the frontend (via API or build-time shared file) to generate Tabs, Colors, and Labels dynamically.
+    *   Define a single `const VARIANTS` array or object in a shared core library (`src/domain/variants.ts`)
+    *   Derive the TypeScript type `Variant` from this const using `as const` and `typeof`
+    *   Derive the Zod schema from this const using `z.enum(VARIANT_IDS)`
+    *   Pass this configuration to the frontend (via API or build-time shared file) to generate Tabs, Colors, and Labels dynamically
+    *   Create a `getVariantColor(variant)` helper instead of inline conditionals
 
 ## 2. Weak Frontend-Backend Boundary Contract
 
@@ -41,11 +46,17 @@ Adding the "Sovereign" variant required touching ~40 files. This is a red flag f
 
 ### Hardcoded Visual Logic
 *   **File:** `src/server/features/trading/prompts/variants.ts` vs Frontend Components.
-*   **Issue:** The backend defines a hex color (`#e11d48`), but the frontend components often hardcode Tailwind classes (`bg-rose-500`).
+*   **Issue:** The backend defines a hex color (`#e11d48`), but the frontend components often hardcode Tailwind classes (`bg-rose-500`). Example from analytics.tsx:
+    ```tsx
+    variant === "Guardian" && "bg-purple-500/20 text-purple-600",
+    variant === "Apex" && "bg-amber-500/20 text-amber-600",
+    // ... repeated in 4+ files
+    ```
 *   **Impact:** Changing a variant's "theme" requires finding and replacing Tailwind classes across multiple UI files.
 *   **Recommendation:**
-    *   Either serve the UI theme (colors, icons) from the backend configuration.
-    *   Or map Variant ID -> Theme Token (e.g., `variant-sovereign`) in a single CSS/Tailwind config file, and use semantic class names.
+    *   Create a centralized `VARIANT_STYLES` map in `variant-context.tsx` or a shared file
+    *   Export a `getVariantClassName(variant)` utility
+    *   Or map Variant ID -> Theme Token (e.g., `variant-guardian`) in a single CSS/Tailwind config file
 
 ## 4. Directory Structure & Modularization
 
@@ -78,6 +89,20 @@ Adding the "Sovereign" variant required touching ~40 files. This is a red flag f
 *   **File:** `src/server/features/analytics/queries.server.ts`
 *   **Issue:** SQL construction or filtering often relies on string literals matching the variant IDs. If a variant ID is renamed, the compiler might catch some, but runtime SQL queries might fail if they rely on raw strings.
 
+### Repeated Type Definitions
+*   **Issue:** The variant type union is defined in multiple places:
+    ```typescript
+    // In dashboardTypes.ts
+    modelVariant?: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian";
+    
+    // In dashboardQueries.ts  
+    ["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"].includes(record.modelVariant)
+    
+    // In marketQueries.ts
+    variant?: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian"
+    ```
+*   **Fix:** Import a single `Variant` type from a shared source.
+
 ---
 
 ## Roadmap to Remediation
@@ -85,3 +110,5 @@ Adding the "Sovereign" variant required touching ~40 files. This is a red flag f
 1.  **Refactor Variants (High Priority):** Create `src/domain/variants.ts` to export the constant list and config. Update DB, Zod, and UI to derive from this.
 2.  **Purge Normalizers:** Audit `dashboardQueries.ts` and remove manual type checking. Trust the `orpc` return types.
 3.  **Centralize UI Config:** Move variant colors/labels into a single config map (or use the one from the backend) and create a `useVariantTheme(variantId)` hook.
+4.  **Generate Zod from Config:** Use `z.enum([...VARIANT_IDS] as const)` derived from the centralized config.
+5.  **DB Migration Strategy:** Consider using a reference table instead of a PostgreSQL enum for easier extensibility.

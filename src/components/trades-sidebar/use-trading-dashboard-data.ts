@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 
+import { getSseUrl } from "@/core/shared/api/apiConfig";
 import {
 	createDashboardSseUpdaters,
 	DASHBOARD_QUERIES,
@@ -13,23 +14,26 @@ import type {
 	TradingDashboardData,
 } from "./types";
 import { resolveModelIdentity } from "./utils";
+import type { VariantId } from "../variant-context";
 
 type UseTradingDashboardDataOptions = {
 	enabled?: boolean;
+	variant?: VariantId;
 };
 
 const SSE_STREAMS = [
-	{ type: "trades", url: "/api/events/trades", updater: "trades" },
-	{ type: "positions", url: "/api/events/positions", updater: "positions" },
+	{ type: "trades", path: "/api/events/trades", updater: "trades" },
+	{ type: "positions", path: "/api/events/positions", updater: "positions" },
 	{
 		type: "conversations",
-		url: "/api/events/conversations",
+		path: "/api/events/conversations",
 		updater: "conversations",
 	},
 ] as const;
 
 export function useTradingDashboardData({
 	enabled = true,
+	variant = "all",
 }: UseTradingDashboardDataOptions = {}): TradingDashboardData {
 	const queryClient = useQueryClient();
 	const sseUpdaters = useMemo(
@@ -38,7 +42,7 @@ export function useTradingDashboardData({
 	);
 
 	const tradesQuery = useQuery({
-		...DASHBOARD_QUERIES.trades(),
+		...DASHBOARD_QUERIES.trades(variant),
 		enabled,
 	});
 	const positionsQuery = useQuery({
@@ -55,8 +59,21 @@ export function useTradingDashboardData({
 			return () => undefined;
 		}
 
-		const sources = SSE_STREAMS.map((stream) => {
-			const source = new EventSource(stream.url);
+		let mounted = true;
+		const reconnectTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+		const reconnectAttempts = new Map<string, number>();
+		const sources = new Map<string, EventSource>();
+		const MAX_RECONNECT_DELAY = 30_000; // Max 30 seconds between reconnects
+
+		const connectStream = (stream: typeof SSE_STREAMS[number]) => {
+			if (!mounted) return;
+
+			const source = new EventSource(getSseUrl(stream.path));
+			sources.set(stream.type, source);
+
+			source.onopen = () => {
+				reconnectAttempts.set(stream.type, 0); // Reset on successful connection
+			};
 
 			source.onmessage = (event) => {
 				try {
@@ -67,15 +84,40 @@ export function useTradingDashboardData({
 				}
 			};
 
-			source.onerror = (error) => {
-				console.error(`[SSE][${stream.type}] stream error`, error);
-			};
+			source.onerror = () => {
+				// Only reconnect if the connection is fully closed
+				if (source.readyState === EventSource.CLOSED) {
+					source.close();
+					sources.delete(stream.type);
 
-			return source;
-		});
+					if (mounted) {
+						const attempts = reconnectAttempts.get(stream.type) ?? 0;
+						// Exponential backoff: 1s, 2s, 4s, 8s, ... up to MAX_RECONNECT_DELAY
+						const delay = Math.min(1000 * 2 ** attempts, MAX_RECONNECT_DELAY);
+						reconnectAttempts.set(stream.type, attempts + 1);
+
+						const timeout = setTimeout(() => connectStream(stream), delay);
+						reconnectTimeouts.set(stream.type, timeout);
+					}
+				}
+			};
+		};
+
+		// Connect all streams
+		for (const stream of SSE_STREAMS) {
+			connectStream(stream);
+		}
 
 		return () => {
-			sources.forEach((source) => source.close());
+			mounted = false;
+			// Clear all reconnect timeouts
+			for (const timeout of reconnectTimeouts.values()) {
+				clearTimeout(timeout);
+			}
+			// Close all sources
+			for (const source of sources.values()) {
+				source.close();
+			}
 		};
 	}, [enabled, sseUpdaters]);
 
