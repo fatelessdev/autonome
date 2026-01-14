@@ -1,139 +1,104 @@
-# Getting Started
-
 # Autonome
 
-Autonome is an AI-powered autonomous cryptocurrency trading platform that blends TanStack Start, multi-provider AI strategies, and a high-fidelity trading simulator for both live and sandbox execution. This README is tailored for the HUSHH TC.40779.2027.55355 / TC.40779.2026.55243 Round-2 submission process and documents everything evaluators need to reproduce, review, and extend the project.
+**Autonome** is an AI-powered autonomous cryptocurrency trading platform that blends TanStack Start, multi-provider AI strategies, and a high-fidelity trading simulator for both live and sandbox execution.
 
-## Table of Contents
-- [Tech Stack](#tech-stack)
-- [Architecture](#architecture)
-- [Core Features](#core-features)
-- [Setup & Run](#setup--run)
-- [Environment Variables](#environment-variables)
-- [Database & Data Models](#database--data-models)
-- [APIs & Integrations](#apis--integrations)
-- [Testing & Quality](#testing--quality)
-- [Impact & Metrics](#impact--metrics)
+## Executive Summary
+Autonome allows you to deploy autonomous trading agents ("Variants") that:
+1.  **Analyze** market structure (Price, Volume, Indicators).
+2.  **Reason** about risk and setups using LLMs (Claude, OpenAI, Mistral).
+3.  **Execute** trades via Lighter DEX (Live) or a built-in Exchange Simulator.
+4.  **Visualize** performance in real-time via a reactive dashboard.
 
 ## Tech Stack
 | Layer | Technologies |
 | --- | --- |
-| Framework & Runtime | TanStack Start (React 19, SSR), Vite w/ TanStack Router plugin, Bun package/runtime |
-| Styling & UI | Tailwind CSS v4, shadcn/ui, Lucide icons, GSAP micro-interactions |
-| Data & State | TanStack Query + oRPC, EventSource (SSE), React Store, cva utilities |
-| Backend | Node/Bun server, oRPC procedures, Sentry tracing, Exchange Simulator, schedulers |
-| Database | PostgreSQL + Drizzle ORM (quoted identifiers, repository pattern) |
-| AI & Trading Integrations | AI SDK v6 (Anthropic Claude primary, Google, OpenAI, Mistral, NVIDIA NIM), Lighter REST API SDK |
-| Tooling | Biome (lint/format), Vitest, T3Env, tsx, dotenv, Sentry |
+| **Framework** | TanStack Start (React 19, SSR), Vite |
+| **Backend** | Bun, Hono, oRPC, Node.js |
+| **Database** | PostgreSQL + Drizzle ORM |
+| **AI Layer** | Vercel AI SDK v6 (Multi-provider orchestration) |
+| **Styling** | Tailwind CSS v4, shadcn/ui |
+| **Integration** | Lighter SDK (DEX), Sentry (Monitoring) |
 
 ## Architecture
 
-![Architecture text](https://github.com/fatelessdev/autonome/blob/main/public/architecture.png)
+![Architecture](https://github.com/fatelessdev/autonome/blob/main/public/architecture.png)
 
-- **Client** renders TanStack Start routes, reusing `orpc.*.*.queryOptions` for data fetching and SSE streams (`/api/events/*`) for live updates.
-- **Server** exposes only oRPC endpoints (`src/routes/api/rpc.$.ts`) backed by domain modules under `src/server/features/**`. Schedulers bootstrap once per process via `instrument.server.mjs` + `ExchangeSimulator`.
-- **Data** persists in PostgreSQL using Drizzle with quoted identifiers (`"Models"`, `"netPortfolio"`) and repository helpers. Read-only SQL tooling is enforced through AI assistant guardrails.
-- **Integrations** include the generated Lighter SDK for real market access, AI SDK multi-provider orchestration, and EventEmitter-backed SSE broadcasters for UI reactivity.
+- **Frontend (Vercel)**: TanStack Start SPA. Connects to backend via oRPC and SSE (`/api/events/*`).
+- **Backend (VPS)**: Hono API server running on Bun. Handles Trading Loop, Schedulers, and DB connections.
+- **Hybrid Deployment**: The Frontend is designed for Edge deployment (Vercel), while the Backend requires a long-running process (VPS/Docker) for the autonomous agents.
 
 ## Core Features
-- **Autonomous Trading Loop** – AI agents evaluate market data, craft trade/exit decisions, and route them via simulator or Lighter live endpoints with risk controls.
-- **AI Co-Pilot Chat** – Model chat tab shows reasoning, tool calls, exit updates, and their execution status with markdown and decision badges.
-- **Trading Simulator** – ExchangeSimulator to validate strategies offline.
-- **Positions & Trades Dashboard** – Unified sidebar with filters, net PnL summaries, exit plan visualization, and streaming updates.
-- **Multi-Provider AI Stack** – Anthropic Claude primary with fallbacks to Google, OpenAI, Mistral, and NVIDIA NIM for SQL planning.
-- **Safety Rails** – Read-only SQL enforcement, Sentry spans, environment-guarded scheduler bootstrap, and typed env access via T3Env.
+- **Autonomous Trading Loop**: Agents wake up, analyze market data, and execute trades with risk controls.
+- **Strategy Variants**: Plug-and-play strategies (e.g., "Guardian" for safety, "Apex" for momentum).
+- **Exchange Simulator**: High-fidelity simulator for backtesting/forward-testing without real funds.
+- **Real-time Analytics**: Live P&L, Sharpe Ratio, and trade history visualization.
+- **Co-Pilot Chat**: Inspect the Agent's "Thought Process" and SQL tooling usage.
 
 ## Setup & Run
 
 ### Prerequisites
-- Bun >= 1.1 and Node 18+ (Bun drives package scripts)
-- PostgreSQL 15+ (local or hosted)
-- Lighter API credentials (or simulator mode)
+- [Bun](https://bun.sh) >= 1.1
+- PostgreSQL 15+
 
-### Steps
-1. **Install deps**
+### Installation
+1. **Install dependencies**
    ```bash
    bun install
    ```
-2. **Configure env**
+2. **Environment Setup**
    ```bash
    cp .env.example .env
-   # fill in API keys, database URL, etc.
+   # Configure DATABASE_URL, API Keys (Anthropic/OpenAI), etc.
    ```
-3. **Prepare database**
+3. **Database Init**
    ```bash
-   bun run db:generate   # after schema tweaks
-   bun run db:migrate    # apply migrations
-   ```
-4. **Run dev server**
-   ```bash
-   bun run dev           # Vite + scheduler bootstrap
-   ```
-5. **Production build & start**
-   ```bash
-   bun run build
-   bun run start
+   bun run db:generate
+   bun run db:migrate
+   bun run db:seed
    ```
 
-Common helper scripts:
+### Development
+Run both Frontend and Backend concurrently:
+```bash
+bun run dev:all
+```
+- Frontend: `http://localhost:5173`
+- Backend: `http://localhost:8081`
 
-| Command | Purpose |
-| --- | --- |
-| `bun run lint` / `bun run format` / `bun run check` | Biome linting, formatting, lint+type combo |
-| `bun run test` | Vitest suite (unit + domain tests) |
-| `bun run db:studio` | Launch Drizzle Studio to inspect live schema |
-| `bun run scripts/validate-env.ts` | Verify mandatory environment configuration (new) |
+### Production Build
+```bash
+# Frontend (Static/Serverless)
+bun run build
+
+# Backend (Standalone Bundle)
+bun run build:api
+bun run start:api
+```
+
+## Docker Deployment
+The `docker-compose.yml` is configured for the **Backend** services (API + DB + Migrations).
+The Frontend is typically deployed to Vercel or a separate container.
+
+```bash
+docker-compose up -d
+```
 
 ## Environment Variables
-All secrets are typed through `src/env.ts`. Copy `.env.example` and fill the following:
+See `src/env.ts` for type-safe environment definitions.
 
 | Variable | Description |
 | --- | --- |
-| `DATABASE_URL` | PostgreSQL connection string |
-| `SERVER_URL` | Public server origin (optional, used for callbacks) |
-| `TRADING_MODE` | `live` or `simulated`; toggles ExchangeSimulator |
-| `IS_SIMULATION_ENABLED` | Mirror flag for client deployments (string `true`/`false`) |
-| `LIGHTER_API_KEY_INDEX` | Selects credential slot in zkLighter account (default 2) |
-| `LIGHTER_BASE_URL` | Lighter REST endpoint base |
-| `SIM_*` vars | Configure simulator capital |
-| `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `OPENAI_API_KEY`, `MISTRAL_API_KEY`, `NIM_API_KEY` | Provider auth tokens |
-| `VITE_SENTRY_DSN` | Browser Sentry DSN (must be prefixed with `VITE_`) |
-| `VITE_APP_TITLE` | Optional UI title override |
+| `TRADING_MODE` | `live` (Real Money) or `simulated` (Paper Trading) |
+| `LIGHTER_API_KEY_INDEX` | Wallet index for Lighter DEX |
+| `ANTHROPIC_API_KEY` | Primary AI Model Key |
+| `IS_SIMULATION_ENABLED` | Feature flag for UI |
 
-## Database & Data Models
-- **ORM**: Drizzle with quoted identifiers; see `db/schema.ts` for `"Models"`, `"Trades"`, `"PortfolioSnapshots"`, etc.
-- **Repository Pattern**: Query helpers under `src/server/db/**` expose typed data loaders consumed by oRPC procedures.
-- **Key Domain Rules**
-  - Monetary fields such as `"netPortfolio"` are stored as `TEXT`; cast to `NUMERIC` for analytics (`CAST("netPortfolio" AS NUMERIC)`).
-  - IDs are `TEXT` (not UUID). Avoid implicit type casts when joining.
-  - All AI-generated SQL is funneled through `queryPortfolioSql` and guarded by `enforceReadOnly`.
-- **Migrations**: Generated via `drizzle-kit` into `drizzle/` and executed with the `db:*` scripts listed above.
+## Key Concepts
+- **Variants**: Defined in `src/server/features/trading/prompts/variants.ts`. Each variant has a distinct System Prompt and Risk Profile.
+- **Market Intelligence**: Aggregated in `marketData.ts`, converting technical indicators into context for the LLM.
+- **Tool Loop**: Agents operate in a loop (`think` -> `tool` -> `think`), allowing complex multi-step reasoning.
 
-## APIs & Integrations
-- **oRPC Router (`src/server/orpc/router`)**
-  - `trading.*`: trades, positions, crypto prices, portfolio history.
-  - `models.*`: AI model metadata, invocation history.
-  - `simulator.*`: place/reset orders, account snapshots, historical trades.
-  - `chat`: model reasoning stream with SQL tooling.
-- **SSE Streams**
-  - `/api/events/trading` – real-time position updates.
-  - `/api/events/trades` – execution feed.
-  - `/api/events/conversations` – AI chat events.
-- **External Services**
-  - `lighter-sdk-ts` generated client for zkLighter REST API.
-  - AI SDK v6 multi-provider stack (Anthropic, Google, OpenAI, Mistral, NVIDIA NIM).
-  - Sentry instrumentation covering both router and server spans.
-
-## Testing & Quality
-- **Vitest** for unit/integration tests (`bun run test`).
-- **Biome** enforces tabs, double quotes, and max line width 80.
-- **Type Safety** through strict TypeScript config and Zod validation on every oRPC input/output.
-- **Manual QA Playbook**
-  - Run `bun run dev` with `TRADING_MODE=simulated` to exercise ExchangeSimulator.
-  - Trigger `scripts/validate-env.ts` before deployments to catch missing secrets.
-
-## Impact & Metrics
-- **Latency**: SSE updates every 3s for price refresh
-- **Caching**: TanStack Query caches volatile data 15s–5min, balancing responsiveness with API quotas.
-- **Resilience**: Schedulers guard against duplicate bootstrap via global flag; errors are traced in Sentry for root-cause analysis.
-- **Scalability**: oRPC procedures are stateless and pool DB connections; trading simulators/spans can run horizontally per process.
+## Contributing
+1.  **Package Manager**: Use `bun` only.
+2.  **Linting**: `bun run check` (Biome).
+3.  **Data Fetching**: Use `oRPC` procedures, never raw `fetch`.
