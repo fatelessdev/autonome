@@ -4,11 +4,6 @@
 **Reviewer:** Jules (Senior Software Engineer)
 **Scope:** Full Stack (Agent, Simulator, API, Frontend, Infrastructure)
 
-## Executive Summary
-The project is a high-velocity, "vibecoded" prototype that successfully demonstrates a complex Agentic Trading loop with a custom Simulator. However, it suffers from critical "Blind Spots" in the Agent's decision-making context, dangerous data inconsistencies between the Database and Exchange, and a fragmented "Source of Truth" for domain concepts.
-
----
-
 ## Severity Levels
 - 🔴 **Critical**: Immediate action required (Data loss, hallucination, financial risk).
 - 🟡 **Warning**: Address soon (Tech debt, maintenance overhead).
@@ -19,17 +14,16 @@ The project is a high-velocity, "vibecoded" prototype that successfully demonstr
 ## 1. 🔴 Critical: Agent "Brain" Gaps
 
 ### Hallucinated Indicators (The "Blind Pilot" Problem)
-*   **Issue:** The Agent prompts (e.g., `Guardian`) explicitly require specific indicators to make decisions:
-    > "Price must be **Outside the Ichimoku Cloud**."
-    > "**ADX < 40**."
-*   **Reality:** These indicators (`Ichimoku`, `ADX`, `Supertrend`, `Bollinger`) are **NOT calculated** in `indicators.ts` nor passed in `marketData.ts`.
-*   **Impact:** The Agent is hallucinating these values or guessing based on raw price action, leading to random adherence to its own strict rules.
-*   **Fix:** Implement `getIchimoku`, `getAdx` in `indicators.ts` and add them to the `MarketSnapshot` passed to the LLM.
+*   **Issue:** The Agent prompts (e.g., `Guardian`) explicitly require specific indicators (`Ichimoku`, `ADX`) to make decisions.
+*   **Reality:** While `taapi` integration exists in `src/server/integrations/taapi`, the `marketData.ts` service (which builds the main prompt context) **does NOT include** these indicators in the `MARKET_DATA` block.
+*   **Impact:** The Agent is "hallucinating" these values or guessing based on raw price action, leading to random adherence to its own strict rules.
+*   **Fix:** Inject `taapi` data into the `MarketSnapshot` in `marketData.ts` or ensure `fetchIndicators` tool is mandatorily called before decision-making.
 
-### Missing "Reasoning" Tracking
-*   **Issue:** The system tracks *what* the agent did (Orders, Trades) and *if* it failed (Failures), but not *why* it succeeded.
-*   **Impact:** We cannot quantitatively analyze why a specific model is winning. Is it respecting the "Cloud"? We don't know because the reasoning is lost in the unstructured chat logs.
-*   **Fix:** Add a `reasoning_tags` or `strategy_compliance` JSON field to the `ToolCalls` or `Orders` table to capture structured rationale (e.g., `{"setup": "pullback_ema50", "trend": "bullish"}`).
+### SL/TP Exchange Drift (The "Silent Killer")
+*   **File:** `src/server/features/trading/agent/tools/updateExitPlanTool.ts`
+*   **Issue:** If `updateSlTpOrdersOnExchange` fails (e.g., network error), the code catches the error, logs it, and **proceeds to update the Database** with the new SL/TP.
+*   **Risk:** The Agent and DB believe the Stop Loss is tightened, but the Exchange still has the old (or no) Stop Loss. This is a critical state drift that could lead to unexpected liquidation.
+*   **Fix:** If Exchange update fails, **rethrow the error** and do NOT update the DB. Fail the tool call explicitly.
 
 ---
 
@@ -43,15 +37,15 @@ The project is a high-velocity, "vibecoded" prototype that successfully demonstr
 *   **Impact:** Adding a new strategy requires touching 10+ files across the stack.
 *   **Fix:** Create a `src/domain/variants.ts` as the single SSOT. Export a `VariantConfig` object that includes the `id`, `prompt`, `color_hex`, and `label`. Frontend should consume this config dynamically.
 
-### Database vs. Exchange Drift
+### Database vs. Exchange Drift (Scale-In)
 *   **Issue:** The "Scale-In" logic in `createPosition.ts` relies on `getOpenOrderBySymbol` (Local DB) to calculate the new Weighted Average Entry Price.
-*   **Risk:** If the DB misses an update (e.g., a liquidation or manual close on the exchange), the Agent will calculate entry prices based on stale data, leading to incorrect P&L assumptions and potential catastrophic risk sizing.
+*   **Risk:** If the DB misses an update (e.g., a liquidation or manual close on the exchange), the Agent will calculate entry prices based on stale data, leading to incorrect P&L assumptions.
 *   **Fix:** Always fetch the *current* position from the Exchange (Lighter SDK) before calculating a scale-in. Use the DB only for "Intent" tracking.
 
 ### Implicit "SHORT" Default
 *   **File:** `src/server/features/trading/openPositions.ts`
 *   **Issue:** `sign: accountPosition.sign === 1 ? "LONG" : "SHORT"`
-*   **Risk:** If the exchange returns `0` (flat) or any other code, the system defaults to `SHORT`. This could cause the UI to show a Short position when the account is actually flat.
+*   **Risk:** If the exchange returns `0` (flat) or any other code, the system defaults to `SHORT`.
 *   **Fix:** Explicitly handle `1` (Long), `-1` (Short), and `0` (Flat). Throw or log warning on unknown values.
 
 ---
@@ -71,18 +65,28 @@ The project is a high-velocity, "vibecoded" prototype that successfully demonstr
 
 ---
 
-## 4. 🔵 UI/UX & Frontend
+## 4. 🔵 Code Quality & Standards
 
-### Hardcoded Visual Logic
-*   **File:** `src/routes/analytics.tsx`
-*   **Issue:** Styling logic (colors for variants) is hardcoded in the component.
-*   **Fix:** Move styling to the shared `VariantConfig`.
+### Weak Frontend-Backend Boundary
+*   **File:** `src/core/shared/trading/dashboardQueries.ts`
+*   **Issue:** Aggressive "Defensive" Data Normalization (checking `typeof x === 'string'` for every field).
+*   **Impact:** Adds massive bloat. Since `orpc` provides end-to-end type safety, we should trust the types on the boundary and remove manual runtime checks in the UI layer.
 
-### Markdown Leakage
-*   **File:** `src/server/features/trading/marketData.ts`
-*   **Issue:** The backend formats data into Markdown (`### MARKET DATA`) for the LLM.
-*   **Tech Debt:** This couples the Data Layer to the Presentation Layer (Prompt). If we want to change the prompt format (e.g., to JSON), we have to refactor the data service.
-*   **Fix:** Return structured objects from `marketData.ts` and let `promptBuilder.ts` handle the string formatting.
+### Directory Structure & Modularization
+*   **Observation:** `src/core` vs `src/server` distinction is muddy.
+    *   `src/core/shared` contains React Query logic (`queryOptions`), which is framework-specific, yet sits in "core".
+*   **Recommendation:**
+    *   `src/domain`: Pure Typescript types/constants (Shared).
+    *   `src/server`: API, DB, Business Logic.
+    *   `src/client`: React components, Hooks, React Query.
+
+### Specific File Critiques
+*   **`src/server/features/trading/tradeExecutor.ts`**: A potential "God Object" accumulating too many responsibilities (execution, logging, notification, retries). Needs decomposition.
+*   **`src/core/utils/excelExport.ts`**: Mixes presentation logic with data processing.
+
+### Type Safety Gaps
+*   **Magic Strings**: `src/server/features/analytics/queries.server.ts` uses raw string literals for SQL.
+*   **Repeated Types**: Variant unions duplicated across `dashboardTypes.ts`, `marketQueries.ts`.
 
 ---
 
@@ -95,8 +99,8 @@ The project is a high-velocity, "vibecoded" prototype that successfully demonstr
 
 ## Recommendations Roadmap
 
-1.  **Immediate Fix:** Implement `Ichimoku` and `ADX` indicators to unblind the Agent.
-2.  **Immediate Fix:** Fix the "Implicit SHORT" bug in `openPositions.ts`.
+1.  **Immediate Fix:** Inject `taapi` indicators into `MarketSnapshot` to fix the "Brain Gap".
+2.  **Immediate Fix:** Add `throw` on exchange failure in `updateExitPlanTool` to prevent DB/Exchange drift.
 3.  **Refactor:** Centralize `VARIANTS` config (including colors) and refactor Frontend/Backend to use it.
 4.  **Refactor:** Switch `marketData.ts` to return JSON, moving Markdown formatting to `promptBuilder.ts`.
 5.  **Infrastructure:** Change `db:push` to `db:migrate` in `docker-compose.yml`.
