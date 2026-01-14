@@ -102,3 +102,7 @@ See `src/env.ts` for type-safe environment definitions.
 1.  **Package Manager**: Use `bun` only.
 2.  **Linting**: `bun run check` (Biome).
 3.  **Data Fetching**: Use `oRPC` procedures, never raw `fetch`.
+
+## Documentation
+- [AGENTS.md](./AGENTS.md) - Developer Guidelines & Architecture Rules.
+- [problems.md](./problems.md) - Known Technical Debt & Critical Issues Report.

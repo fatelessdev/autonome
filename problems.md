@@ -1,6 +1,6 @@
 # Architectural Analysis & Technical Debt Report
 
-**Date:** 2025-01-20
+**Date:** 2026-01-05
 **Reviewer:** Jules (Senior Software Engineer)
 **Scope:** Full Stack (Agent, Simulator, API, Frontend, Infrastructure)
 
@@ -9,7 +9,14 @@ The project is a high-velocity, "vibecoded" prototype that successfully demonstr
 
 ---
 
-## 1. Critical: Agent "Brain" Gaps
+## Severity Levels
+- 🔴 **Critical**: Immediate action required (Data loss, hallucination, financial risk).
+- 🟡 **Warning**: Address soon (Tech debt, maintenance overhead).
+- 🔵 **Info**: Optimization opportunities.
+
+---
+
+## 1. 🔴 Critical: Agent "Brain" Gaps
 
 ### Hallucinated Indicators (The "Blind Pilot" Problem)
 *   **Issue:** The Agent prompts (e.g., `Guardian`) explicitly require specific indicators to make decisions:
@@ -26,7 +33,7 @@ The project is a high-velocity, "vibecoded" prototype that successfully demonstr
 
 ---
 
-## 2. Architecture & Data Integrity
+## 2. 🟡 Architecture & Data Integrity
 
 ### Fragmentation of Truth (The "Variant" Problem)
 *   **Issue:** "Variants" (Guardian, Apex, etc.) are defined in `variants.ts`, but their existence is implicitly assumed in:
@@ -49,7 +56,7 @@ The project is a high-velocity, "vibecoded" prototype that successfully demonstr
 
 ---
 
-## 3. Infrastructure & DevOps
+## 3. 🟡 Infrastructure & DevOps
 
 ### Risky Production Deployment
 *   **File:** `docker-compose.yml`
@@ -64,7 +71,7 @@ The project is a high-velocity, "vibecoded" prototype that successfully demonstr
 
 ---
 
-## 4. UI/UX & Frontend
+## 4. 🔵 UI/UX & Frontend
 
 ### Hardcoded Visual Logic
 *   **File:** `src/routes/analytics.tsx`
@@ -79,7 +86,7 @@ The project is a high-velocity, "vibecoded" prototype that successfully demonstr
 
 ---
 
-## 5. Verified Bugs (From POTENTIAL_BUGS.md)
+## 5. 🔴 Verified Bugs (From POTENTIAL_BUGS.md)
 
 1.  **Live Trading Fill Tracking**: `createPosition.ts` assumes the order fills completely at the requested quantity. It does not verify the actual fill amount from the exchange.
 2.  **Fallback Hiding**: `parseFloat(...) || null` in `queries.server.ts` can mask data corruption.
