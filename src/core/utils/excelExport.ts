@@ -5,6 +5,7 @@
 
 import * as XLSX from "xlsx";
 import type { OverallStats, AdvancedStats } from "@/server/features/analytics/types";
+import { VARIANT_IDS } from "@/core/shared/variants";
 
 /**
  * Leaderboard entry for export
@@ -251,9 +252,8 @@ export function exportLeaderboardToExcel(
 	// Create workbook
 	const wb = XLSX.utils.book_new();
 
-	// Add a sheet for each variant (Guardian, Apex, Gladiator, Sniper, Trendsurfer, Contrarian)
-	const variants = ["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian"];
-	for (const variant of variants) {
+	// Add a sheet for each variant
+	for (const variant of VARIANT_IDS) {
 		const data = variantData.find((d) => d.variant === variant);
 		if (data && data.entries.length > 0) {
 			const sheet = createLeaderboardSheet(data.entries, false);

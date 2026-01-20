@@ -11,6 +11,8 @@ import {
 	uniqueIndex,
 } from "drizzle-orm/pg-core";
 
+import { VARIANT_IDS } from "@/core/shared/variants";
+
 export const toolCallTypeEnum = pgEnum("ToolCallType", [
 	"CREATE_POSITION",
 	"CLOSE_POSITION",
@@ -21,15 +23,8 @@ export const orderStatusEnum = pgEnum("OrderStatus", ["OPEN", "CLOSED"]);
 
 export const orderSideEnum = pgEnum("OrderSide", ["LONG", "SHORT"]);
 
-export const variantEnum = pgEnum("Variant", [
-	"Guardian",
-	"Apex",
-	"Gladiator",
-	"Sniper",
-	"Trendsurfer",
-	"Contrarian",
-	"Sovereign",
-]);
+// Variant enum derived from SSOT
+export const variantEnum = pgEnum("Variant", VARIANT_IDS);
 
 export const models = pgTable(
 	"Models",
@@ -247,13 +242,5 @@ export const OrderSide = {
 
 export type OrderSide = (typeof orderSideEnum.enumValues)[number];
 
-export const Variant = {
-	Guardian: variantEnum.enumValues[0],
-	Apex: variantEnum.enumValues[1],
-	Gladiator: variantEnum.enumValues[2],
-	Sniper: variantEnum.enumValues[3],
-	Trendsurfer: variantEnum.enumValues[4],
-	Contrarian: variantEnum.enumValues[5],
-} as const;
-
-export type Variant = (typeof variantEnum.enumValues)[number];
+// Re-export Variant type from SSOT for consistency
+export type { VariantId as Variant } from "@/core/shared/variants";

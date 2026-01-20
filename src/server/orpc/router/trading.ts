@@ -5,6 +5,12 @@ import * as Sentry from "@sentry/react";
 import { z } from "zod";
 import { parseSymbols } from "@/shared/formatting/numberFormat";
 import {
+	VARIANT_IDS,
+	variantIdSchema,
+	isValidVariantId,
+	type VariantId,
+} from "@/core/shared/variants";
+import {
 	CryptoPricesInputSchema,
 	CryptoPricesResponseSchema,
 	PortfolioHistoryResponseSchema,
@@ -13,8 +19,6 @@ import {
 } from "../schema";
 
 // ==================== Internal Types ====================
-
-type Variant = "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign";
 
 // These mirror the server-side types to avoid importing from server module
 interface TradeRecord {
@@ -96,16 +100,15 @@ interface PortfolioHistoryResult {
 	resolution: DownsampleResolution;
 }
 
-// Helper to safely cast variant
-function toVariant(v: string | undefined): Variant | undefined {
-	const variants: Variant[] = ["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"];
-	return variants.includes(v as Variant) ? (v as Variant) : undefined;
+// Helper to safely cast variant using shared utility
+function toVariant(v: string | undefined): VariantId | undefined {
+	return isValidVariantId(v) ? v : undefined;
 }
 
 // ==================== Trades ====================
 
 const TradesInputSchema = z.object({
-	variant: z.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"]).optional(),
+	variant: variantIdSchema.optional(),
 	limit: z.number().int().min(1).max(500).optional(),
 });
 
@@ -167,7 +170,7 @@ export const getTrades = os
 // ==================== Positions ====================
 
 const PositionsInputSchema = z.object({
-	variant: z.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"]).optional(),
+	variant: variantIdSchema.optional(),
 });
 
 export const getPositions = os
@@ -303,7 +306,7 @@ export const getCryptoPrices = os
 // ==================== Portfolio History ====================
 
 const PortfolioHistoryInputSchema = z.object({
-	variant: z.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"]).optional(),
+	variant: variantIdSchema.optional(),
 	startDate: z.string().datetime().optional(),
 	endDate: z.string().datetime().optional(),
 	// Aggregate mode (no variant) needs more points since data spans all model-variant combinations
@@ -347,19 +350,11 @@ export const getPortfolioHistory = os
 										typeof entry.model.name === "string"
 											? entry.model.name
 											: "",
-									variant:
-										typeof entry.model.variant === "string" &&
-										[
-											"Guardian",
-											"Apex",
-											"Gladiator",
-											"Sniper",
-											"Trendsurfer",
-											"Contrarian",
-										"Sovereign",
-									].includes(entry.model.variant)
-										? (entry.model.variant as "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign")
+									variant: toVariant(
+										typeof entry.model.variant === "string"
+											? entry.model.variant
 											: undefined,
+									),
 									openRouterModelName:
 										typeof entry.model.openRouterModelName === "string"
 											? entry.model.openRouterModelName

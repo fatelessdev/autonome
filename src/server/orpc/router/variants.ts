@@ -9,23 +9,15 @@ import { db } from "@/db";
 import { models, orders, portfolioSize } from "@/db/schema";
 import {
 	VARIANT_IDS,
-	VARIANTS,
-} from "@/server/features/trading/prompts/variants";
+	VARIANT_CONFIG,
+	variantIdSchema,
+} from "@/core/shared/variants";
+import { VARIANT_PROMPTS } from "@/server/features/trading/prompts/variants";
 
 // ==================== Schema Definitions ====================
 
-const VariantIdSchema = z.enum([
-	"Guardian",
-	"Apex",
-	"Gladiator",
-	"Sniper",
-	"Trendsurfer",
-	"Contrarian",
-	"Sovereign",
-]);
-
 const VariantSchema = z.object({
-	id: VariantIdSchema,
+	id: variantIdSchema,
 	label: z.string(),
 	description: z.string(),
 	temperature: z.number(),
@@ -37,7 +29,7 @@ const VariantListOutputSchema = z.object({
 });
 
 const VariantStatsSchema = z.object({
-	variantId: VariantIdSchema,
+	variantId: variantIdSchema,
 	label: z.string(),
 	color: z.string(),
 	totalTrades: z.number(),
@@ -53,7 +45,7 @@ const VariantHistoryPointSchema = z.object({
 });
 
 const VariantHistoryEntrySchema = z.object({
-	variantId: VariantIdSchema,
+	variantId: variantIdSchema,
 	label: z.string(),
 	color: z.string(),
 	history: z.array(VariantHistoryPointSchema),
@@ -71,10 +63,10 @@ export const getVariants = os
 		return Sentry.startSpan({ name: "variants.getVariants" }, async () => {
 			const variants = VARIANT_IDS.map((id) => ({
 				id,
-				label: VARIANTS[id].label,
-				description: VARIANTS[id].description,
-				temperature: VARIANTS[id].temperature,
-				color: VARIANTS[id].color,
+				label: VARIANT_CONFIG[id].label,
+				description: VARIANT_CONFIG[id].description,
+				temperature: VARIANT_PROMPTS[id].temperature,
+				color: VARIANT_CONFIG[id].color,
 			}));
 			return { variants };
 		});
@@ -101,8 +93,8 @@ export const getVariantStats = os
 					if (modelIds.length === 0) {
 						return {
 							variantId,
-							label: VARIANTS[variantId].label,
-							color: VARIANTS[variantId].color,
+							label: VARIANT_CONFIG[variantId].label,
+							color: VARIANT_CONFIG[variantId].color,
 							totalTrades: 0,
 							winRate: 0,
 							totalPnl: 0,
@@ -137,8 +129,8 @@ export const getVariantStats = os
 
 					return {
 						variantId,
-						label: VARIANTS[variantId].label,
-						color: VARIANTS[variantId].color,
+						label: VARIANT_CONFIG[variantId].label,
+						color: VARIANT_CONFIG[variantId].color,
 						totalTrades,
 						winRate,
 						totalPnl,
@@ -191,8 +183,8 @@ export const getVariantHistory = os
 					if (modelIds.length === 0) {
 						return {
 							variantId,
-							label: VARIANTS[variantId].label,
-							color: VARIANTS[variantId].color,
+							label: VARIANT_CONFIG[variantId].label,
+							color: VARIANT_CONFIG[variantId].color,
 							history: [],
 						};
 					}
@@ -230,8 +222,8 @@ export const getVariantHistory = os
 
 					return {
 						variantId,
-						label: VARIANTS[variantId].label,
-						color: VARIANTS[variantId].color,
+						label: VARIANT_CONFIG[variantId].label,
+						color: VARIANT_CONFIG[variantId].color,
 						history: aggregatedHistory,
 					};
 				})

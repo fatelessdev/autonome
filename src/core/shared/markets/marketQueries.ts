@@ -2,6 +2,7 @@ import { type QueryClient, queryOptions, useQuery } from "@tanstack/react-query"
 
 import { orpc } from "@/server/orpc/client";
 import { SUPPORTED_MARKETS } from "./marketMetadata";
+import { type VariantId, isValidVariantId } from "@/core/shared/variants";
 
 export type MarketSymbol = (typeof SUPPORTED_MARKETS)[number];
 
@@ -27,7 +28,7 @@ export type PortfolioHistoryEntry = {
 	updatedAt: string;
 	model?: {
 		name: string;
-		variant?: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign";
+		variant?: VariantId;
 		openRouterModelName?: string;
 	};
 };
@@ -207,9 +208,8 @@ function normalizePortfolioHistory(
 		}
 
 		const modelRecord = model as Record<string, unknown>;
-		const variant = typeof modelRecord.variant === "string" &&
-			["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"].includes(modelRecord.variant)
-				? (modelRecord.variant as "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign")
+		const variant = typeof modelRecord.variant === "string" && isValidVariantId(modelRecord.variant)
+				? modelRecord.variant
 				: undefined;
 
 		entries.push({
@@ -235,7 +235,7 @@ function normalizePortfolioHistory(
 	return { history: entries, resolution };
 }
 
-async function requestPortfolioHistory(variant?: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign"): Promise<PortfolioHistoryResult> {
+async function requestPortfolioHistory(variant?: VariantId): Promise<PortfolioHistoryResult> {
 	// Server handles time-based downsampling automatically and returns resolution
 	// Resolution is auto-detected from data time range:
 	// - ≤24h: 1-minute buckets
@@ -250,7 +250,7 @@ async function requestPortfolioHistory(variant?: "Guardian" | "Apex" | "Gladiato
 	return normalizePortfolioHistory(data);
 }
 
-export const portfolioHistoryQueryOptions = (variant?: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign") =>
+export const portfolioHistoryQueryOptions = (variant?: VariantId) =>
 	queryOptions({
 		queryKey: PORTFOLIO_QUERY_KEYS.history(variant),
 		queryFn: () => requestPortfolioHistory(variant),
@@ -259,7 +259,7 @@ export const portfolioHistoryQueryOptions = (variant?: "Guardian" | "Apex" | "Gl
 		refetchInterval: 3 * 60_000,
 	});
 
-export async function prefetchPortfolioHistory(queryClient: QueryClient, variant?: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign") {
+export async function prefetchPortfolioHistory(queryClient: QueryClient, variant?: VariantId) {
 	return queryClient.ensureQueryData(portfolioHistoryQueryOptions(variant));
 }
 
@@ -293,7 +293,7 @@ export type VariantHistoryPoint = {
 };
 
 export type VariantHistoryEntry = {
-	variantId: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign";
+	variantId: VariantId;
 	label: string;
 	color: string;
 	history: VariantHistoryPoint[];

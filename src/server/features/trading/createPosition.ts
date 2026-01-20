@@ -1,4 +1,4 @@
-import { ExchangeSimulator } from "@//server/features/simulator/exchangeSimulator";
+	import { ExchangeSimulator } from "@/server/features/simulator/exchangeSimulator";
 import {
 	API_KEY_INDEX,
 	BASE_URL,
@@ -19,6 +19,7 @@ import {
 	scaleIntoOrder,
 } from "@/server/db/ordersRepository.server";
 import { placeSlTpOrders, cancelSlTpOrders } from "./slTpOrderManager";
+import { trackFill } from "./fillTracker";
 
 export interface PositionRequest {
 	symbol: string;
@@ -287,7 +288,8 @@ export async function createPosition(
 			const orderQuantity = Math.abs(quantity);
 
 			// Execute order on exchange using new SDK
-			await client.createOrder({
+			// Returns [orderInfo, txHash, error]
+			const [orderInfo, txHash, orderError] = await client.createOrder({
 				marketIndex: market.marketId,
 				clientOrderIndex: market.clientOrderIndex,
 				baseAmount: Math.round(orderQuantity * market.qtyDecimals),
@@ -302,6 +304,61 @@ export async function createPosition(
 				triggerPrice: SignerClient.NIL_TRIGGER_PRICE,
 				orderExpiry: SignerClient.DEFAULT_IOC_EXPIRY,
 			});
+
+			// Check for order creation error
+			if (orderError) {
+				console.error(`[createPosition] Order creation failed for ${symbol}:`, orderError);
+				results.push({
+					symbol,
+					side,
+					quantity,
+					leverage,
+					success: false,
+					error: `Order creation failed: ${orderError}`,
+				});
+				continue;
+			}
+
+			// Track fill with polling (SDK handles the waiting internally)
+			const fillResult = await trackFill(client, {
+				txHash,
+				accountIndex: Number(account.accountIndex),
+				marketId: market.marketId,
+				clientOrderIndex: market.clientOrderIndex,
+				requestedQuantity: orderQuantity,
+				maxWaitMs: 30_000,
+				pollIntervalMs: 500,
+			});
+
+			// Handle fill result
+			if (!fillResult.success || !fillResult.filled) {
+				console.error(`[createPosition] Order not filled for ${symbol}:`, fillResult.error);
+				results.push({
+					symbol,
+					side,
+					quantity,
+					leverage,
+					success: false,
+					error: fillResult.error ?? "Order not filled",
+				});
+				continue;
+			}
+
+			// Use actual filled quantity and price
+			const filledQuantity = fillResult.filledQuantity;
+			// Use tracked average price, or fall back to latest price if not available
+			const actualEntryPrice = fillResult.averagePrice > 0 ? fillResult.averagePrice : latestPriceNum;
+
+			if (fillResult.partialFill) {
+				console.warn(
+					`[createPosition] Partial fill for ${symbol}: requested=${orderQuantity}, filled=${filledQuantity}`,
+				);
+			}
+
+			console.log(
+				`[createPosition] Fill confirmed for ${symbol}: qty=${filledQuantity}, price=${actualEntryPrice}`,
+			);
+
 			// Check for existing open order to scale into
 			try {
 				const existingOrder = await getOpenOrderBySymbol(
@@ -313,20 +370,19 @@ export async function createPosition(
 					// Scale into existing position using weighted avg formula
 					const prevQty = parseFloat(existingOrder.quantity);
 					const prevEntry = parseFloat(existingOrder.entryPrice);
-					const newQty = orderQuantity;
 					const prevNotional = prevEntry * prevQty;
-					const newNotional = latestPrice * newQty;
-					const totalQty = prevQty + newQty;
+					const newNotional = actualEntryPrice * filledQuantity;
+					const totalQty = prevQty + filledQuantity;
 					const newAvgEntry =
 						totalQty !== 0
 							? (prevNotional + newNotional) / totalQty
-							: latestPrice;
+							: actualEntryPrice;
 
 				// When scaling in, new exit plan values REPLACE old ones
 				const updatedOrder = await scaleIntoOrder({
 						orderId: existingOrder.id,
-						additionalQuantity: newQty.toString(),
-						newEntryPrice: latestPrice.toString(),
+						additionalQuantity: filledQuantity.toString(),
+						newEntryPrice: actualEntryPrice.toString(),
 						newAvgEntryPrice: newAvgEntry.toString(),
 						exitPlan: {
 							stop: stopLoss ?? existingOrder.exitPlan?.stop ?? null,
@@ -374,15 +430,14 @@ export async function createPosition(
 						orderId: updatedOrder.id,
 					});
 				} else {
-				// Create new order (either no existing position or opposite side)
-					// TODO: In live trading, we should fetch the actual fill quantity from the exchange
-					// For now, we assume the market order fills completely at the requested quantity
+					// Create new order (either no existing position or opposite side)
+					// Use actual filled quantity and price from exchange
 					const dbOrder = await createOrder({
 						modelId: account.id,
 						symbol: symbol.toUpperCase(),
 						side,
-						quantity: orderQuantity.toString(),
-						entryPrice: latestPrice.toString(),
+						quantity: filledQuantity.toString(),
+						entryPrice: actualEntryPrice.toString(),
 						leverage: leverage?.toString() ?? null,
 						exitPlan: {
 							stop: stopLoss ?? null,
@@ -400,7 +455,7 @@ export async function createPosition(
 						await placeSlTpOrders(client, {
 							symbol: symbol.toUpperCase(),
 							side,
-							quantity: orderQuantity,
+							quantity: filledQuantity,
 							stopLoss: stopLoss ?? null,
 							takeProfit: profitTarget ?? null,
 							orderId: dbOrder.id,
@@ -410,9 +465,9 @@ export async function createPosition(
 					results.push({
 						symbol,
 						side,
-						quantity,
+						quantity: filledQuantity,
 						leverage,
-						entryPrice: latestPrice,
+						entryPrice: actualEntryPrice,
 						success: true,
 						orderId: dbOrder.id,
 					});
@@ -422,13 +477,16 @@ export async function createPosition(
 					`[createPosition] DB persist failed for ${symbol}:`,
 					dbError,
 				);
+				// Position was filled on exchange but DB save failed
+				// Return success with fill info so caller knows the position exists
 				results.push({
 					symbol,
 					side,
-					quantity,
+					quantity: filledQuantity,
 					leverage,
-					entryPrice: latestPrice,
+					entryPrice: actualEntryPrice,
 					success: true,
+					error: "DB persist failed - position opened on exchange",
 				});
 			}
 		} catch (err) {

@@ -1,6 +1,14 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 
-export type VariantId = "all" | "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign";
+import {
+	type VariantId as SharedVariantId,
+	type VariantIdWithAll,
+	VARIANT_TABS,
+} from "@/core/shared/variants";
+
+// Re-export types and VARIANT_TABS for backward compatibility
+export type VariantId = VariantIdWithAll;
+export { VARIANT_TABS };
 
 export interface VariantContextValue {
 	selectedVariant: VariantId;
@@ -26,54 +34,3 @@ export function useVariant() {
 	}
 	return context;
 }
-
-export const VARIANT_TABS: {
-	id: VariantId;
-	label: string;
-	color: string;
-	background: string;
-}[] = [
-	{ id: "all", label: "Aggregate Index", color: "#0f172a", background: "#f8fafc" },
-	{
-		id: "Guardian",
-		label: "Guardian (Fortress)",
-		color: "#a855f7",
-		background: "#faf5ff",
-	},
-	{
-		id: "Apex",
-		label: "Apex (Kelly Engine)",
-		color: "#f59e0b",
-		background: "#fffbeb",
-	},
-	{
-		id: "Gladiator",
-		label: "Gladiator (Tournament)",
-		color: "#22c55e",
-		background: "#f0fdf4",
-	},
-	{
-		id: "Sniper",
-		label: "Sniper (Precision)",
-		color: "#3b82f6",
-		background: "#eff6ff",
-	},
-	{
-		id: "Trendsurfer",
-		label: "Trendsurfer (Momentum)",
-		color: "#06b6d4",
-		background: "#ecfeff",
-	},
-	{
-		id: "Contrarian",
-		label: "Contrarian (Reverter)",
-		color: "#e11d48",
-		background: "#fff1f2",
-	},
-	{
-		id: "Sovereign",
-		label: "Sovereign (Adaptive)",
-		color: "#eab308",
-		background: "#fefce8",
-	},
-];

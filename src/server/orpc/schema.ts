@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { variantIdSchema } from "@/core/shared/variants";
+
 // ==================== Common Schemas ====================
 
 export const TodoSchema = z.object({
@@ -13,9 +15,7 @@ export const TradeSchema = z.object({
 	id: z.string(),
 	modelId: z.string(),
 	modelName: z.string(),
-	modelVariant: z
-		.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"])
-		.optional(),
+	modelVariant: variantIdSchema.optional(),
 	modelRouterName: z.string().optional(),
 	modelKey: z.string().optional(),
 	side: z.enum(["long", "short"]),
@@ -65,9 +65,7 @@ export const PositionSchema = z.object({
 export const AccountPositionsSchema = z.object({
 	modelId: z.string(),
 	modelName: z.string(),
-	modelVariant: z
-		.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"])
-		.optional(),
+	modelVariant: variantIdSchema.optional(),
 	modelLogo: z.string().optional(),
 	positions: z.array(PositionSchema),
 	totalUnrealizedPnl: z.number().optional(),
@@ -105,9 +103,7 @@ export const PortfolioSnapshotSchema = z.object({
 	model: z
 		.object({
 			name: z.string(),
-			variant: z
-				.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"])
-				.optional(),
+			variant: variantIdSchema.optional(),
 			openRouterModelName: z.string().optional(),
 		})
 		.optional(),
@@ -138,9 +134,7 @@ export const InvocationSchema = z.object({
 	id: z.string(),
 	modelId: z.string(),
 	modelName: z.string(),
-	modelVariant: z
-		.enum(["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"])
-		.optional(),
+	modelVariant: variantIdSchema.optional(),
 	modelLogo: z.string(),
 	response: z.string().nullable(),
 	responsePayload: z.any().optional(),

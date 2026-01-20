@@ -18,6 +18,7 @@ import {
 	getOpenOrderBySymbol,
 } from "@/server/db/ordersRepository.server";
 import { cancelSlTpOrders } from "./slTpOrderManager";
+import { trackFill } from "./fillTracker";
 
 export interface ClosedPositionSummary {
 	symbol: string;
@@ -226,14 +227,15 @@ export async function closePosition(
 			const baseQuantity =
 				position.quantity ?? toNumber(position.position) ?? 0;
 
-			await client.createOrder({
+			// Execute close order and capture result
+			const [orderInfo, txHash, orderError] = await client.createOrder({
 				marketIndex: market.marketId,
 				clientOrderIndex: market.clientOrderIndex,
 				baseAmount: Math.abs(baseQuantity) * market.qtyDecimals,
 				price:
 					(closeSign === "LONG" ? latestPrice * 1.01 : latestPrice * 0.99) *
 					market.priceDecimals,
-			isAsk: closeSign !== "LONG",
+				isAsk: closeSign !== "LONG",
 				orderType: SignerClient.ORDER_TYPE_MARKET,
 				timeInForce: SignerClient.ORDER_TIME_IN_FORCE_IMMEDIATE_OR_CANCEL,
 				reduceOnly: true,
@@ -241,17 +243,49 @@ export async function closePosition(
 				orderExpiry: SignerClient.DEFAULT_IOC_EXPIRY,
 			});
 
-			const summary = buildSummary(symbol, position, latestPrice, closedAtIso);
+			// Check for order creation error
+			if (orderError) {
+				console.error(`[closePosition] Order creation failed for ${symbol}:`, orderError);
+				continue;
+			}
+
+			// Track fill to get actual exit price
+			const fillResult = await trackFill(client, {
+				txHash,
+				accountIndex: Number(account.accountIndex),
+				marketId: market.marketId,
+				clientOrderIndex: market.clientOrderIndex,
+				requestedQuantity: Math.abs(baseQuantity),
+				maxWaitMs: 30_000,
+				pollIntervalMs: 500,
+			});
+
+			// Use actual fill price if available, otherwise fall back to latest price
+			const actualExitPrice = fillResult.success && fillResult.averagePrice > 0
+				? fillResult.averagePrice
+				: latestPrice;
+
+			if (fillResult.success && fillResult.filled) {
+				console.log(
+					`[closePosition] Fill confirmed for ${symbol}: qty=${fillResult.filledQuantity}, price=${actualExitPrice}`,
+				);
+			} else {
+				console.warn(
+					`[closePosition] Fill tracking incomplete for ${symbol}: ${fillResult.error ?? "unknown"}`,
+				);
+			}
+
+			const summary = buildSummary(symbol, position, actualExitPrice, closedAtIso);
 			if (summary) {
 				summaries.push(summary);
 
-				// Update order in database
+				// Update order in database with actual fill price
 				try {
 					const dbOrder = await getOpenOrderBySymbol(account.id, key);
 					if (dbOrder) {
 						await closeOrder({
 							orderId: dbOrder.id,
-							exitPrice: latestPrice.toString(),
+							exitPrice: actualExitPrice.toString(),
 							realizedPnl: (summary.netPnl ?? 0).toString(),
 						});
 					} else {

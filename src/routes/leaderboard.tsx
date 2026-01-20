@@ -24,6 +24,7 @@ import { VariantSelector } from "@/components/variant-selector";
 import { useVariant, type VariantId } from "@/components/variant-context";
 import { cn } from "@/core/lib/utils";
 import { getModelInfo } from "@/core/shared/models/modelConfig";
+import { VARIANT_IDS, getVariantBadgeClasses } from "@/core/shared/variants";
 import { exportLeaderboardToExcel, type LeaderboardVariantData } from "@/core/utils/excelExport";
 import { orpc } from "@/server/orpc/client";
 
@@ -59,9 +60,8 @@ function LeaderboardRoute() {
 	);
 
 	// Queries for all variants (used for export)
-	const variants = ["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"] as const;
 	const variantQueries = useQueries({
-		queries: variants.map((variant) =>
+		queries: VARIANT_IDS.map((variant) =>
 			orpc.analytics.getLeaderboard.queryOptions({
 				input: { window, sortBy, variant },
 			}),
@@ -79,7 +79,7 @@ function LeaderboardRoute() {
 		setIsExporting(true);
 		try {
 			// Build variant data from queries
-			const variantData: LeaderboardVariantData[] = variants.map((variant, idx) => ({
+			const variantData: LeaderboardVariantData[] = VARIANT_IDS.map((variant, idx) => ({
 				variant,
 				entries: (variantQueries[idx]?.data?.entries ?? []).map((e) => ({
 					modelName: e.modelName,
@@ -317,13 +317,7 @@ function LeaderboardRoute() {
 														<TableCell className="px-4 py-3">
 															<span className={cn(
 																"px-2 py-0.5 rounded text-xs font-medium",
-																entry.variant === "Guardian" && "bg-purple-500/20 text-purple-600",
-																entry.variant === "Apex" && "bg-amber-500/20 text-amber-600",
-																entry.variant === "Gladiator" && "bg-green-500/20 text-green-600",
-																entry.variant === "Sniper" && "bg-blue-500/20 text-blue-600",
-																entry.variant === "Trendsurfer" && "bg-cyan-500/20 text-cyan-600",
-																entry.variant === "Contrarian" && "bg-rose-500/20 text-rose-600",
-																entry.variant === "Sovereign" && "bg-yellow-500/20 text-yellow-600",
+																getVariantBadgeClasses(entry.variant),
 															)}>
 																{entry.variant}
 															</span>
