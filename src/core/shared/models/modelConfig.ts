@@ -44,6 +44,12 @@ export const MODEL_INFO: Record<string, ModelInfoEntry> = {
 		label: "Qwen3 Max",
 		provider: "openrouter",
 	},
+	"qwen3-235b-a22b": {
+		logo: "/models/qwen.png",
+		color: "#8B5CF6",
+		label: "Qwen3 235B A22B",
+		provider: "nim",
+	},
 	"glm-4.5-air": {
 		logo: "/models/glm.svg",
 		color: "#343333",
