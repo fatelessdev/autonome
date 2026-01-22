@@ -82,7 +82,10 @@ Cash: {{AVAILABLE_CASH}} | Exposure: {{EXPOSURE_TO_EQUITY_PCT}}%
 
 == MARKET DATA ==
 {{MARKET_INTELLIGENCE}}
-*Note: Use Taapi (ADX/Cloud) for Context, Local Data for Execution.*
+*Context Guide:*
+1. **Regime:** Use ADX & Ichimoku Cloud (Taapi) to define Trend vs Chop.
+2. **Value:** Use VWAP & EMA20 (Local) for entry/exit levels.
+3. **Sentiment:** Check Funding Rate. Avoid crowded trades.
 
 == PORTFOLIO ==
 {{PORTFOLIO_SNAPSHOT}}
@@ -94,9 +97,12 @@ Cash: {{AVAILABLE_CASH}} | Exposure: {{EXPOSURE_TO_EQUITY_PCT}}%
 {{PERFORMANCE_OVERVIEW}}
 
 == MISSION ==
-1.  **Analyze Regime:** Use ADX and Ichimoku to decide: Trend or Range?
-2.  **Select Strategy:** Deploy Capital based on the Regime.
-3.  **Execute:** If edge exists, take it. If Chop (Inside Cloud), Call **holding()**.
+1. **Audit:** Manage open positions. (Trail stops on winners, kill Zombies).
+2. **Regime Check:** Is ADX > 25 (Trend) or < 20 (Range)?
+3. **Execute:**
+   * *Trend:* Buy Pullbacks to VWAP.
+   * *Range:* Fade Bollinger Extremes.
+   * *Chop:* **HOLD.**
 
 CRITICAL: End your response with a tool call. If no action needed, call holding() with your reasoning.
 `;

@@ -72,6 +72,7 @@ export function buildOpenPositionsSection(
 	const sections = positions.map((position) => {
 		const leverage =
 			position.leverage != null ? `${position.leverage.toFixed(2)}x` : "n/a";
+		// Per-position realized = P&L from scaling down this specific position (partial closes)
 		const mainLine = [
 			`symbol ${position.symbol}`,
 			`side ${position.sign}`,
@@ -81,7 +82,7 @@ export function buildOpenPositionsSection(
 			`mark ${formatNullableNumber(position.markPrice, 2)}`,
 			`liquidation ${formatNullableNumber(position.liquidationPrice, 2)}`,
 			`unrealized ${formatUsd(position.unrealizedPnl, 2)}`,
-			`realized ${formatUsd(position.realizedPnl, 2)}`,
+			`scaled_realized ${formatUsd(position.realizedPnl, 2)}`,
 			`leverage ${leverage}`,
 		].join(" | ");
 
@@ -133,7 +134,8 @@ export function buildPortfolioSnapshotSection({
 		`open_positions: ${openPositions.length}`,
 		`gross_exposure_usd: ${formatUsd(exposureSummary.totalNotional)}`,
 		`unrealized_pnl: ${formatUsd(exposureSummary.totalUnrealized)}`,
-		`realized_pnl: ${formatUsd(exposureSummary.totalRealized)}`,
+		// Open-position realized = P&L from scaling down current positions (not yet fully closed)
+		`scaled_realized_pnl: ${formatUsd(exposureSummary.totalRealized)}`,
 	];
 
 	if (cashUtilization !== null && Number.isFinite(cashUtilization)) {
@@ -190,7 +192,8 @@ export function buildPerformanceOverview({
 		`short_exposure: ${formatUsd(exposure.shortExposure)}`,
 		`net_exposure: ${formatUsd(netExposure)}`,
 		`unrealized_pnl: ${formatUsd(exposure.totalUnrealized)}`,
-		`realized_pnl: ${formatUsd(exposure.totalRealized)}`,
+		// Closed-trade realized = cumulative P&L from all fully closed trades (historical performance)
+		`closed_trade_realized_pnl: ${formatUsd(performanceMetrics.closedTradeRealizedPnl)}`,
 		`gross_risk_usd: ${formatUsd(exposure.totalRiskUsd)}`,
 		`max_single_position_risk_usd: ${formatUsd(exposure.maxPositionRiskUsd)}`,
 		`annualized_sharpe_ratio: ${performanceMetrics.sharpeRatio}`,

@@ -32,7 +32,7 @@ export const models = pgTable(
 		id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
 		name: text("name").notNull(),
 		openRouterModelName: text("openRouterModelName").notNull(),
-		variant: variantEnum("variant").notNull().default("Guardian"),
+		variant: variantEnum("variant").notNull().default("Apex"),
 		lighterApiKey: text("lighterApiKey").notNull().default("0"),
 		invocationCount: integer("invocationCount").notNull().default(0),
 		totalMinutes: integer("totalMinutes").notNull().default(0),

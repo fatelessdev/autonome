@@ -37,9 +37,10 @@ const MODEL_DEFINITIONS = [
 	"deepseek-ai/deepseek-v3.1-terminus",
 	"minimaxai/minimax-m2",
 	"moonshotai/kimi-k2-thinking",
+	"openai/gpt-oss-120b",
 	// "xiaomi/mimo-v2-flash:free",
 	// "kwaipilot/kat-coder-pro:free",
-	
+	"qwen/qwen3-235b-a22b",
 	// "mistralai/mistral-large-3-675b-instruct-2512"
 
 ];

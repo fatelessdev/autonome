@@ -5,11 +5,13 @@ import {
 	calculateSharpeRatioFromTrades,
 } from "@/core/shared/trading/calculations";
 import type { Account } from "@/server/features/trading/accounts";
-import { getClosedOrdersByModel } from "@/server/db/ordersRepository.server";
+import { getClosedOrdersByModel, getTotalRealizedPnl } from "@/server/db/ordersRepository.server";
 
 export type PerformanceMetrics = {
 	sharpeRatio: string;
 	totalReturnPercent: string;
+	/** Realized P&L from all closed trades (historical) */
+	closedTradeRealizedPnl: number;
 };
 
 /**
@@ -46,12 +48,16 @@ export async function calculatePerformanceMetrics(
 	account: Account,
 	currentPortfolioValue: number,
 ): Promise<PerformanceMetrics> {
-	const portfolioHistory = await getPortfolioHistory(account.id);
+	const [portfolioHistory, closedTradeRealizedPnl] = await Promise.all([
+		getPortfolioHistory(account.id),
+		getTotalRealizedPnl(account.id),
+	]);
 
 	if (portfolioHistory.length < 2) {
 		return {
 			sharpeRatio: "N/A (need more data)",
 			totalReturnPercent: "N/A",
+			closedTradeRealizedPnl,
 		};
 	}
 
@@ -66,5 +72,6 @@ export async function calculatePerformanceMetrics(
 	return {
 		sharpeRatio,
 		totalReturnPercent: `${totalReturn.toFixed(2)}%`,
+		closedTradeRealizedPnl,
 	};
 }

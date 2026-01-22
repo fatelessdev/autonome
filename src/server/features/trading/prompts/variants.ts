@@ -6,13 +6,10 @@
  * can be tested in parallel.
  *
  * Variants:
- * 1. Guardian (The Fortress) - Capital preservation, Ichimoku Cloud filter
- * 2. Apex (The Kelly Engine) - Aggressive, VWAP momentum validation
- * 3. Gladiator (Tournament) - Game theory, leaderboard-aware
- * 4. Sniper (Precision) - Confluence trading, Rule of Three
- * 5. Trendsurfer (Momentum) - Trend following, ADX filter
- * 6. Contrarian (Mean Reversion) - Fade extremes in ranging markets
- * 7. Sovereign (Adaptive) - Flexible regime-adaptive allocator
+ * 1. Apex (The Kelly Engine) - Aggressive, VWAP momentum validation
+ * 2. Trendsurfer (Momentum) - Trend following, ADX filter
+ * 3. Contrarian (Mean Reversion) - Fade extremes in ranging markets
+ * 4. Sovereign (Adaptive) - Flexible regime-adaptive allocator
  */
 
 import {
@@ -24,21 +21,9 @@ import {
 } from "@/core/shared/variants";
 
 import {
-	SYSTEM_PROMPT as SYSTEM_PROMPT_GUARDIAN,
-	USER_PROMPT as USER_PROMPT_GUARDIAN,
-} from "./guardian";
-import {
 	SYSTEM_PROMPT as SYSTEM_PROMPT_APEX,
 	USER_PROMPT as USER_PROMPT_APEX,
 } from "./apex";
-import {
-	SYSTEM_PROMPT as SYSTEM_PROMPT_GLADIATOR,
-	USER_PROMPT as USER_PROMPT_GLADIATOR,
-} from "./gladiator";
-import {
-	SYSTEM_PROMPT as SYSTEM_PROMPT_SNIPER,
-	USER_PROMPT as USER_PROMPT_SNIPER,
-} from "./sniper";
 import {
 	SYSTEM_PROMPT as SYSTEM_PROMPT_TRENDSURFER,
 	USER_PROMPT as USER_PROMPT_TRENDSURFER,
@@ -78,28 +63,10 @@ export interface VariantConfig extends SharedVariantConfig {
  * Builds on top of VARIANT_CONFIG from shared module.
  */
 export const VARIANT_PROMPTS: Record<VariantId, VariantConfig> = {
-	Guardian: {
-		...VARIANT_CONFIG.Guardian,
-		systemPrompt: SYSTEM_PROMPT_GUARDIAN,
-		userPrompt: USER_PROMPT_GUARDIAN,
-		temperature: 0,
-	},
 	Apex: {
 		...VARIANT_CONFIG.Apex,
 		systemPrompt: SYSTEM_PROMPT_APEX,
 		userPrompt: USER_PROMPT_APEX,
-		temperature: 0,
-	},
-	Gladiator: {
-		...VARIANT_CONFIG.Gladiator,
-		systemPrompt: SYSTEM_PROMPT_GLADIATOR,
-		userPrompt: USER_PROMPT_GLADIATOR,
-		temperature: 0,
-	},
-	Sniper: {
-		...VARIANT_CONFIG.Sniper,
-		systemPrompt: SYSTEM_PROMPT_SNIPER,
-		userPrompt: USER_PROMPT_SNIPER,
 		temperature: 0,
 	},
 	Trendsurfer: {

@@ -190,6 +190,7 @@ const { data } = useQuery(orpc.trading.getPositions.queryOptions({ input: {} }))
 - Variant validation: Use `isValidVariantId(value)` type guard when parsing unknown variant strings. Safer than hardcoded `.includes()` checks.
 - Live fill tracking: `createPosition.ts` and `closePosition.ts` now use `fillTracker.ts` to capture actual fill quantity and average price from exchange. Uses SDK's `waitForTransaction()` + `checkOrderStatus()` with polling. Handles partial fills gracefully.
 - Retention config: `RETENTION_CONFIG` and `DOWNSAMPLE_CONFIG` in `retentionService.ts` consolidate all timing thresholds. Modify these constants to adjust data retention/downsampling behavior.
+- Realized PnL semantics: Portfolio section shows `scaled_realized_pnl` (cumulative from scaling open positions), Performance section shows `closed_trade_realized_pnl` (cumulative from fully closed trades). Per-position `scaled_realized` shows P&L from partial closes of that position. Use `PerformanceMetrics.closedTradeRealizedPnl` from `performanceMetrics.ts` and `ExposureSummary.totalRealized` from `openPositionEnrichment.ts`.
 
 ## Code Style (Biome)
 

@@ -24,10 +24,7 @@ import { z } from "zod";
  * This is the SSOT - all other variant lists derive from this.
  */
 export const VARIANT_IDS = [
-	"Guardian",
 	"Apex",
-	"Gladiator",
-	"Sniper",
 	"Trendsurfer",
 	"Contrarian",
 	"Sovereign",
@@ -85,41 +82,14 @@ export interface VariantConfig {
  * Colors match Tailwind's palette for consistency.
  */
 export const VARIANT_CONFIG: Record<VariantId, VariantConfig> = {
-	Guardian: {
-		id: "Guardian",
-		label: "Guardian (Fortress)",
-		description: "Capital preservation, Ichimoku Cloud hard filter, ADX safety",
-		color: "#a855f7", // purple-500
-		bgClass: "bg-purple-500/20",
-		textClass: "text-purple-600",
-		lightBg: "#faf5ff",
-	},
 	Apex: {
 		id: "Apex",
 		label: "Apex (Kelly Engine)",
 		description: "Aggressive 10x leverage, VWAP momentum validation, squeeze trading",
-		color: "#f59e0b", // amber-500
-		bgClass: "bg-amber-500/20",
-		textClass: "text-amber-600",
-		lightBg: "#fffbeb",
-	},
-	Gladiator: {
-		id: "Gladiator",
-		label: "Gladiator (Tournament)",
-		description: "Game theory based, leaderboard-aware attack/defend posture",
-		color: "#22c55e", // green-500
-		bgClass: "bg-green-500/20",
-		textClass: "text-green-600",
-		lightBg: "#f0fdf4",
-	},
-	Sniper: {
-		id: "Sniper",
-		label: "Sniper (Precision)",
-		description: "Confluence specialist, Rule of Three, VWAP + RSI + Pattern",
-		color: "#3b82f6", // blue-500
-		bgClass: "bg-blue-500/20",
-		textClass: "text-blue-600",
-		lightBg: "#eff6ff",
+		color: "#a855f7", // purple-500
+		bgClass: "bg-purple-500/20",
+		textClass: "text-purple-600",
+		lightBg: "#faf5ff",
 	},
 	Trendsurfer: {
 		id: "Trendsurfer",
@@ -259,4 +229,4 @@ export const VARIANT_TABS: Array<{
 /**
  * Default variant for backward compatibility
  */
-export const DEFAULT_VARIANT: VariantId = "Guardian";
+export const DEFAULT_VARIANT: VariantId = "Apex";
