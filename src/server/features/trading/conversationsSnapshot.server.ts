@@ -7,13 +7,14 @@ import {
 	type TradingDecision,
 	type TradingDecisionResult,
 } from "@/server/features/trading/tradingDecisions";
+import { VARIANT_IDS, type VariantId } from "@/core/shared/variants";
 import { safeJsonParse } from "@/utils/json";
 
 export type ConversationSnapshot = {
 	id: string;
 	modelId: string;
 	modelName: string;
-	modelVariant?: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign";
+	modelVariant?: VariantId;
 	modelLogo: string;
 	response: string | null;
 	responsePayload: unknown;
@@ -61,7 +62,7 @@ export async function fetchConversationSnapshots(
 	limitPerVariant = 100,
 ): Promise<ConversationSnapshot[]> {
 	// Fetch 100 invocations per variant to ensure fair representation
-	const variants = ["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"] as const;
+	const variants = VARIANT_IDS;
 
 	const variantQueries = variants.map((variant) =>
 		db.query.invocations.findMany({
