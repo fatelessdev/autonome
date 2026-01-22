@@ -12,6 +12,7 @@ import {
 	type PortfolioHistoryEntry,
 	type DownsampleResolution,
 } from "@/core/shared/markets/marketQueries";
+import type { VariantId } from "@/core/shared/variants";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { getModelInfo } from "@/shared/models/modelConfig";
 
@@ -35,7 +36,8 @@ export default function PerformanceGraph() {
 	const queryClient = useQueryClient();
 
 	// Server-side variant filtering - pass variant to query
-	const variantParam = selectedVariant === "all" ? undefined : selectedVariant as "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign";
+	const variantParam: VariantId | undefined =
+		selectedVariant === "all" ? undefined : selectedVariant;
 
 	const {
 		data: portfolioResult,
