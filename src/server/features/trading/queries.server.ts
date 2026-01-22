@@ -4,6 +4,12 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { models, orders } from "@/db/schema";
 import { DEFAULT_SIMULATOR_OPTIONS, IS_SIMULATION_ENABLED } from "@/env";
+import {
+	DEFAULT_VARIANT,
+	isValidVariantId,
+	VARIANT_IDS,
+	type VariantId,
+} from "@/core/shared/variants";
 import { fetchCandlesticksRest } from "@/server/integrations/lighter";
 import { ExchangeSimulator } from "@/server/features/simulator/exchangeSimulator";
 import { closeOrder, getOpenOrdersByModel } from "@/server/db/ordersRepository.server";
@@ -141,17 +147,18 @@ type TradeRecord = {
 };
 
 export type FetchTradesOptions = {
-	variant?: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign";
+	variant?: VariantId;
 	limit?: number;
 };
 
 export async function fetchTrades(options?: FetchTradesOptions): Promise<TradeRecord[]> {
 	const { variant, limit = 100 } = options ?? {};
+	const normalizedVariant = isValidVariantId(variant) ? variant : undefined;
 
 	// If a specific variant is requested, fetch only for that variant
-	const variants = variant
-		? [variant]
-		: (["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"] as const);
+	const variants = normalizedVariant
+		? [normalizedVariant]
+		: VARIANT_IDS;
 	const LIMIT_PER_VARIANT = Math.ceil(limit / variants.length);
 
 	const variantQueries = variants.map((v) =>
@@ -201,7 +208,7 @@ export async function fetchTrades(options?: FetchTradesOptions): Promise<TradeRe
 			modelId: order.modelId,
 			modelName: order.model?.name ?? "Unknown",
 			modelRouterName: order.model?.openRouterModelName ?? null,
-			modelVariant: order.model?.variant ?? "Guardian",
+			modelVariant: order.model?.variant ?? DEFAULT_VARIANT,
 			symbol: order.symbol,
 			side: order.side,
 			quantity,
@@ -272,15 +279,16 @@ async function reconcilePositionsWithLive(
 }
 
 export type FetchPositionsOptions = {
-	variant?: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign";
+	variant?: VariantId;
 };
 
 export async function fetchPositions(options?: FetchPositionsOptions) {
 	const { variant } = options ?? {};
+	const normalizedVariant = isValidVariantId(variant) ? variant : undefined;
 
 	try {
 		// Fetch models - filter by variant if specified
-		const dbModels = variant
+		const dbModels = normalizedVariant
 			? await db
 					.select({
 						id: models.id,
@@ -293,7 +301,7 @@ export async function fetchPositions(options?: FetchPositionsOptions) {
 						totalMinutes: models.totalMinutes,
 					})
 					.from(models)
-					.where(eq(models.variant, variant))
+					.where(eq(models.variant, normalizedVariant))
 			: await db
 					.select({
 						id: models.id,

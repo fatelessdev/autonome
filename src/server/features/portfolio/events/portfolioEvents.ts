@@ -1,9 +1,11 @@
 import { EventEmitter } from "node:events";
 
+import type { VariantId } from "@/core/shared/variants";
+
 export type PortfolioSnapshotData = {
 	modelId: string;
 	modelName: string;
-	variant?: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign";
+	variant?: VariantId;
 	netPortfolio: string;
 	createdAt: string;
 };

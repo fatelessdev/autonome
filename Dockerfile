@@ -47,6 +47,7 @@ COPY --from=builder --chown=bunjs:nodejs /app/drizzle ./drizzle
 COPY --from=builder --chown=bunjs:nodejs /app/drizzle.config.ts ./drizzle.config.ts
 COPY --from=builder --chown=bunjs:nodejs /app/scripts ./scripts
 COPY --from=builder --chown=bunjs:nodejs /app/src/db ./src/db
+COPY --from=builder --chown=bunjs:nodejs /app/src/core/shared ./src/core/shared
 COPY --from=builder --chown=bunjs:nodejs /app/src/env.ts ./src/env.ts
 COPY --from=builder --chown=bunjs:nodejs /app/tsconfig.json ./tsconfig.json
 
