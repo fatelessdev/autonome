@@ -149,9 +149,20 @@ const { data } = useQuery(orpc.trading.getPositions.queryOptions({ input: {} }))
 - `INITIAL_CAPITAL` (10,000) - Constant for return calculations
 
 **Scheduler Initialization**:
-- Use `globalThis` variables for singleton state (survives HMR)
-- `bootstrap.ts` guards with `globalThis.__autonomeSchedulersBootstrapped`
+- Use consolidated `schedulerState.ts` module for all scheduler globals
+- Single `globalThis.__schedulerState` object replaces scattered globals
+- `bootstrap.ts` guards with `isBootstrapped()` / `markBootstrapped()`
 - Called from API server startup in `api/src/index.ts`
+
+**Shared Variants** (`@/core/shared/variants`):
+- `VARIANT_IDS` - SSOT array: `["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"]`
+- `VariantId`, `VariantIdWithAll` - TypeScript types
+- `variantIdSchema`, `variantIdWithAllSchema` - Zod validation
+- `VARIANT_CONFIG` - Label, description, color, Tailwind classes per variant
+- `getVariantBadgeClasses(variant)` - Returns Tailwind bg + text classes
+- `getVariantColor(variant)` - Returns hex color for charts
+- `isValidVariantId(value)` - Type guard for variant validation
+- `VARIANT_TABS` - Pre-built tab array with "all" option
 
 ## Session Notes
 
@@ -172,6 +183,14 @@ const { data } = useQuery(orpc.trading.getPositions.queryOptions({ input: {} }))
 - Scheduler error isolation: All scheduler callbacks wrapped in try-catch to prevent unhandled rejections from stopping the scheduler loops.
 - Model stuck detection: Trade scheduler auto-clears models stuck in "running" state for >10 minutes. Tracked via `modelsRunningStartTime` map.
 - Execution health tracking: Health endpoint now tracks `lastSuccessfulCompletion`, `lastCycleStats` (success/failure counts), and `consecutiveFailedCycles`. Health is "degraded" if no successful completion in 15 minutes or 3+ consecutive failed cycles.
+- NIM API key cycling: Use `getNextNimApiKey()` from `@/env` for round-robin key distribution. Supports `NIM_API_KEY`, `NIM_API_KEY1`, `NIM_API_KEY2`, `NIM_API_KEY3` in `.env.local`.
+- Variant SSOT: All variant definitions consolidated in `@/core/shared/variants`. DB schema, oRPC schemas, UI components, and export utilities now import from this module. To add a new variant: add to `VARIANT_IDS`, add config to `VARIANT_CONFIG`, run migrations.
+- Scheduler state consolidation: Replaced scattered `globalThis.*` variables with `schedulerState.ts` module. All scheduler state accessed via typed getters/setters (`getTradeState()`, `getPortfolioState()`, `isModelRunning()`, etc.). Health endpoints use `getSchedulerHealth()` and `getSchedulerDetailedHealth()`.
+- Variant badge styling: Use `getVariantBadgeClasses(variant)` instead of inline conditionals. Returns combined Tailwind classes like `"bg-purple-500/20 text-purple-600"`.
+- Variant validation: Use `isValidVariantId(value)` type guard when parsing unknown variant strings. Safer than hardcoded `.includes()` checks.
+- Live fill tracking: `createPosition.ts` and `closePosition.ts` now use `fillTracker.ts` to capture actual fill quantity and average price from exchange. Uses SDK's `waitForTransaction()` + `checkOrderStatus()` with polling. Handles partial fills gracefully.
+- Retention config: `RETENTION_CONFIG` and `DOWNSAMPLE_CONFIG` in `retentionService.ts` consolidate all timing thresholds. Modify these constants to adjust data retention/downsampling behavior.
+- Realized PnL semantics: Portfolio section shows `scaled_realized_pnl` (cumulative from scaling open positions), Performance section shows `closed_trade_realized_pnl` (cumulative from fully closed trades). Per-position `scaled_realized` shows P&L from partial closes of that position. Use `PerformanceMetrics.closedTradeRealizedPnl` from `performanceMetrics.ts` and `ExposureSummary.totalRealized` from `openPositionEnrichment.ts`.
 
 ## Code Style (Biome)
 

@@ -44,42 +44,20 @@ import { analyzeToolCallFailure } from "@/server/features/analytics/toolCallAnal
 import {
 	CONSENSUS_MODEL_NAME,
 } from "@/server/features/trading/orchestrator";
+import {
+	getTradeIntervalHandle,
+	setTradeIntervalHandle,
+	setTradeLastRun,
+	setTradeLastSuccessfulCompletion,
+	setTradeLastCycleStats,
+	incrementConsecutiveFailedCycles,
+	resetConsecutiveFailedCycles,
+	isModelRunning,
+	setModelRunning,
+	clearStaleRunningModels,
+} from "@/server/schedulers/schedulerState";
 
 import { createTradeAgent, type ToolContext } from "./agent";
-
-declare global {
-	// eslint-disable-next-line no-var
-	var tradeIntervalHandle: ReturnType<typeof setInterval> | undefined;
-	// eslint-disable-next-line no-var
-	var modelsRunning: Map<string, boolean> | undefined;
-	// eslint-disable-next-line no-var
-	var modelsRunningStartTime: Map<string, number> | undefined;
-	// eslint-disable-next-line no-var
-	var tradeSchedulerLastRun: number | undefined;
-	// eslint-disable-next-line no-var
-	var tradeSchedulerLastSuccessfulCompletion: number | undefined;
-	// eslint-disable-next-line no-var
-	var tradeSchedulerLastCycleStats: {
-		successCount: number;
-		failureCount: number;
-		totalModels: number;
-		timestamp: number;
-	} | undefined;
-	// eslint-disable-next-line no-var
-	var tradeSchedulerConsecutiveFailedCycles: number | undefined;
-}
-
-// Initialize per-model running state
-if (!globalThis.modelsRunning) {
-	globalThis.modelsRunning = new Map();
-}
-if (!globalThis.modelsRunningStartTime) {
-	globalThis.modelsRunningStartTime = new Map();
-}
-// Initialize execution metrics
-if (globalThis.tradeSchedulerConsecutiveFailedCycles === undefined) {
-	globalThis.tradeSchedulerConsecutiveFailedCycles = 0;
-}
 
 const TRADE_INTERVAL_MS = 5 * 60 * 1000;
 const AGENT_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
@@ -374,7 +352,7 @@ export async function runTradeWorkflow(account: Account) {
  */
 export async function executeScheduledTrades() {
 	try {
-		globalThis.tradeSchedulerLastRun = Date.now();
+		setTradeLastRun(Date.now());
 		await executeScheduledTradesInternal();
 	} catch (error) {
 		console.error("[Trade Scheduler] Unhandled error in executeScheduledTrades:", error);
@@ -408,26 +386,16 @@ async function executeScheduledTradesInternal() {
 
 	// Clear stale running states (models stuck for >10 minutes)
 	const STALE_THRESHOLD_MS = 10 * 60 * 1000;
-	const now = Date.now();
-	if (globalThis.modelsRunningStartTime) {
-		for (const [modelId, startTime] of globalThis.modelsRunningStartTime.entries()) {
-			if (now - startTime > STALE_THRESHOLD_MS) {
-				console.warn(`[Trade Scheduler] Clearing stale running state for model ${modelId} (stuck for ${Math.round((now - startTime) / 1000)}s)`);
-				globalThis.modelsRunning?.set(modelId, false);
-				globalThis.modelsRunningStartTime.delete(modelId);
-			}
-		}
-	}
+	clearStaleRunningModels(STALE_THRESHOLD_MS);
 
 	// Filter out models that are still running from previous cycle
 	const modelsToRun = validModels.filter((model) => {
-		const isRunning = globalThis.modelsRunning?.get(model.id) ?? false;
-		return !isRunning;
+		return !isModelRunning(model.id);
 	});
 
 	// Check if consensus is already running
 	const consensusIsRunning = consensusModel
-		? (globalThis.modelsRunning?.get(consensusModel.id) ?? false)
+		? isModelRunning(consensusModel.id)
 		: false;
 
 	if (modelsToRun.length === 0 && (!consensusModel || consensusIsRunning)) {
@@ -436,8 +404,7 @@ async function executeScheduledTradesInternal() {
 
 	// Mark models as running with timestamps
 	for (const model of modelsToRun) {
-		globalThis.modelsRunning?.set(model.id, true);
-		globalThis.modelsRunningStartTime?.set(model.id, Date.now());
+		setModelRunning(model.id, true);
 	}
 
 	// Hard timeout for each model run - ensures every promise settles
@@ -470,8 +437,7 @@ async function executeScheduledTradesInternal() {
 			console.error(`[Trade Scheduler] Model ${model.name} ${isTimeout ? "timed out" : "failed"}:`, error);
 			return { modelId: model.id, success: false };
 		} finally {
-			globalThis.modelsRunning?.set(model.id, false);
-			globalThis.modelsRunningStartTime?.delete(model.id);
+			setModelRunning(model.id, false);
 		}
 	};
 
@@ -493,20 +459,19 @@ async function executeScheduledTradesInternal() {
 		const failureCount = validResults.length - successCount;
 
 		// Update cycle stats
-		globalThis.tradeSchedulerLastCycleStats = {
+		setTradeLastCycleStats({
 			successCount,
 			failureCount,
 			totalModels,
 			timestamp: Date.now(),
-		};
+		});
 
 		// Track consecutive failed cycles (all models failed)
 		if (successCount === 0 && totalModels > 0) {
-			globalThis.tradeSchedulerConsecutiveFailedCycles =
-				(globalThis.tradeSchedulerConsecutiveFailedCycles ?? 0) + 1;
+			incrementConsecutiveFailedCycles();
 		} else if (successCount > 0) {
-			globalThis.tradeSchedulerConsecutiveFailedCycles = 0;
-			globalThis.tradeSchedulerLastSuccessfulCompletion = Date.now();
+			resetConsecutiveFailedCycles();
+			setTradeLastSuccessfulCompletion(Date.now());
 		}
 
 		const successful = validResults
@@ -531,7 +496,7 @@ async function executeScheduledTradesInternal() {
  * Ensures the trade scheduler is running
  */
 export function ensureTradeScheduler() {
-	if (globalThis.tradeIntervalHandle) {
+	if (getTradeIntervalHandle()) {
 		return;
 	}
 
@@ -539,9 +504,9 @@ export function ensureTradeScheduler() {
 
 	void executeScheduledTrades();
 
-	globalThis.tradeIntervalHandle = setInterval(() => {
+	setTradeIntervalHandle(setInterval(() => {
 		void executeScheduledTrades();
-	}, TRADE_INTERVAL_MS);
+	}, TRADE_INTERVAL_MS));
 }
 
 if ((import.meta as { main?: boolean }).main) {

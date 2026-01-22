@@ -45,6 +45,10 @@ import {
 } from "@/server/features/trading/queries.server";
 import router from "@/server/orpc/router";
 import { bootstrapSchedulers } from "@/server/schedulers/bootstrap";
+import {
+	getSchedulerHealth,
+	getSchedulerDetailedHealth,
+} from "@/server/schedulers/schedulerState";
 
 // ==================== Global Error Handlers ====================
 // Prevent unhandled errors from silently crashing schedulers
@@ -58,9 +62,6 @@ process.on("uncaughtException", (error) => {
 	console.error("[CRITICAL] Uncaught Exception:", error);
 	// Don't exit - keep the server running
 });
-
-// Track server start time for uptime calculation
-globalThis.__serverStartTime = Date.now();
 
 // ==================== Server Setup ====================
 
@@ -282,84 +283,12 @@ app.get("/api/events/workflow", async (c) => {
 
 // Health handler function (reused for both paths)
 const healthHandler = (c: Context) => {
-	// Include scheduler health information
-	const now = Date.now();
-	const tradeSchedulerLastRun = globalThis.tradeSchedulerLastRun;
-	const portfolioSchedulerLastRun = globalThis.__portfolioSchedulerLastRun;
-	const serverStartTime = globalThis.__serverStartTime ?? now;
-	const lastSuccessfulCompletion = globalThis.tradeSchedulerLastSuccessfulCompletion;
-	const lastCycleStats = globalThis.tradeSchedulerLastCycleStats;
-	const consecutiveFailedCycles = globalThis.tradeSchedulerConsecutiveFailedCycles ?? 0;
-
-	// Check if schedulers have run recently (within 2x their interval)
-	const TRADE_INTERVAL_MS = 5 * 60 * 1000;
-	const PORTFOLIO_INTERVAL_MS = 1 * 60 * 1000;
-
-	// Trade scheduler is "running" if interval is active and ran recently
-	const tradeSchedulerRunning = tradeSchedulerLastRun
-		? now - tradeSchedulerLastRun < TRADE_INTERVAL_MS * 2
-		: false;
-
-	// Trade scheduler is "healthy" only if models are actually completing successfully
-	// - Must have had a successful completion in the last 15 minutes (3 cycles)
-	// - OR be a fresh server with no cycles completed yet (give it grace period)
-	const MAX_SUCCESS_AGE_MS = 15 * 60 * 1000; // 15 minutes
-	const isNewServer = !lastCycleStats && now - serverStartTime < TRADE_INTERVAL_MS * 2;
-	const hasRecentSuccess = lastSuccessfulCompletion
-		? now - lastSuccessfulCompletion < MAX_SUCCESS_AGE_MS
-		: isNewServer;
-	const tradeSchedulerHealthy = tradeSchedulerRunning && hasRecentSuccess && consecutiveFailedCycles < 3;
-
-	const portfolioSchedulerHealthy = portfolioSchedulerLastRun
-		? now - portfolioSchedulerLastRun < PORTFOLIO_INTERVAL_MS * 2
-		: false;
-
-	const allHealthy = tradeSchedulerHealthy && portfolioSchedulerHealthy;
-	const uptimeSeconds = Math.floor((now - serverStartTime) / 1000);
-
-	return c.json({
-		status: allHealthy ? "ok" : "degraded",
-		timestamp: new Date().toISOString(),
-		serverStartedAt: new Date(serverStartTime).toISOString(),
-		uptimeSeconds,
-		schedulers: {
-			trade: {
-				healthy: tradeSchedulerHealthy,
-				lastRun: tradeSchedulerLastRun
-					? new Date(tradeSchedulerLastRun).toISOString()
-					: null,
-				ageMs: tradeSchedulerLastRun ? now - tradeSchedulerLastRun : null,
-			},
-			portfolio: {
-				healthy: portfolioSchedulerHealthy,
-				lastRun: portfolioSchedulerLastRun
-					? new Date(portfolioSchedulerLastRun).toISOString()
-					: null,
-				ageMs: portfolioSchedulerLastRun
-					? now - portfolioSchedulerLastRun
-					: null,
-			},
-		},
-	});
+	const health = getSchedulerHealth();
+	return c.json(health);
 };
 
 app.get("/health", healthHandler);
 app.get("/api/health", healthHandler);
-
-// Declare global types for scheduler health
-declare global {
-	var tradeSchedulerLastRun: number | undefined;
-	var __portfolioSchedulerLastRun: number | undefined;
-	var __serverStartTime: number | undefined;
-	var tradeSchedulerLastSuccessfulCompletion: number | undefined;
-	var tradeSchedulerLastCycleStats: {
-		successCount: number;
-		failureCount: number;
-		totalModels: number;
-		timestamp: number;
-	} | undefined;
-	var tradeSchedulerConsecutiveFailedCycles: number | undefined;
-}
 
 app.get("/", (c) => {
 	return c.json({
@@ -380,84 +309,12 @@ app.get("/", (c) => {
 
 // Detailed scheduler health endpoint
 const schedulersHealthHandler = (c: Context) => {
-	const now = Date.now();
-	const tradeSchedulerLastRun = globalThis.tradeSchedulerLastRun;
-	const portfolioSchedulerLastRun = globalThis.__portfolioSchedulerLastRun;
-	const modelsRunning = globalThis.modelsRunning;
-	const modelsRunningStartTime = globalThis.modelsRunningStartTime;
-	const serverStartTime = globalThis.__serverStartTime ?? now;
-	const lastSuccessfulCompletion = globalThis.tradeSchedulerLastSuccessfulCompletion;
-	const lastCycleStats = globalThis.tradeSchedulerLastCycleStats;
-	const consecutiveFailedCycles = globalThis.tradeSchedulerConsecutiveFailedCycles ?? 0;
-
-	// Build detailed running models info with duration
-	const runningModelsInfo = modelsRunning
-		? Array.from(modelsRunning.entries())
-				.filter(([_, running]) => running)
-				.map(([id]) => ({
-					id,
-					runningForSeconds: modelsRunningStartTime?.has(id)
-						? Math.round((now - (modelsRunningStartTime.get(id) ?? now)) / 1000)
-						: null,
-				}))
-		: [];
-
-	const uptimeSeconds = Math.floor((now - serverStartTime) / 1000);
-
-	return c.json({
-		timestamp: new Date().toISOString(),
-		serverStartedAt: new Date(serverStartTime).toISOString(),
-		uptimeSeconds,
-		tradeScheduler: {
-			lastRun: tradeSchedulerLastRun
-				? new Date(tradeSchedulerLastRun).toISOString()
-				: null,
-			ageSeconds: tradeSchedulerLastRun
-				? Math.round((now - tradeSchedulerLastRun) / 1000)
-				: null,
-			modelsCurrentlyRunning: runningModelsInfo,
-			intervalHandle: Boolean(globalThis.tradeIntervalHandle),
-			// New execution health metrics
-			lastSuccessfulCompletion: lastSuccessfulCompletion
-				? new Date(lastSuccessfulCompletion).toISOString()
-				: null,
-			lastSuccessAge: lastSuccessfulCompletion
-				? Math.round((now - lastSuccessfulCompletion) / 1000)
-				: null,
-			lastCycleStats: lastCycleStats
-				? {
-						successCount: lastCycleStats.successCount,
-						failureCount: lastCycleStats.failureCount,
-						totalModels: lastCycleStats.totalModels,
-						timestamp: new Date(lastCycleStats.timestamp).toISOString(),
-					}
-				: null,
-			consecutiveFailedCycles,
-		},
-		portfolioScheduler: {
-			lastRun: portfolioSchedulerLastRun
-				? new Date(portfolioSchedulerLastRun).toISOString()
-				: null,
-			ageSeconds: portfolioSchedulerLastRun
-				? Math.round((now - portfolioSchedulerLastRun) / 1000)
-				: null,
-			intervalHandle: Boolean(globalThis.__portfolioIntervalHandle),
-			initialized: Boolean(globalThis.__portfolioSchedulerInitialized),
-		},
-	});
+	const detailedHealth = getSchedulerDetailedHealth();
+	return c.json(detailedHealth);
 };
 
 app.get("/health/schedulers", schedulersHealthHandler);
 app.get("/api/health/schedulers", schedulersHealthHandler);
-
-// Declare additional global types
-declare global {
-	var tradeIntervalHandle: ReturnType<typeof setInterval> | undefined;
-	var modelsRunning: Map<string, boolean> | undefined;
-	var modelsRunningStartTime: Map<string, number> | undefined;
-	var __portfolioIntervalHandle: ReturnType<typeof setInterval> | undefined;
-	var __portfolioSchedulerInitialized: boolean | undefined;
-}
 
 // ==================== Start Server ====================
 

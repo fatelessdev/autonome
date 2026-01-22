@@ -44,6 +44,7 @@ export const env = createEnv({
 		NIM_API_KEY2: z.string().optional(),
 		NIM_API_KEY3: z.string().optional(),
 		OPENROUTER_API_KEY: z.string().optional(),
+		OPENROUTER_API_KEY1: z.string().optional(),
 		MISTRAL_API_KEY: z.string().optional(),
 
 		// Lighter API configuration
@@ -144,4 +145,34 @@ export function getNextNimApiKey(): string {
  */
 export function getNimApiKeyCount(): number {
 	return nimApiKeys.length;
+}
+
+// ==================== OpenRouter API Key Cycling ====================
+// Collect all available OpenRouter API keys into an array for round-robin cycling
+const openRouterApiKeys: string[] = [
+	env.OPENROUTER_API_KEY,
+	env.OPENROUTER_API_KEY1,
+].filter((key): key is string => Boolean(key));
+
+// Track request counter for round-robin cycling
+let openRouterRequestCounter = 0;
+
+/**
+ * Get the next OpenRouter API key using round-robin cycling.
+ * This distributes requests across multiple keys to avoid rate limits.
+ */
+export function getNextOpenRouterApiKey(): string {
+	if (openRouterApiKeys.length === 0) {
+		throw new Error("No OpenRouter API keys configured");
+	}
+	const key = openRouterApiKeys[openRouterRequestCounter % openRouterApiKeys.length]!;
+	openRouterRequestCounter++;
+	return key;
+}
+
+/**
+ * Get all available OpenRouter API keys count (for logging/debugging)
+ */
+export function getOpenRouterApiKeyCount(): number {
+	return openRouterApiKeys.length;
 }

@@ -15,11 +15,53 @@ import { and, eq, gte, lt, sql, min, avg, count } from "drizzle-orm";
 import { db } from "@/db";
 import { portfolioSize, models, type Variant } from "@/db/schema";
 
-// Retention thresholds
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+// ==================== Retention Configuration ====================
 
-// Resolution for aggregation
+/**
+ * Retention thresholds - controls data pruning and aggregation timing.
+ * All values in milliseconds.
+ */
+export const RETENTION_CONFIG = {
+	/** Keep raw 1-minute data for this duration */
+	RAW_DATA_RETENTION_MS: 7 * 24 * 60 * 60 * 1000, // 7 days
+	/** After this, aggregate to daily buckets */
+	HOURLY_TO_DAILY_MS: 30 * 24 * 60 * 60 * 1000, // 30 days
+} as const;
+
+// ==================== Downsampling Configuration ====================
+
+/**
+ * Time-based downsampling resolution tiers for chart rendering.
+ * Resolution is auto-detected from data time range.
+ * 
+ * Time Range → Bucket Size → Approx Points (for 7 days of data)
+ * - ≤24h      → 1 min      → 1,440 points
+ * - ≤3d       → 5 min      → 864 points
+ * - ≤7d       → 15 min     → 672 points
+ * - ≤30d      → 1 hour     → 720 points
+ * - >30d      → 4 hours    → ~180-360 points
+ */
+export const DOWNSAMPLE_CONFIG = {
+	/** Time range thresholds (in milliseconds) */
+	THRESHOLDS: {
+		ONE_DAY: 24 * 60 * 60 * 1000,
+		THREE_DAYS: 3 * 24 * 60 * 60 * 1000,
+		SEVEN_DAYS: 7 * 24 * 60 * 60 * 1000,
+		THIRTY_DAYS: 30 * 24 * 60 * 60 * 1000,
+	},
+	/** Resolution bucket sizes (in milliseconds) */
+	RESOLUTIONS: {
+		"1m": 60_000,
+		"5m": 5 * 60_000,
+		"15m": 15 * 60_000,
+		"1h": 60 * 60_000,
+		"4h": 4 * 60 * 60_000,
+	},
+} as const;
+
+export type DownsampleResolution = keyof typeof DOWNSAMPLE_CONFIG.RESOLUTIONS;
+
+// Resolution for aggregation export
 export type Resolution = "raw" | "hourly" | "daily";
 
 /**
@@ -34,8 +76,8 @@ export async function runRetentionPolicy(): Promise<{
 	rawRecordsDeleted: number;
 }> {
 	const now = Date.now();
-	const sevenDaysAgo = new Date(now - SEVEN_DAYS_MS);
-	const thirtyDaysAgo = new Date(now - THIRTY_DAYS_MS);
+	const sevenDaysAgo = new Date(now - RETENTION_CONFIG.RAW_DATA_RETENTION_MS);
+	const thirtyDaysAgo = new Date(now - RETENTION_CONFIG.HOURLY_TO_DAILY_MS);
 
 	// Step 1: Get first snapshot per model (must preserve these)
 	const firstSnapshots = await getFirstSnapshotPerModel();
@@ -366,38 +408,17 @@ export async function getPortfolioHistoryWithResolution(options?: {
 }
 
 /**
- * Time-based downsampling resolution tiers.
- * Resolution is auto-detected from data time range.
- * 
- * Time Range → Bucket Size → Approx Points (for 7 days)
- * - ≤24h      → 1 min      → 1,440 points
- * - ≤3d       → 5 min      → 864 points
- * - ≤7d       → 15 min     → 672 points
- * - ≤30d      → 1 hour     → 720 points
- * - >30d      → 4 hours    → ~180-360 points
- */
-export type DownsampleResolution = "1m" | "5m" | "15m" | "1h" | "4h";
-
-const RESOLUTION_MS: Record<DownsampleResolution, number> = {
-	"1m": 60_000,
-	"5m": 5 * 60_000,
-	"15m": 15 * 60_000,
-	"1h": 60 * 60_000,
-	"4h": 4 * 60 * 60_000,
-};
-
-/**
  * Auto-detect appropriate resolution from data time range.
  */
 function detectResolutionFromTimeRange(startMs: number, endMs: number): DownsampleResolution {
 	const rangeMs = endMs - startMs;
-	const ONE_DAY = 24 * 60 * 60_000;
+	const { THRESHOLDS } = DOWNSAMPLE_CONFIG;
 	
-	if (rangeMs <= ONE_DAY) return "1m";           // ≤1 day: 1-minute buckets
-	if (rangeMs <= 3 * ONE_DAY) return "5m";       // ≤3 days: 5-minute buckets
-	if (rangeMs <= 7 * ONE_DAY) return "15m";      // ≤7 days: 15-minute buckets
-	if (rangeMs <= 30 * ONE_DAY) return "1h";      // ≤30 days: 1-hour buckets
-	return "4h";                                    // >30 days: 4-hour buckets
+	if (rangeMs <= THRESHOLDS.ONE_DAY) return "1m";           // ≤1 day: 1-minute buckets
+	if (rangeMs <= THRESHOLDS.THREE_DAYS) return "5m";        // ≤3 days: 5-minute buckets
+	if (rangeMs <= THRESHOLDS.SEVEN_DAYS) return "15m";       // ≤7 days: 15-minute buckets
+	if (rangeMs <= THRESHOLDS.THIRTY_DAYS) return "1h";       // ≤30 days: 1-hour buckets
+	return "4h";                                               // >30 days: 4-hour buckets
 }
 
 type PortfolioEntry = {
@@ -460,7 +481,7 @@ export function downsampleForChart(
 
 	// Auto-detect resolution if not provided
 	const detectedResolution = resolution ?? detectResolutionFromTimeRange(startMs, endMs);
-	const bucketSizeMs = RESOLUTION_MS[detectedResolution];
+	const bucketSizeMs = DOWNSAMPLE_CONFIG.RESOLUTIONS[detectedResolution];
 
 	// Track the absolute latest entry per model (before bucketing)
 	// For aggregate mode, track latest value per variant to average accurately

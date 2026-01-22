@@ -8,7 +8,7 @@ import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { ToolLoopAgent, stepCountIs, hasToolCall } from "ai";
 import * as Sentry from "@sentry/react";
 
-import { env, getNextNimApiKey } from "@/env";
+import { getNextNimApiKey, getNextOpenRouterApiKey } from "@/env";
 import type { Account } from "@/server/features/trading/accounts";
 import type { StepTelemetry } from "@/server/features/trading/invocationResponse";
 import { getModelProvider } from "@/shared/models/modelConfig";
@@ -63,8 +63,9 @@ export function createTradeAgent(config: TradeAgentConfig) {
 		// },
 	});
 
+	const openRouterApiKey = getNextOpenRouterApiKey();
 	const openrouter = createOpenRouter({
-		apiKey: env.OPENROUTER_API_KEY,
+		apiKey: openRouterApiKey,
 	});
 
 	// Select model based on provider
@@ -73,7 +74,7 @@ export function createTradeAgent(config: TradeAgentConfig) {
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	const selectedModel = (
 		useOpenRouter
-			? openrouter(account.modelName)
+			? openrouter.chat(account.modelName)
 			: nim.chatModel(account.modelName)
 	) as any;
 

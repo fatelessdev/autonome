@@ -7,16 +7,20 @@ import { runRetentionPolicy } from "@/server/features/portfolio/retentionService
 import { INITIAL_CAPITAL } from "@/core/shared/trading/calculations";
 import { emitPortfolioEvent } from "@/server/features/portfolio/events/portfolioEvents";
 import { QueryClient } from "@tanstack/react-query";
+import {
+	isPortfolioInitialized,
+	markPortfolioInitialized,
+	getPortfolioIntervalHandle,
+	setPortfolioIntervalHandle,
+	setRetentionIntervalHandle,
+	setPortfolioLastRun,
+} from "@/server/schedulers/schedulerState";
 
 const PORTFOLIO_INTERVAL_MS = 1000 * 60 * 1; // 1 minute
 const RETENTION_INTERVAL_MS = 1000 * 60 * 60; // 1 hour
 
 declare global {
-	var __portfolioSchedulerInitialized: boolean | undefined;
-	var __portfolioIntervalHandle: ReturnType<typeof setInterval> | undefined;
-	var __retentionIntervalHandle: ReturnType<typeof setInterval> | undefined;
 	var __portfolioQueryClient: QueryClient | undefined;
-	var __portfolioSchedulerLastRun: number | undefined;
 }
 
 /**
@@ -39,24 +43,24 @@ function getPortfolioFetchClient(): QueryClient {
 
 export function ensurePortfolioScheduler() {
 	// Double-check guard to prevent duplicate schedulers
-	if (globalThis.__portfolioSchedulerInitialized || globalThis.__portfolioIntervalHandle) {
+	if (isPortfolioInitialized() || getPortfolioIntervalHandle()) {
 		return;
 	}
 
-	globalThis.__portfolioSchedulerInitialized = true;
+	markPortfolioInitialized();
 	console.log("[Portfolio Scheduler] Starting portfolio tracker...");
 
 	// Initial run
 	void safeRecordPortfolios();
 
-	globalThis.__portfolioIntervalHandle = setInterval(() => {
+	setPortfolioIntervalHandle(setInterval(() => {
 		void safeRecordPortfolios();
-	}, PORTFOLIO_INTERVAL_MS);
+	}, PORTFOLIO_INTERVAL_MS));
 
 	// Run retention policy hourly
-	globalThis.__retentionIntervalHandle = setInterval(() => {
+	setRetentionIntervalHandle(setInterval(() => {
 		void runRetentionPolicyJob();
-	}, RETENTION_INTERVAL_MS);
+	}, RETENTION_INTERVAL_MS));
 
 	// Run retention on startup (after a delay to not block initialization)
 	setTimeout(() => {
@@ -70,7 +74,7 @@ export function ensurePortfolioScheduler() {
  */
 async function safeRecordPortfolios() {
 	try {
-		globalThis.__portfolioSchedulerLastRun = Date.now();
+		setPortfolioLastRun(Date.now());
 		await recordPortfolios();
 	} catch (error) {
 		console.error("[Portfolio Scheduler] Error in recordPortfolios:", error);

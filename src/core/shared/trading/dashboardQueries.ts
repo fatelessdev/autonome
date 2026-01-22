@@ -2,6 +2,7 @@ import { type QueryClient, queryOptions } from "@tanstack/react-query";
 
 import { orpc } from "@/server/orpc/client";
 import { normalizeNumber } from "@/shared/formatting/numberFormat";
+import { VARIANT_IDS, isValidVariantId, type VariantId } from "@/core/shared/variants";
 
 import type {
 	Conversation,
@@ -63,9 +64,8 @@ function normalizeTrades(payload: TradesResponse): Trade[] {
 				modelId,
 				modelName: typeof record.modelName === "string" ? record.modelName : "",
 				modelVariant:
-					typeof record.modelVariant === "string" &&
-					["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"].includes(record.modelVariant)
-						? (record.modelVariant as "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign")
+					typeof record.modelVariant === "string" && isValidVariantId(record.modelVariant)
+						? record.modelVariant
 						: undefined,
 				modelRouterName:
 					typeof record.modelRouterName === "string"
@@ -193,9 +193,8 @@ function normalizePositions(payload: PositionsResponse): ModelPositions[] {
 				modelId,
 				modelName,
 				modelVariant:
-					typeof record.modelVariant === "string" &&
-					["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"].includes(record.modelVariant)
-						? (record.modelVariant as "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign")
+					typeof record.modelVariant === "string" && isValidVariantId(record.modelVariant)
+						? record.modelVariant
 						: undefined,
 				modelLogo:
 					typeof record.modelLogo === "string" ? record.modelLogo : modelName,
@@ -282,9 +281,8 @@ function normalizeConversations(
 				modelName:
 					typeof record.modelName === "string" ? record.modelName : "Unknown",
 				modelVariant:
-					typeof record.modelVariant === "string" &&
-					["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"].includes(record.modelVariant)
-						? (record.modelVariant as "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign")
+					typeof record.modelVariant === "string" && isValidVariantId(record.modelVariant)
+						? record.modelVariant
 						: undefined,
 				modelLogo:
 					typeof record.modelLogo === "string"

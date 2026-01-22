@@ -23,7 +23,7 @@ const WINDOW_MS: Record<LeaderboardWindow, number> = {
 	"30d": 30 * 24 * 60 * 60 * 1000,
 };
 
-type VariantFilter = "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign";
+type VariantFilter = "Apex" | "Trendsurfer" | "Contrarian" | "Sovereign";
 
 /**
  * Fetch closed trades for multiple models and group them
@@ -167,7 +167,7 @@ export async function getAllModelsWithFailureCounts(
 	Array<{
 		id: string;
 		name: string;
-		variant: "Guardian" | "Apex" | "Gladiator" | "Sniper" | "Trendsurfer" | "Contrarian" | "Sovereign";
+		variant: "Apex" | "Trendsurfer" | "Contrarian" | "Sovereign";
 		failedWorkflowCount: number;
 		failedToolCallCount: number;
 		invocationCount: number;

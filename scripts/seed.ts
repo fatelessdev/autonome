@@ -6,7 +6,7 @@
  * This script will:
  * 1. Truncate all tables (cascade)
  * 2. Insert the predefined AI models into the Models table
- *    - Each model gets 5 rows, one per variant (Situational, Minimal, Guardian, Max, Sovereign)
+ *    - Each model gets one row per variant
  */
 
 import { config } from "dotenv";
@@ -14,6 +14,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { sql } from "drizzle-orm";
 import { Pool } from "pg";
 import { env } from "@/env";
+import { VARIANT_IDS } from "@/core/shared/variants";
 
 // Load environment variables
 config({ path: ".env.local" });
@@ -30,18 +31,16 @@ if (!DATABASE_URL) {
 const pool = new Pool({ connectionString: DATABASE_URL });
 const db = drizzle(pool);
 
-// All variants to create for each model
-const VARIANTS = ["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"] as const;
-
 // Model definitions - openRouterModelName
 const MODEL_DEFINITIONS = [
 	// "deepseek-ai/deepseek-v3.2",
 	"deepseek-ai/deepseek-v3.1-terminus",
 	"minimaxai/minimax-m2",
 	"moonshotai/kimi-k2-thinking",
+	"openai/gpt-oss-120b",
 	// "xiaomi/mimo-v2-flash:free",
 	// "kwaipilot/kat-coder-pro:free",
-	
+	"qwen/qwen3-235b-a22b",
 	// "mistralai/mistral-large-3-675b-instruct-2512"
 
 ];
@@ -81,7 +80,7 @@ async function seed() {
 		for (const openRouterModelName of MODEL_DEFINITIONS) {
 			const name = extractModelName(openRouterModelName);
 
-			for (const variant of VARIANTS) {
+			for (const variant of VARIANT_IDS) {
 				await db.execute(sql`
 					INSERT INTO "Models" (
 						"id",
@@ -110,7 +109,7 @@ async function seed() {
 		}
 
 		console.log(`\n✅ Successfully seeded ${totalInserted} model-variant combinations`);
-		console.log(`   (${MODEL_DEFINITIONS.length} models × ${VARIANTS.length} variants)`);
+		console.log(`   (${MODEL_DEFINITIONS.length} models × ${VARIANT_IDS.length} variants)`);
 	} catch (error) {
 		console.error("❌ Seed failed:", error);
 		process.exit(1);

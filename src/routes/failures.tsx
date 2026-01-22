@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/core/lib/utils";
 import { getModelInfo } from "@/core/shared/models/modelConfig";
+import { getVariantBadgeClasses } from "@/core/shared/variants";
 import { orpc } from "@/server/orpc/client";
 import type { FailureEntry } from "@/server/features/analytics/types";
 
@@ -506,13 +507,7 @@ function FailuresRoute() {
 													<TableCell>
 														<span className={cn(
 															"px-2 py-0.5 rounded text-xs font-medium",
-															stat.variant === "Guardian" && "bg-purple-500/20 text-purple-600",
-															stat.variant === "Apex" && "bg-amber-500/20 text-amber-600",
-															stat.variant === "Gladiator" && "bg-green-500/20 text-green-600",
-															stat.variant === "Sniper" && "bg-blue-500/20 text-blue-600",
-															stat.variant === "Trendsurfer" && "bg-cyan-500/20 text-cyan-600",
-															stat.variant === "Contrarian" && "bg-rose-500/20 text-rose-600",
-															stat.variant === "Sovereign" && "bg-yellow-500/20 text-yellow-600",
+															getVariantBadgeClasses(stat.variant),
 														)}>
 															{stat.variant}
 														</span>

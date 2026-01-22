@@ -25,6 +25,7 @@ import { VariantSelector } from "@/components/variant-selector";
 import { useVariant, type VariantId } from "@/components/variant-context";
 import { cn } from "@/core/lib/utils";
 import { getModelInfo } from "@/core/shared/models/modelConfig";
+import { getVariantBadgeClasses } from "@/core/shared/variants";
 import { formatHoldTime } from "@/core/shared/trading/calculations";
 import { orpc } from "@/server/orpc/client";
 import type {
@@ -237,13 +238,7 @@ function getOverallColumns(showVariant: boolean): ColumnDef<OverallStats>[] {
 				return (
 					<span className={cn(
 						"px-2 py-0.5 rounded text-xs font-medium",
-						variant === "Guardian" && "bg-purple-500/20 text-purple-600",
-						variant === "Apex" && "bg-amber-500/20 text-amber-600",
-						variant === "Gladiator" && "bg-green-500/20 text-green-600",
-						variant === "Sniper" && "bg-blue-500/20 text-blue-600",
-						variant === "Trendsurfer" && "bg-cyan-500/20 text-cyan-600",
-						variant === "Contrarian" && "bg-rose-500/20 text-rose-600",
-						variant === "Sovereign" && "bg-yellow-500/20 text-yellow-600",
+						getVariantBadgeClasses(variant),
 					)}>
 						{variant}
 					</span>
@@ -376,13 +371,7 @@ function getAdvancedColumns(showVariant: boolean): ColumnDef<AdvancedStats>[] {
 				return (
 					<span className={cn(
 						"px-2 py-0.5 rounded text-xs font-medium",
-						variant === "Guardian" && "bg-purple-500/20 text-purple-600",
-						variant === "Apex" && "bg-amber-500/20 text-amber-600",
-						variant === "Gladiator" && "bg-green-500/20 text-green-600",
-						variant === "Sniper" && "bg-blue-500/20 text-blue-600",
-						variant === "Trendsurfer" && "bg-cyan-500/20 text-cyan-600",
-						variant === "Contrarian" && "bg-rose-500/20 text-rose-600",
-						variant === "Sovereign" && "bg-yellow-500/20 text-yellow-600",
+						getVariantBadgeClasses(variant),
 					)}>
 						{variant}
 					</span>
