@@ -209,11 +209,16 @@ function getOverallColumns(showVariant: boolean): ColumnDef<OverallStats>[] {
 				return (
 					<div className="flex items-center gap-2">
 						{modelInfo.logo ? (
-							<img
-								src={modelInfo.logo}
-								alt={modelName}
-								className="h-5 w-5 rounded"
-							/>
+							<div
+								className="h-5 w-5 rounded-full flex items-center justify-center overflow-hidden"
+								style={{ backgroundColor: modelInfo.color }}
+							>
+								<img
+									src={modelInfo.logo}
+									alt={modelName}
+									className="h-4 w-4 object-contain"
+								/>
+							</div>
 						) : (
 							<div
 								className="h-5 w-5 rounded flex items-center justify-center text-[8px] font-bold text-white"
@@ -342,11 +347,16 @@ function getAdvancedColumns(showVariant: boolean): ColumnDef<AdvancedStats>[] {
 				return (
 					<div className="flex items-center gap-2">
 						{modelInfo.logo ? (
-							<img
-								src={modelInfo.logo}
-								alt={modelName}
-								className="h-5 w-5 rounded"
-							/>
+							<div
+								className="h-5 w-5 rounded-full flex items-center justify-center overflow-hidden"
+								style={{ backgroundColor: modelInfo.color }}
+							>
+								<img
+									src={modelInfo.logo}
+									alt={modelName}
+									className="h-4 w-4 object-contain"
+								/>
+							</div>
 						) : (
 							<div
 								className="h-5 w-5 rounded flex items-center justify-center text-[8px] font-bold text-white"

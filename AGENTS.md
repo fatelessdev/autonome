@@ -155,7 +155,7 @@ const { data } = useQuery(orpc.trading.getPositions.queryOptions({ input: {} }))
 - Called from API server startup in `api/src/index.ts`
 
 **Shared Variants** (`@/core/shared/variants`):
-- `VARIANT_IDS` - SSOT array: `["Guardian", "Apex", "Gladiator", "Sniper", "Trendsurfer", "Contrarian", "Sovereign"]`
+- `VARIANT_IDS` - SSOT array: `["Apex", "Trendsurfer", "Contrarian", "Sovereign"]`
 - `VariantId`, `VariantIdWithAll` - TypeScript types
 - `variantIdSchema`, `variantIdWithAllSchema` - Zod validation
 - `VARIANT_CONFIG` - Label, description, color, Tailwind classes per variant
@@ -176,35 +176,6 @@ const { data } = useQuery(orpc.trading.getPositions.queryOptions({ input: {} }))
 - `runRetentionPolicy()` - Aggregates old data into hourly/daily buckets
 - `downsampleForChart()` - Server-side time-based downsampling with auto-detected resolution
 - `getPortfolioHistoryWithResolution()` - Fetches portfolio data with adaptive resolution
-
-## Session Notes
-
-- Shared market price fetching now exposed via `useMarketPrices` (in `marketQueries`); reuse instead of duplicating queries.
-- Failures analytics are variant-filterable end-to-end (oRPC `getFailures` accepts `variant`).
-- Dashboard UX: crypto tracker has desktop dropdown + mobile pill selector; performance graph shows active variant badge and hides filters on mobile.
-- Exposure prompts now use deployed equity (total value minus available cash) via `calculateExposureToEquityPct` to avoid leverage-inflated percentages.
-- Portfolio data retention: Use `retentionService.ts` for tiered aggregation (7d raw → hourly → daily). Call `getPortfolioHistoryWithResolution()` for server-side downsampling.
-- Portfolio chart downsampling: Server-side time-based downsampling in `downsampleForChart()`. Resolution auto-detected from data range: ≤24h→1min, ≤3d→5min, ≤7d→15min, ≤30d→1hour, >30d→4hour. Aggregate mode averages across all variants per model.
-- Server-side variant filtering: All trading queries (`fetchTrades`, `fetchPositions`, `fetchPortfolioHistory`) accept `variant` parameter. Filter at DB level, not client.
-- Cache timing tiers: Import from `@/core/shared/cache/cacheConfig.ts`. Use `CACHE_TIMING.REALTIME` (10s), `STANDARD` (60s), `SLOW` (3min), `STATIC` (Infinity).
-- Virtual scrolling: Use `@tanstack/react-virtual` for lists with 100+ items. See `trades-tab.tsx` for implementation pattern.
-- Server QueryClient: Use `getServerQueryClient()` singleton from `serverQueryClient.ts` for server-side TanStack Query operations. Avoids creating multiple instances.
-- Error boundaries: Wrap chart/graph components with `withErrorBoundary` HOC from `error-boundary.tsx` for graceful failure handling.
-- Real-time portfolio updates: SSE endpoint at `/api/events/portfolio` emits `portfolio:updated` events. Client subscribes and invalidates `["portfolio", "history"]` query. See `priceTracker.ts` → `emitPortfolioEvent()` → `performance-graph.tsx` SSE subscription.
-- SSE auto-reconnect: All frontend SSE connections (`EventSource`) use exponential backoff reconnection (1s, 2s, 4s, ... up to 30s). Prevents permanent disconnection when backend restarts.
-- Scheduler health monitoring: Check `/health` for scheduler status. Use `/health/schedulers` for detailed info including last run timestamps and models currently running.
-- Scheduler error isolation: All scheduler callbacks wrapped in try-catch to prevent unhandled rejections from stopping the scheduler loops.
-- Model stuck detection: Trade scheduler auto-clears models stuck in "running" state for >10 minutes. Tracked via `modelsRunningStartTime` map.
-- Execution health tracking: Health endpoint now tracks `lastSuccessfulCompletion`, `lastCycleStats` (success/failure counts), and `consecutiveFailedCycles`. Health is "degraded" if no successful completion in 15 minutes or 3+ consecutive failed cycles.
-- NIM API key cycling: Use `getNextNimApiKey()` from `@/env` for round-robin key distribution. Supports `NIM_API_KEY`, `NIM_API_KEY1`, `NIM_API_KEY2`, `NIM_API_KEY3` in `.env.local`.
-- Variant SSOT: All variant definitions consolidated in `@/core/shared/variants`. DB schema, oRPC schemas, UI components, and export utilities now import from this module. To add a new variant: add to `VARIANT_IDS`, add config to `VARIANT_CONFIG`, run migrations.
-- Scheduler state consolidation: Replaced scattered `globalThis.*` variables with `schedulerState.ts` module. All scheduler state accessed via typed getters/setters (`getTradeState()`, `getPortfolioState()`, `isModelRunning()`, etc.). Health endpoints use `getSchedulerHealth()` and `getSchedulerDetailedHealth()`.
-- Variant badge styling: Use `getVariantBadgeClasses(variant)` instead of inline conditionals. Returns combined Tailwind classes like `"bg-purple-500/20 text-purple-600"`.
-- Variant validation: Use `isValidVariantId(value)` type guard when parsing unknown variant strings. Safer than hardcoded `.includes()` checks.
-- Variant query normalization: Server trading queries normalize `variant` inputs with `isValidVariantId` and use `VARIANT_IDS` to avoid invalid enum values.
-- Live fill tracking: `createPosition.ts` and `closePosition.ts` now use `fillTracker.ts` to capture actual fill quantity and average price from exchange. Uses SDK's `waitForTransaction()` + `checkOrderStatus()` with polling. Handles partial fills gracefully.
-- Retention config: `RETENTION_CONFIG` and `DOWNSAMPLE_CONFIG` in `retentionService.ts` consolidate all timing thresholds. Modify these constants to adjust data retention/downsampling behavior.
-- Realized PnL semantics: Portfolio section shows `scaled_realized_pnl` (cumulative from scaling open positions), Performance section shows `closed_trade_realized_pnl` (cumulative from fully closed trades). Per-position `scaled_realized` shows P&L from partial closes of that position. Use `PerformanceMetrics.closedTradeRealizedPnl` from `performanceMetrics.ts` and `ExposureSummary.totalRealized` from `openPositionEnrichment.ts`.
 
 ## Code Style (Biome)
 

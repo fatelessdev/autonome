@@ -104,11 +104,16 @@ function FailureCard({ failure }: { failure: FailureEntry }) {
 						<div className="flex items-center justify-between">
 							<div className="flex items-center gap-3">
 								{modelInfo.logo ? (
-									<img
-										src={modelInfo.logo}
-										alt={failure.modelName}
-										className="h-8 w-8 rounded"
-									/>
+									<div
+										className="h-8 w-8 rounded-full flex items-center justify-center overflow-hidden"
+										style={{ backgroundColor: modelInfo.color }}
+									>
+										<img
+											src={modelInfo.logo}
+											alt={failure.modelName}
+											className="h-6 w-6 object-contain"
+										/>
+									</div>
 								) : (
 									<div
 										className="h-8 w-8 rounded flex items-center justify-center text-xs font-bold text-white"
@@ -487,11 +492,16 @@ function FailuresRoute() {
 												<TableCell className="font-medium">
 													<div className="flex items-center gap-2">
 														{modelInfo.logo ? (
-															<img
-																src={modelInfo.logo}
-																alt={stat.modelName}
-																className="h-5 w-5 rounded"
-															/>
+															<div
+																className="h-5 w-5 rounded-full flex items-center justify-center overflow-hidden"
+																style={{ backgroundColor: modelInfo.color }}
+															>
+																<img
+																	src={modelInfo.logo}
+																	alt={stat.modelName}
+																	className="h-4 w-4 object-contain"
+																/>
+															</div>
 														) : (
 															<div
 																className="h-5 w-5 rounded flex items-center justify-center text-[8px] font-bold text-white"

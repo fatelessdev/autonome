@@ -295,11 +295,16 @@ function LeaderboardRoute() {
 													<TableCell className="px-4 py-3 font-semibold">
 														<div className="flex items-center gap-3">
 															{modelInfo.logo ? (
-																<img
-																	src={modelInfo.logo}
-																	alt={entry.modelName}
-																	className="h-6 w-6 rounded"
-																/>
+																<div
+																	className="h-6 w-6 rounded-full flex items-center justify-center overflow-hidden"
+																	style={{ backgroundColor: modelInfo.color }}
+																>
+																	<img
+																		src={modelInfo.logo}
+																		alt={entry.modelName}
+																		className="h-5 w-5 object-contain"
+																	/>
+																</div>
 															) : (
 																<div
 																	className="h-6 w-6 rounded flex items-center justify-center text-[10px] font-bold text-white"
