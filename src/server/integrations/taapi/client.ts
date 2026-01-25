@@ -20,6 +20,7 @@ import type {
 import { TAAPI_FREE_PLAN_SYMBOLS } from "./types";
 
 const BULK_URL = "https://api.taapi.io/bulk";
+const FETCH_TIMEOUT_MS = 30_000; // 30 second timeout for API calls
 
 // Get API key from environment
 const getTaapiApiKey = (): string => {
@@ -42,11 +43,18 @@ export class TaapiClient {
 	): Promise<TaapiBulkResponse> {
 		for (let attempt = 0; attempt < retries; attempt++) {
 			try {
+				// Create abort controller for timeout
+				const controller = new AbortController();
+				const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
 				const response = await fetch(BULK_URL, {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify(payload),
+					signal: controller.signal,
 				});
+
+				clearTimeout(timeoutId);
 
 				if (response.status === 429) {
 					if (attempt < retries - 1) {
@@ -69,8 +77,10 @@ export class TaapiClient {
 
 				return (await response.json()) as TaapiBulkResponse;
 			} catch (error) {
+				const isAborted =
+					error instanceof Error && error.name === "AbortError";
 				const isTimeout =
-					error instanceof Error && error.message.includes("timeout");
+					error instanceof Error && (error.message.includes("timeout") || isAborted);
 				const isNetworkError =
 					error instanceof Error &&
 					(error.message.includes("fetch") ||
@@ -78,7 +88,7 @@ export class TaapiClient {
 
 				if ((isTimeout || isNetworkError) && attempt < retries - 1) {
 					const wait = backoffMs * (attempt + 1);
-					console.warn(`[TAAPI] Network error, retrying in ${Math.round(wait / 1000)}s`);
+					console.warn(`[TAAPI] ${isAborted ? "Timeout" : "Network error"}, retrying in ${Math.round(wait / 1000)}s`);
 					await new Promise((r) => setTimeout(r, wait));
 					continue;
 				}

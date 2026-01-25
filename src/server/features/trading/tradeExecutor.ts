@@ -59,6 +59,19 @@ import {
 
 import { createTradeAgent, type ToolContext } from "./agent";
 
+/** Result returned from runTradeWorkflow for outer timeout handling */
+export interface TradeWorkflowResult {
+	response: string;
+	invocationId: string;
+}
+
+/**
+ * Tracks pending invocations by model ID.
+ * This allows the outer timeout handler to update the invocation record
+ * when runTradeWorkflow is killed before it can clean up.
+ */
+const pendingInvocations = new Map<string, string>(); // modelId -> invocationId
+
 const TRADE_INTERVAL_MS = 5 * 60 * 1000;
 const AGENT_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
 const MAX_RETRIES = 2;
@@ -109,8 +122,12 @@ export async function runTradeWorkflow(account: Account) {
 		hour12: true,
 	}).format(new Date());
 
-	// Create invocation record
+	// Create invocation record and track it for outer timeout handling
 	const modelInvocation = await createInvocationMutation(account.id);
+	pendingInvocations.set(account.id, modelInvocation.id);
+
+	// Helper to clean up pending tracking
+	const clearPending = () => pendingInvocations.delete(account.id);
 
 	// Calculate performance metrics
 	const currentPortfolioValue = parseFloat(portfolio.total);
@@ -285,6 +302,7 @@ export async function runTradeWorkflow(account: Account) {
 			}),
 		});
 
+		clearPending();
 		return failureMessage;
 	}
 
@@ -343,6 +361,7 @@ export async function runTradeWorkflow(account: Account) {
 	// Emit unified workflow event
 	await emitAllDataChanged(account.id);
 
+	clearPending();
 	return responseText;
 }
 
@@ -435,6 +454,35 @@ async function executeScheduledTradesInternal() {
 		} catch (error) {
 			const isTimeout = error instanceof Error && error.message.includes("timed out");
 			console.error(`[Trade Scheduler] Model ${model.name} ${isTimeout ? "timed out" : "failed"}:`, error);
+
+			// Check for pending invocation that needs cleanup
+			// This happens when outer timeout fires before runTradeWorkflow completes
+			const pendingInvocationId = pendingInvocations.get(model.id);
+			if (pendingInvocationId) {
+				const errorMessage = isTimeout
+					? "Model run timed out after 9 minutes (outer timeout)"
+					: `Trade workflow aborted: ${error instanceof Error ? error.message : String(error)}`;
+
+				try {
+					await updateInvocationMutation({
+						id: pendingInvocationId,
+						response: errorMessage,
+						responsePayload: buildInvocationResponsePayload({
+							prompt: "[Outer timeout - prompt not captured]",
+							result: null,
+							decisions: [],
+							executionResults: [],
+							closedPositions: [],
+							stepTelemetry: [],
+						}),
+					});
+					console.log(`[Trade Scheduler] Updated orphaned invocation ${pendingInvocationId} for ${model.name}`);
+				} catch (updateError) {
+					console.error(`[Trade Scheduler] Failed to update orphaned invocation:`, updateError);
+				}
+				pendingInvocations.delete(model.id);
+			}
+
 			return { modelId: model.id, success: false };
 		} finally {
 			setModelRunning(model.id, false);
