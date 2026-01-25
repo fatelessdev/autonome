@@ -18,6 +18,9 @@ import {
 import axios from "axios";
 import type { Candlestick } from "@/server/features/trading/indicators";
 
+// Default timeout for API calls (30 seconds)
+const API_TIMEOUT_MS = 30_000;
+
 // Singleton API client
 const apiClient = new ApiClient({ host: BASE_URL });
 
@@ -51,6 +54,7 @@ export async function fetchCandlesticksRest(params: {
 				end_timestamp: params.end_timestamp ?? now,
 				count_back: params.count_back,
 			},
+			timeout: API_TIMEOUT_MS,
 		});
 
 		// API response format: { code, r, c: [...candles] }

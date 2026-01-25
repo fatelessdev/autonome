@@ -18,6 +18,7 @@ import { taapiClient, type TaapiPreFetchResult } from "@/server/integrations/taa
 import { TAAPI_FREE_PLAN_SYMBOLS } from "@/server/integrations/taapi/types";
 
 const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+const FETCH_TIMEOUT_MS = 60_000; // 1 minute timeout for entire fetch operation
 
 interface CacheEntry {
 	snapshots: MarketSnapshot[];
@@ -213,13 +214,22 @@ export async function getSharedMarketIntelligence(): Promise<{
 		return entry;
 	})();
 
-	globalThis.__marketIntelligenceFetchPromise = fetchPromise;
+	// Wrap with timeout to ensure fetch always settles
+	const timeoutPromise = new Promise<never>((_, reject) => {
+		setTimeout(
+			() => reject(new Error("Market intelligence fetch timed out after 60 seconds")),
+			FETCH_TIMEOUT_MS
+		);
+	});
+
+	const timedFetchPromise = Promise.race([fetchPromise, timeoutPromise]);
+	globalThis.__marketIntelligenceFetchPromise = timedFetchPromise;
 
 	try {
-		const result = await fetchPromise;
+		const result = await timedFetchPromise;
 		return { snapshots: result.snapshots, formatted: result.formatted };
 	} finally {
-		// Clear the in-flight promise once resolved
+		// Clear the in-flight promise once resolved OR rejected (including timeout)
 		globalThis.__marketIntelligenceFetchPromise = null;
 	}
 }
