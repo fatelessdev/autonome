@@ -66,6 +66,34 @@ export function calculateWinRate(pnls: number[]): number {
 	return (wins / pnls.length) * 100;
 }
 
+/**
+ * Compute max drawdown from a series of portfolio values.
+ * Returns as a positive percentage (e.g., 32.5 = 32.5% drawdown).
+ */
+export function calculateMaxDrawdown(values: number[]): number {
+	if (values.length < 2) return 0;
+	let peak = values[0]!;
+	let maxDd = 0;
+	for (const v of values) {
+		if (v > peak) peak = v;
+		const dd = ((peak - v) / peak) * 100;
+		if (dd > maxDd) maxDd = dd;
+	}
+	return maxDd;
+}
+
+/**
+ * Compute current drawdown from peak to current value.
+ * Returns as a positive percentage (e.g., 15.2 = 15.2% below peak).
+ */
+export function calculateCurrentDrawdown(values: number[]): number {
+	if (values.length < 1) return 0;
+	const peak = Math.max(...values);
+	const current = values[values.length - 1]!;
+	if (peak <= 0) return 0;
+	return ((peak - current) / peak) * 100;
+}
+
 // ==================== Statistical Helpers ====================
 
 /**

@@ -43,6 +43,20 @@ export function closePositionTool(ctx: ToolContext) {
 				return true;
 			});
 
+			// Before closing, capture cooldown info from open positions
+			for (const symbol of symbolsToClose) {
+				const upper = symbol.toUpperCase();
+				const position = ctx.openPositions.find(
+					(p) => p.symbol?.toUpperCase() === upper,
+				);
+				if (position?.exitPlan?.cooldownUntil && position.sign) {
+					ctx.closedPositionCooldowns.set(upper, {
+						side: position.sign as "LONG" | "SHORT",
+						cooldownUntil: position.exitPlan.cooldownUntil,
+					});
+				}
+			}
+
 			if (symbolsToClose.length === 0) {
 				const messages: string[] = [];
 				if (skippedDuplicates.length > 0) {

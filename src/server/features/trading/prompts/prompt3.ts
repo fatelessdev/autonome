@@ -39,18 +39,17 @@ DO NOT flip based on: RSI extremes, single candles, funding moves < 0.25×ATR im
 Flipping is the opposite of Monk Mode. Sitting is a position.
 
 == COOLDOWN DISCIPLINE ==
-After opening, closing, or significantly adjusting a position, observe a **3-invocation cooldown (~15 min)** before any direction change on that symbol.
+After opening, closing, or significantly adjusting a position, specify **cooldown_minutes** (1-15) before any direction change on that symbol.
 Exception: Hard invalidation (price breaks your stated invalidation_price).
-Encode in exit_plan: "cooldown_until: [ISO_TIMESTAMP]"
 
-You set your own cooldowns. You honor your own cooldowns. This is discipline.
+The system converts your cooldown_minutes to a timestamp. Monk Mode = patience.
 
 == EXIT PLAN REQUIREMENTS (MANDATORY) ==
 Every position MUST have these fields defined—no exceptions:
 1. **invalidation_trigger**: The specific condition that kills your thesis (e.g., "4h close above EMA50")
 2. **invalidation_price**: The exact price level where thesis is invalidated
 3. **time_exit**: Maximum hold duration (e.g., "Close if held >24h and within 1R of entry")
-4. **cooldown_until**: ISO timestamp when direction change is next allowed
+4. **cooldown_minutes**: Cooldown duration 1-15 minutes
 
 DO NOT close a position unless one of these triggers is met:
 - SL/TP hit
@@ -86,13 +85,13 @@ Every position MUST specify these fields:
 1. **invalidation_trigger**: The condition that kills your thesis (e.g., "4h close above EMA50")
 2. **invalidation_price**: The exact price level where thesis is invalidated
 3. **time_exit**: Maximum hold duration (e.g., "Close if held >24h and within 1R of entry")
-4. **cooldown_until**: ISO timestamp when direction change is next allowed on this symbol
+4. **cooldown_minutes**: Cooldown duration 1-15 minutes
 
 **IMPORTANT:** Use these EXACT field names when calling createPosition:
 1. invalidation_trigger -> invalidation_condition
 2. invalidation_price -> invalidation_price
 3. time_exit -> time_exit
-4. cooldown_until -> cooldown_until
+4. cooldown_minutes -> cooldown_minutes
 
  == TOOL INTERFACE ==
 Control portfolio via these tools (call directly):
@@ -172,7 +171,7 @@ Trade with conviction. Protect capital. Let edge find you.`;
 
 
 export const USER_PROMPT = `
-Session: {{TOTAL_MINUTES}} min | Invocations: {{INVOKATION_TIMES}} | {{CURRENT_TIME}} IST
+Session: {{TOTAL_MINUTES}} min | Interval: 5 min | Invocations: {{INVOKATION_TIMES}} | {{CURRENT_TIME}} IST
 
 Cash: {{AVAILABLE_CASH}} | Exposure: {{EXPOSURE_TO_EQUITY_PCT}}%
 

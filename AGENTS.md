@@ -54,6 +54,11 @@ surface intact and stub/annotate it instead of deleting it.
 7. **Adaptive refactoring**: When modifying code, if you stumble upon sloppy code even if it's not directly related, refactor that code to improve clarity and maintainability.
 8. **Adaptive knowledge**: When working on a feature, familiarize yourself with all related files (e.g. DB schema, oRPC router, events, client code) to ensure holistic understanding and improvements and at the end update this doc with any new insights.
 9. **Thorough implementation**: When making changes to a feature, ensure all related aspects (DB schema, oRPC procedures, frontend code, events) are updated accordingly to maintain consistency and functionality.
+10. **Critical Alignment**: Do not blindly follow instructions. Always evaluate the intent of the request against the existing codebase. If a request feels "off," partial, or doesn't solve the root user problem, you must explicitly point this out—even if it means correcting the user. Your engineering judgment is required; do not be a passive coder.
+11. **Edge Case Exhaustion**: Before finalizing any code, strictly "stress test" your solution mentally. Recursively generate failure scenarios and fix them immediately. Do not stop until you cannot find a way for the code to fail. Do not wait for a review to catch these; catch them yourself now.
+12. **No Defensive Bloat**: Do not write defensive code for problems that don't exist. If a data structure already handles something correctly, don't add cleanup/validation for it. If the user suggests a potential problem, first verify if it's actually a problem before writing code. Point out when suggested fixes are unnecessary.
+13. **Complete Data for AI Prompts**: When building prompts for AI agents, include ALL relevant metrics explicitly. Never assume the AI can infer or calculate values. If you think about adding a metric, add it. Explicit labels > compact formats. Zeros are meaningful (show them), N/A values are noise (omit them). Token cost is not a concern—clarity and completeness are.
+
 
 ## Commands
 
@@ -145,8 +150,24 @@ const { data } = useQuery(orpc.trading.getPositions.queryOptions({ input: {} }))
 - `calculateSharpeRatioFromPortfolio()` - Portfolio NAV-based Sharpe (preferred)
 - `calculateSharpeRatioFromTrades()` - Trade P&L-based Sharpe (simplified)
 - `calculateReturnPercent()`, `calculateWinRate()`, `calculateExpectancy()`
+- `calculateMaxDrawdown()`, `calculateCurrentDrawdown()` - Drawdown metrics
 - `mean()`, `median()`, `standardDeviation()` - Statistical helpers
 - `INITIAL_CAPITAL` (10,000) - Constant for return calculations
+
+**Trading Prompts** (`@/server/features/trading/prompts`):
+- Variant-specific prompts: `apex.ts`, `sovereign.ts`, `trendsurfer.ts`, `contrarian.ts`
+- Each exports `SYSTEM_PROMPT` (static instructions) and `USER_PROMPT` (dynamic data template)
+- `promptBuilder.ts` - Assembles prompts with template replacements (`{{PLACEHOLDER}}`)
+- `promptSections.ts` - Builds PORTFOLIO, PERFORMANCE, OPEN POSITIONS sections
+
+**Prompt Data Principles**:
+- **Spoon-feed data**: AI should never infer or calculate - provide all metrics explicitly
+- **Explicit labels**: `risk_usd $128.56` not `risk $128.56` - no ambiguity
+- **Show zeros**: `scaled_realized $0.00` is meaningful (no partial closes yet)
+- **Omit N/A**: If data doesn't exist, don't show it (noise reduction)
+- **No token optimization**: Clarity > brevity. Full descriptive labels always.
+- **Section separation**: Header (session), PORTFOLIO (current state), PERFORMANCE (historical), OPEN POSITIONS (per-position)
+- **No duplication**: Each metric lives in exactly one section
 
 **Scheduler Initialization**:
 - Use consolidated `schedulerState.ts` module for all scheduler globals

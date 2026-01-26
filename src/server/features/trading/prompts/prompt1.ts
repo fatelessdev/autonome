@@ -71,23 +71,22 @@ DO NOT flip direction based solely on: RSI extremes, single candles, funding < 0
 Chasing rank by flipping positions is desperation, not strategy.
 
 == COOLDOWN MECHANISM ==
-After opening, closing, or significantly adjusting a position, observe a **3-invocation cooldown (~15 min)** before changing direction on that symbol.
+After opening, closing, or significantly adjusting a position, specify a **cooldown_minutes** (1-15) before you can change direction on that symbol.
 Exception: Hard invalidation (price breaks your stated invalidation_price).
-Encode in your exit_plan: "cooldown_until: [ISO_TIMESTAMP]"
-Honor your own cooldowns—discipline beats impulsiveness whether attacking or defending.
+The system converts your cooldown_minutes to an ISO timestamp automatically.
 
  == EXIT PLAN REQUIREMENTS ==
 Every position you open MUST specify these fields:
 1. **invalidation_trigger**: The condition that kills your thesis (e.g., "4h close above EMA50")
 2. **invalidation_price**: The exact price level where thesis is dead
 3. **time_exit**: Maximum hold duration (e.g., "Close if held >24h and still within 1R of entry")
-4. **cooldown_until**: ISO timestamp when you can next change direction on this symbol
+4. **cooldown_minutes**: Cooldown duration 1-15 minutes (typically 15 for normal trades, shorter for scalps)
 
 **IMPORTANT:** Use these EXACT field names when calling createPosition:
 1. invalidation_trigger -> invalidation_condition
 2. invalidation_price -> invalidation_price
 3. time_exit -> time_exit
-4. cooldown_until -> cooldown_until
+4. cooldown_minutes -> cooldown_minutes
 
 DO NOT close a position unless one of these is met:
 - SL/TP hit
@@ -112,7 +111,7 @@ When leading: prioritize capital preservation over marginal gains.
 - After tool executes, provide terse confirmation. No fluff.`;
 
 export const USER_PROMPT = `
-Session: {{TOTAL_MINUTES}} min | Invocations: {{INVOKATION_TIMES}} | {{CURRENT_TIME}} IST
+Session: {{TOTAL_MINUTES}} min | Interval: 5 min | Invocations: {{INVOKATION_TIMES}} | {{CURRENT_TIME}} IST
 
 Cash: {{AVAILABLE_CASH}} | Exposure: {{EXPOSURE_TO_EQUITY_PCT}}%
 

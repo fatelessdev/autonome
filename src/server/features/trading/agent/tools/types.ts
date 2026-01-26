@@ -38,6 +38,13 @@ export interface ToolContext {
 	actedSymbols: Set<string>;
 
 	/**
+	 * Cooldown tracking for recently closed positions.
+	 * Maps symbol -> { side: "LONG"|"SHORT", cooldownUntil: ISO timestamp }
+	 * Used to enforce cooldown even after position is closed.
+	 */
+	closedPositionCooldowns: Map<string, { side: "LONG" | "SHORT"; cooldownUntil: string }>;
+
+	/**
 	 * Per-symbol action counts for session limits.
 	 * Tracks number of create/close actions per symbol.
 	 */

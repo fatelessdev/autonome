@@ -17,6 +17,70 @@ import { MAX_ACTIONS_PER_SYMBOL, type ToolContext } from "./types";
 /**
  * Creates the createPosition tool with the given context
  */
+// Calculate cooldown timestamp from minutes (default 15 if not provided)
+function calculateCooldownUntil(minutes?: number | null): string {
+	const cooldownMinutes = Math.min(15, Math.max(1, minutes ?? 15));
+	return new Date(Date.now() + cooldownMinutes * 60 * 1000).toISOString();
+}
+
+/**
+ * Check if a symbol is on cooldown for direction change.
+ * Checks both open positions AND recently closed positions.
+ * Returns null if allowed, or an error message if blocked.
+ */
+function checkCooldown(
+	symbol: string,
+	requestedSide: string,
+	openPositions: ToolContext["openPositions"],
+	closedPositionCooldowns: ToolContext["closedPositionCooldowns"],
+): string | null {
+	const upperSymbol = symbol.toUpperCase();
+	
+	// Check open positions first
+	const existingPosition = openPositions.find(
+		(p) => p.symbol?.toUpperCase() === upperSymbol,
+	);
+
+	if (existingPosition) {
+		// Same direction = adding to position, no cooldown check needed
+		const existingSide = existingPosition.sign; // "LONG" or "SHORT"
+		if (existingSide === requestedSide) return null;
+
+		// Direction change requested - check cooldown
+		const cooldownUntil = existingPosition.exitPlan?.cooldownUntil;
+		if (cooldownUntil) {
+			const cooldownTime = new Date(cooldownUntil);
+			const now = new Date();
+
+			if (now < cooldownTime) {
+				const remainingMs = cooldownTime.getTime() - now.getTime();
+				const remainingMins = Math.ceil(remainingMs / 60000);
+				return `${symbol} direction change blocked: cooldown active for ${remainingMins} more minute(s) (until ${cooldownTime.toISOString()})`;
+			}
+		}
+		return null;
+	}
+
+	// Check recently closed positions (for flip-after-close scenarios)
+	const closedCooldown = closedPositionCooldowns.get(upperSymbol);
+	if (closedCooldown) {
+		// Same direction as closed position = allowed (re-entering same direction)
+		if (closedCooldown.side === requestedSide) return null;
+
+		// Opposite direction = check cooldown
+		const cooldownTime = new Date(closedCooldown.cooldownUntil);
+		const now = new Date();
+
+		if (now < cooldownTime) {
+			const remainingMs = cooldownTime.getTime() - now.getTime();
+			const remainingMins = Math.ceil(remainingMs / 60000);
+			return `${symbol} direction flip blocked: recently closed ${closedCooldown.side}, cooldown active for ${remainingMins} more minute(s) (until ${cooldownTime.toISOString()})`;
+		}
+	}
+
+	return null;
+}
+
 export function createPositionTool(ctx: ToolContext) {
 	return tool({
 		description: "Open one or more positions atomically",
@@ -40,7 +104,7 @@ export function createPositionTool(ctx: ToolContext) {
 					invalidationCondition: item.invalidation_condition ?? null,
 					invalidationPrice: item.invalidation_price ?? null,
 					timeExit: item.time_exit ?? null,
-					cooldownUntil: item.cooldown_until ?? null,
+					cooldownUntil: calculateCooldownUntil(item.cooldown_minutes), // Convert minutes to timestamp
 					confidence: item.confidence ?? null,
 				})) ?? [];
 
@@ -48,6 +112,7 @@ export function createPositionTool(ctx: ToolContext) {
 			const seenSymbols = new Set<string>();
 			const skippedDuplicates: string[] = [];
 			const skippedLimitReached: string[] = [];
+			const skippedCooldown: string[] = [];
 
 			for (const entry of [...modern]) {
 				const symbol = entry.symbol;
@@ -55,6 +120,18 @@ export function createPositionTool(ctx: ToolContext) {
 				// Check if already acted on this symbol this session (duplicate in same invocation)
 				if (ctx.actedSymbols.has(symbol)) {
 					skippedDuplicates.push(symbol);
+					continue;
+				}
+
+				// Check cooldown for direction changes
+				const cooldownError = checkCooldown(
+					symbol,
+					entry.side,
+					ctx.openPositions,
+					ctx.closedPositionCooldowns,
+				);
+				if (cooldownError) {
+					skippedCooldown.push(cooldownError);
 					continue;
 				}
 
@@ -93,6 +170,9 @@ export function createPositionTool(ctx: ToolContext) {
 				}
 				if (skippedLimitReached.length > 0) {
 					messages.push(`Session limit (${MAX_ACTIONS_PER_SYMBOL}) reached for ${skippedLimitReached.join(", ")}`);
+				}
+				if (skippedCooldown.length > 0) {
+					messages.push(skippedCooldown.join("; "));
 				}
 				return messages.length > 0
 					? `${messages.join(". ")}. Call 'holding' if done.`

@@ -3,6 +3,9 @@ import {
 	INITIAL_CAPITAL,
 	calculateReturnPercent,
 	calculateSharpeRatioFromTrades,
+	calculateWinRate,
+	calculateMaxDrawdown,
+	calculateCurrentDrawdown,
 } from "@/core/shared/trading/calculations";
 import type { Account } from "@/server/features/trading/accounts";
 import { getClosedOrdersByModel, getTotalRealizedPnl } from "@/server/db/ordersRepository.server";
@@ -12,6 +15,14 @@ export type PerformanceMetrics = {
 	totalReturnPercent: string;
 	/** Realized P&L from all closed trades (historical) */
 	closedTradeRealizedPnl: number;
+	/** Number of completed trades */
+	tradeCount: number;
+	/** Win rate as percentage string (e.g., "65.0%") */
+	winRate: string;
+	/** Current drawdown from peak as percentage string (e.g., "5.2%") */
+	currentDrawdown: string;
+	/** Maximum historical drawdown as percentage string (e.g., "12.3%") */
+	maxDrawdown: string;
 };
 
 /**
@@ -48,16 +59,41 @@ export async function calculatePerformanceMetrics(
 	account: Account,
 	currentPortfolioValue: number,
 ): Promise<PerformanceMetrics> {
-	const [portfolioHistory, closedTradeRealizedPnl] = await Promise.all([
+	const [portfolioHistory, closedTradeRealizedPnl, closedOrders] = await Promise.all([
 		getPortfolioHistory(account.id),
 		getTotalRealizedPnl(account.id),
+		getClosedOrdersByModel(account.id),
 	]);
+
+	// Calculate trade stats
+	const tradeCount = closedOrders.length;
+	const pnls = closedOrders
+		.map((order) => parseFloat(order.realizedPnl ?? "0"))
+		.filter((pnl) => Number.isFinite(pnl));
+	const winRate = tradeCount > 0 
+		? `${calculateWinRate(pnls).toFixed(1)}%` 
+		: "N/A";
+
+	// Calculate drawdown from portfolio history
+	const portfolioValues = portfolioHistory
+		.map((h) => parseFloat(h.netPortfolio))
+		.filter((v) => Number.isFinite(v));
+	const currentDrawdown = portfolioValues.length > 0
+		? `${calculateCurrentDrawdown(portfolioValues).toFixed(1)}%`
+		: "0.0%";
+	const maxDrawdown = portfolioValues.length > 1
+		? `${calculateMaxDrawdown(portfolioValues).toFixed(1)}%`
+		: "0.0%";
 
 	if (portfolioHistory.length < 2) {
 		return {
 			sharpeRatio: "N/A (need more data)",
 			totalReturnPercent: "N/A",
 			closedTradeRealizedPnl,
+			tradeCount,
+			winRate,
+			currentDrawdown,
+			maxDrawdown,
 		};
 	}
 
@@ -73,5 +109,9 @@ export async function calculatePerformanceMetrics(
 		sharpeRatio,
 		totalReturnPercent: `${totalReturn.toFixed(2)}%`,
 		closedTradeRealizedPnl,
+		tradeCount,
+		winRate,
+		currentDrawdown,
+		maxDrawdown,
 	};
 }

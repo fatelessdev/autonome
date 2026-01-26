@@ -30,6 +30,12 @@ import type { TradingSignal } from "@/server/features/trading/tradingDecisions";
 import { marketSymbols } from "../schemas";
 import type { ToolContext } from "./types";
 
+// Calculate cooldown timestamp from minutes (default 15 if not provided)
+function calculateCooldownUntil(minutes?: number | null): string {
+	const cooldownMinutes = Math.min(15, Math.max(1, minutes ?? 15));
+	return new Date(Date.now() + cooldownMinutes * 60 * 1000).toISOString();
+}
+
 /**
  * Creates the updateExitPlan tool with the given context
  */
@@ -60,11 +66,13 @@ export function updateExitPlanTool(ctx: ToolContext) {
 							.optional()
 							.nullable()
 							.describe("Maximum hold duration (e.g., 'Close if held >24h and within 1R')"),
-						cooldown_until: z
-							.string()
-							.optional()
-							.nullable()
-							.describe("ISO timestamp when direction change is next allowed"),
+							cooldown_minutes: z
+								.number()
+								.min(1)
+								.max(15)
+								.optional()
+								.nullable()
+								.describe("Optional: Only provide if you want to RESET the cooldown (e.g., after significant adjustment). Omit for simple stop trailing."),
 					}),
 				)
 				.min(1),
@@ -178,7 +186,10 @@ export function updateExitPlanTool(ctx: ToolContext) {
 					invalidation: update.reason,
 					invalidationPrice: update.invalidation_price ?? position.exitPlan?.invalidationPrice ?? null,
 					timeExit: update.time_exit ?? position.exitPlan?.timeExit ?? null,
-					cooldownUntil: update.cooldown_until ?? position.exitPlan?.cooldownUntil ?? null,
+					// Only update cooldown if explicitly provided (trailing stops shouldn't reset cooldown)
+					cooldownUntil: update.cooldown_minutes != null
+						? calculateCooldownUntil(update.cooldown_minutes)
+						: (position.exitPlan?.cooldownUntil ?? null),
 				};
 
 				position.exitPlan = updatedExitPlan;

@@ -40,13 +40,15 @@ Every position MUST specify:
 - **invalidation_trigger**: "Kijun-Sen break" or "EMA20 break"
 - **invalidation_price**: Kijun-Sen level (for trailing)
 - **time_exit**: No fixed time (ride the trend)
-- **cooldown_until**: ISO timestamp (3 invocations after action)
+- **cooldown_minutes**: 1-15 minutes
+
+**WHY COOLDOWN?** Prevents impulsive direction flips. While a position is open, you cannot flip to the opposite direction until cooldown expires. This applies both while holding AND after closing. System enforces this.
 
 **IMPORTANT:** Use these EXACT field names when calling createPosition:
 1. invalidation_trigger -> invalidation_condition
 2. invalidation_price -> invalidation_price
 3. time_exit -> time_exit
-4. cooldown_until -> cooldown_until
+4. cooldown_minutes -> cooldown_minutes
 
 == RESPONSE FORMAT ==
 1. **Regime:** "ADX 32. Price > Cloud. Strong Trend."
@@ -55,7 +57,7 @@ Every position MUST specify:
 `;
 
 export const USER_PROMPT = `
-Session: {{TOTAL_MINUTES}} min | Invocations: {{INVOKATION_TIMES}} | {{CURRENT_TIME}} IST
+Session: {{TOTAL_MINUTES}} min | Interval: 5 min | Invocations: {{INVOKATION_TIMES}} | {{CURRENT_TIME}} IST
 Cash: {{AVAILABLE_CASH}} | Exposure: {{EXPOSURE_TO_EQUITY_PCT}}%
 
 == MARKET DATA ==

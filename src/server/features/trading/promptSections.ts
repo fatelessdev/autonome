@@ -1,4 +1,3 @@
-import type { Account } from "@/server/features/trading/accounts";
 import type { PortfolioSnapshot } from "@/server/features/trading/getPortfolio";
 import type {
 	EnrichedOpenPosition,
@@ -57,11 +56,6 @@ function formatConfidence(value: number | null | undefined): string {
 	return `${normalized.toFixed(1)}%`;
 }
 
-function formatIsoDate(value: string | null | undefined): string {
-	if (!value) return "N/A";
-	return value;
-}
-
 export function buildOpenPositionsSection(
 	positions: EnrichedOpenPosition[],
 ): string {
@@ -71,43 +65,57 @@ export function buildOpenPositionsSection(
 
 	const sections = positions.map((position) => {
 		const leverage =
-			position.leverage != null ? `${position.leverage.toFixed(2)}x` : "n/a";
-		// Per-position realized = P&L from scaling down this specific position (partial closes)
-		const mainLine = [
+			position.leverage != null ? `${position.leverage.toFixed(2)}x` : "N/A";
+
+		// Line 1: Core position info (always include all fields, omit only if N/A)
+		const mainParts = [
 			`symbol ${position.symbol}`,
 			`side ${position.sign}`,
 			`qty ${formatNullableNumber(position.quantity, 4)}`,
-			`notional ${formatUsd(position.notionalUsd, 2)}`,
 			`entry ${formatNullableNumber(position.entryPrice, 2)}`,
 			`mark ${formatNullableNumber(position.markPrice, 2)}`,
-			`liquidation ${formatNullableNumber(position.liquidationPrice, 2)}`,
+			`notional ${formatUsd(position.notionalUsd, 2)}`,
+			`leverage ${leverage}`,
+		];
+		// Only include liquidation if available (omit N/A)
+		if (position.liquidationPrice != null) {
+			mainParts.push(`liquidation ${formatNullableNumber(position.liquidationPrice, 2)}`);
+		}
+		const mainLine = mainParts.join(" | ");
+
+		// Line 2: P&L (keep zeros, they're meaningful)
+		const pnlLine = [
 			`unrealized ${formatUsd(position.unrealizedPnl, 2)}`,
 			`scaled_realized ${formatUsd(position.realizedPnl, 2)}`,
-			`leverage ${leverage}`,
 		].join(" | ");
 
-		const riskPieces = [
-			`risk_usd ${formatUsd(position.riskUsd, 2)}`,
-			`risk_pct ${formatPercent(position.riskPercent, 2)}`,
-		];
-
-		if (position.rewardUsd !== null) {
-			riskPieces.push(`reward_usd ${formatUsd(position.rewardUsd, 2)}`);
+		// Line 3: Risk/Reward (explicit labels, omit N/A fields)
+		const riskParts: string[] = [];
+		if (position.riskUsd !== null) {
+			riskParts.push(`risk_usd ${formatUsd(position.riskUsd, 2)}`);
+			riskParts.push(`risk_pct ${formatPercent(position.riskPercent, 2)}`);
 		}
-		if (position.rewardPercent !== null) {
-			riskPieces.push(`reward_pct ${formatPercent(position.rewardPercent, 2)}`);
+		if (position.rewardUsd !== null) {
+			riskParts.push(`reward_usd ${formatUsd(position.rewardUsd, 2)}`);
+			riskParts.push(`reward_pct ${formatPercent(position.rewardPercent, 2)}`);
 		}
 		if (position.riskRewardRatio !== null) {
-			riskPieces.push(`rr_ratio ${position.riskRewardRatio.toFixed(2)}`);
+			riskParts.push(`rr_ratio ${position.riskRewardRatio.toFixed(2)}`);
 		}
 
-		const exitPlanLine = `exit_plan: target ${formatNullableNumber(position.exitPlan?.target, 2)} | stop ${formatNullableNumber(position.exitPlan?.stop, 2)} | invalidation ${position.exitPlan?.invalidation ?? "N/A"} | time_exit ${position.exitPlan?.timeExit ?? "N/A"} | cooldown_until ${position.exitPlan?.cooldownUntil ?? "N/A"}`;
+		// Line 4: Exit plan (quote string fields for clarity)
+		const exitPlanLine = `exit_plan: target ${formatNullableNumber(position.exitPlan?.target, 2)} | stop ${formatNullableNumber(position.exitPlan?.stop, 2)} | invalidation "${position.exitPlan?.invalidation ?? "N/A"}" | time_exit "${position.exitPlan?.timeExit ?? "N/A"}" | cooldown_until ${position.exitPlan?.cooldownUntil ?? "N/A"}`;
 
-		const intentLine = `intent: signal ${position.signal ?? position.sign} | confidence ${formatConfidence(position.confidence)} | decision_status ${position.decisionStatus ?? "N/A"} | last_decision_at ${formatIsoDate(position.lastDecisionAt)} | invalidation_price ${formatNullableNumber(position.exitPlan?.stop, 2)} | time_exit ${position.exitPlan?.timeExit ?? "N/A"} | cooldown_until ${position.exitPlan?.cooldownUntil ?? "N/A"}`;
+		// Line 5: Intent context (explicit labels)
+		const intentLine = `intent: signal ${position.signal ?? position.sign} | confidence ${formatConfidence(position.confidence)} | decision_status ${position.decisionStatus ?? "N/A"} | last_decision_at ${position.lastDecisionAt ?? "N/A"}`;
 
-		return [mainLine, riskPieces.join(" | "), exitPlanLine, intentLine].join(
-			"\n",
-		);
+		const lines = [mainLine, pnlLine];
+		if (riskParts.length > 0) {
+			lines.push(riskParts.join(" | "));
+		}
+		lines.push(exitPlanLine, intentLine);
+
+		return lines.join("\n");
 	});
 
 	return sections.join("\n\n");
@@ -122,97 +130,46 @@ export function buildPortfolioSnapshotSection({
 	openPositions: EnrichedOpenPosition[];
 	exposureSummary: ExposureSummary;
 }): string {
-	const cashUtilization =
-		portfolio.totalValue > 0
-			? 1 - portfolio.availableCash / portfolio.totalValue
-			: null;
 	const exposurePct = calculateExposureToEquityPct(portfolio, exposureSummary);
+	const riskPct =
+		portfolio.totalValue > 0
+			? (exposureSummary.totalRiskUsd / portfolio.totalValue) * 100
+			: 0;
+	const maxRiskPct =
+		portfolio.totalValue > 0
+			? (exposureSummary.maxPositionRiskUsd / portfolio.totalValue) * 100
+			: 0;
+	const cashUtilizationPct =
+		portfolio.totalValue > 0
+			? ((portfolio.totalValue - portfolio.availableCash) / portfolio.totalValue) * 100
+			: 0;
 
-	const lines = [
-		`portfolio_value: ${formatUsd(portfolio.totalValue)}`,
-		`available_cash: ${formatUsd(portfolio.availableCash)}`,
-		`open_positions: ${openPositions.length}`,
-		`gross_exposure_usd: ${formatUsd(exposureSummary.totalNotional)}`,
-		`unrealized_pnl: ${formatUsd(exposureSummary.totalUnrealized)}`,
-		// Open-position realized = P&L from scaling down current positions (not yet fully closed)
-		`scaled_realized_pnl: ${formatUsd(exposureSummary.totalRealized)}`,
-	];
+	const netExposure = exposureSummary.longExposure - exposureSummary.shortExposure;
+	const exposurePctLabel = exposurePct !== null && Number.isFinite(exposurePct) 
+		? exposurePct.toFixed(1) 
+		: "0.0";
 
-	if (cashUtilization !== null && Number.isFinite(cashUtilization)) {
-		lines.push(`cash_utilization_pct: ${(cashUtilization * 100).toFixed(1)}%`);
-	}
-
-	if (exposurePct !== null && Number.isFinite(exposurePct)) {
-		lines.push(`exposure_to_equity_pct: ${exposurePct.toFixed(1)}%`);
-	}
-
-	if (portfolio.totalValue > 0 && exposureSummary.totalRiskUsd > 0) {
-		lines.push(
-			`risk_to_equity_pct: ${((exposureSummary.totalRiskUsd / portfolio.totalValue) * 100).toFixed(2)}%`,
-		);
-	}
-
-	return lines.join("\n");
+	// All fields always shown - zeros are meaningful, AI should never infer
+	return [
+		`portfolio_value: ${formatUsd(portfolio.totalValue)} | available_cash: ${formatUsd(portfolio.availableCash)} | open_positions: ${openPositions.length}`,
+		`cash_utilization_pct: ${cashUtilizationPct.toFixed(1)}% | exposure_to_equity_pct: ${exposurePctLabel}%`,
+		`gross_exposure_usd: ${formatUsd(exposureSummary.totalNotional)} | long_exposure: ${formatUsd(exposureSummary.longExposure)} | short_exposure: ${formatUsd(exposureSummary.shortExposure)} | net_exposure: ${formatUsd(netExposure)}`,
+		`unrealized_pnl: ${formatUsd(exposureSummary.totalUnrealized)} | scaled_realized_pnl: ${formatUsd(exposureSummary.totalRealized)}`,
+		`gross_risk_usd: ${formatUsd(exposureSummary.totalRiskUsd)} | risk_to_equity_pct: ${riskPct.toFixed(2)}% | max_single_position_risk_usd: ${formatUsd(exposureSummary.maxPositionRiskUsd)} | max_single_position_risk_pct: ${maxRiskPct.toFixed(2)}%`,
+	].join("\n");
 }
 
 export function buildPerformanceOverview({
-	account,
-	portfolio,
 	performanceMetrics,
-	openPositions,
-	exposureSummary,
 }: {
-	account: Account;
-	portfolio: PortfolioSnapshot;
 	performanceMetrics: PerformanceMetrics;
-	openPositions: EnrichedOpenPosition[];
-	exposureSummary: ExposureSummary;
 }): string {
-	const exposure = exposureSummary;
-	const netExposure = exposure.longExposure - exposure.shortExposure;
-	const exposureRatio = calculateExposureToEquityPct(portfolio, exposureSummary);
-	const grossRiskRatio =
-		portfolio.totalValue > 0 && exposure.totalRiskUsd > 0
-			? (exposure.totalRiskUsd / portfolio.totalValue) * 100
-			: null;
-	const maxRiskRatio =
-		portfolio.totalValue > 0 && exposure.maxPositionRiskUsd > 0
-			? (exposure.maxPositionRiskUsd / portfolio.totalValue) * 100
-			: null;
-
-	const lines = [
-		`scheduled_interval_minutes: 5`,
-		`invocations_completed: ${account.invocationCount}`,
-		`elapsed_minutes: ${account.totalMinutes}`,
-		`portfolio_value: ${formatUsd(portfolio.totalValue)}`,
-		`available_cash: ${formatUsd(portfolio.availableCash)}`,
-		`open_positions: ${openPositions.length}`,
-		`total_notional_exposure: ${formatUsd(exposure.totalNotional)}`,
-		`long_exposure: ${formatUsd(exposure.longExposure)}`,
-		`short_exposure: ${formatUsd(exposure.shortExposure)}`,
-		`net_exposure: ${formatUsd(netExposure)}`,
-		`unrealized_pnl: ${formatUsd(exposure.totalUnrealized)}`,
-		// Closed-trade realized = cumulative P&L from all fully closed trades (historical performance)
-		`closed_trade_realized_pnl: ${formatUsd(performanceMetrics.closedTradeRealizedPnl)}`,
-		`gross_risk_usd: ${formatUsd(exposure.totalRiskUsd)}`,
-		`max_single_position_risk_usd: ${formatUsd(exposure.maxPositionRiskUsd)}`,
-		`annualized_sharpe_ratio: ${performanceMetrics.sharpeRatio}`,
-		`total_return_since_start: ${performanceMetrics.totalReturnPercent}`,
-	];
-
-	if (exposureRatio !== null && Number.isFinite(exposureRatio)) {
-		lines.splice(6, 0, `exposure_to_equity_pct: ${exposureRatio.toFixed(2)}%`);
-	}
-
-	if (grossRiskRatio !== null && Number.isFinite(grossRiskRatio)) {
-		lines.push(`risk_to_equity_pct: ${grossRiskRatio.toFixed(2)}%`);
-	}
-
-	if (maxRiskRatio !== null && Number.isFinite(maxRiskRatio)) {
-		lines.push(`max_position_risk_pct: ${maxRiskRatio.toFixed(2)}%`);
-	}
-
-	return lines.join("\n");
+	// PERFORMANCE = historical metrics only (current state is in PORTFOLIO)
+	return [
+		`closed_trade_realized_pnl: ${formatUsd(performanceMetrics.closedTradeRealizedPnl)} | trade_count: ${performanceMetrics.tradeCount} | win_rate: ${performanceMetrics.winRate}`,
+		`total_return_since_start: ${performanceMetrics.totalReturnPercent} | annualized_sharpe_ratio: ${performanceMetrics.sharpeRatio}`,
+		`current_drawdown: ${performanceMetrics.currentDrawdown} | max_drawdown: ${performanceMetrics.maxDrawdown}`,
+	].join("\n");
 }
 
 export { formatUsd };

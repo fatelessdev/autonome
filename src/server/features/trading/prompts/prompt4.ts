@@ -49,18 +49,17 @@ At ${MAX_LEVERAGE}x, a whipsaw costs 10× more than at 1x. DO NOT flip based on:
 Discipline at max leverage is non-negotiable.
 
 == COOLDOWN MECHANISM ==
-After opening, closing, or significantly adjusting a position, observe a **3-invocation cooldown (~15 min)** before any direction change on that symbol.
+After opening, closing, or significantly adjusting a position, specify **cooldown_minutes** (1-15) before any direction change on that symbol.
 Exception: Hard invalidation (price breaks your stated invalidation_price).
-Encode in exit_plan: "cooldown_until: [ISO_TIMESTAMP]"
 
-High leverage + rapid flipping = account destruction. Honor your cooldowns.
+High leverage + rapid flipping = account destruction. The system converts your cooldown_minutes to a timestamp.
 
 == EXIT PLAN REQUIREMENTS ==
 Every position MUST specify these fields:
 1. **invalidation_trigger**: The condition that kills your thesis (e.g., "4h close above EMA50")
 2. **invalidation_price**: The exact price level where thesis is dead
 3. **time_exit**: Maximum hold duration (e.g., "Close if held >24h and within 1R")
-4. **cooldown_until**: ISO timestamp when direction change is next allowed
+4. **cooldown_minutes**: Cooldown duration 1-15 minutes
 
 DO NOT close a position unless one of these is met:
 - SL/TP hit
@@ -74,7 +73,7 @@ At ${MAX_LEVERAGE}x, premature exits and re-entries bleed you dry through fees a
 1. invalidation_trigger -> invalidation_condition
 2. invalidation_price -> invalidation_price
 3. time_exit -> time_exit
-4. cooldown_until -> cooldown_until
+4. cooldown_minutes -> cooldown_minutes
 
  == REASONING FRAMEWORK ==
 Before each decision, systematically analyze:
@@ -121,7 +120,7 @@ Max leverage is mandatory. Risk discipline is non-negotiable.`;
 
 
 export const USER_PROMPT = `
-Session: {{TOTAL_MINUTES}} min | Invocations: {{INVOKATION_TIMES}} | {{CURRENT_TIME}} IST
+Session: {{TOTAL_MINUTES}} min | Interval: 5 min | Invocations: {{INVOKATION_TIMES}} | {{CURRENT_TIME}} IST
 
 Cash: {{AVAILABLE_CASH}} | Exposure: {{EXPOSURE_TO_EQUITY_PCT}}%
 
