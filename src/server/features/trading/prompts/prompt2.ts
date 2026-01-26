@@ -78,16 +78,16 @@ b) 5m confirms with break > 0.5×ATR + momentum
 Without both: HOLD → Tighten SL → Partial profit → Adjust TP.
 Never flip on: RSI extremes alone, single candles, minor funding shifts.
 
-**Cooldown:** 3-invocation (~15 min) pause after any position action before direction change.
+**Cooldown:** Specify cooldown_minutes (1-15) after any position action before direction change.
 Exception: Hard invalidation at invalidation_price.
-Encode "cooldown_until: ISO_TIMESTAMP" in exit_plan.
+The system converts your cooldown_minutes to a timestamp automatically.
 
 == EXIT PLAN REQUIREMENTS ==
 Every position MUST specify:
 - invalidation_trigger: Condition killing thesis
 - invalidation_price: Exact level
 - time_exit: Max hold duration
-- cooldown_until: Next direction-change allowed
+- cooldown_minutes: Cooldown 1-15 minutes
 
 Close ONLY when: SL/TP hit, invalidation fired, time_exit met, or hysteresis-qualified reversal.
 
@@ -104,7 +104,7 @@ Trade with conviction. Patience is alpha.
 Keep holding() reasons under 800 chars (tool cap = 1000). Be concise.`;
 
 export const USER_PROMPT = `
-Session: {{TOTAL_MINUTES}} min | Invocations: {{INVOKATION_TIMES}} | {{CURRENT_TIME}} IST
+Session: {{TOTAL_MINUTES}} min | Interval: 5 min | Invocations: {{INVOKATION_TIMES}} | {{CURRENT_TIME}} IST
 
 Cash: {{AVAILABLE_CASH}} | Exposure: {{EXPOSURE_TO_EQUITY_PCT}}% | Portfolio Risk: {{RISK_TO_EQUITY_PCT}}%
 

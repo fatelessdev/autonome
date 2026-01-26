@@ -143,13 +143,7 @@ export function buildTradingPrompts(params: TradingPromptParams): {
 		)
 		.replaceAll(
 			"{{PERFORMANCE_OVERVIEW}}",
-			buildPerformanceOverview({
-				account,
-				portfolio,
-				performanceMetrics,
-				openPositions,
-				exposureSummary,
-			}),
+			buildPerformanceOverview({ performanceMetrics }),
 		)
 		.replaceAll(
 			"{{COMPETITION_STANDINGS}}",

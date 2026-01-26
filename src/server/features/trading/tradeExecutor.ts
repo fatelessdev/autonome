@@ -90,6 +90,9 @@ export async function runTradeWorkflow(account: Account) {
 	// Track symbols acted on this session to prevent duplicate actions
 	const actedSymbols = new Set<string>();
 
+	// Track cooldowns from closed positions (for flip-after-close enforcement)
+	const closedPositionCooldowns = new Map<string, { side: "LONG" | "SHORT"; cooldownUntil: string }>();
+
 	// Track per-symbol action counts for session limits
 	const symbolActionCounts = new Map<string, number>();
 
@@ -150,6 +153,7 @@ export async function runTradeWorkflow(account: Account) {
 		openPositions,
 		decisionIndex,
 		actedSymbols,
+		closedPositionCooldowns,
 		symbolActionCounts,
 		capturedDecisions,
 		capturedExecutionResults,

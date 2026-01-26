@@ -44,10 +44,12 @@ export const decisionSchema = z.object({
 		.string()
 		.optional()
 		.describe("Maximum hold duration condition (e.g., 'Close if held >24h and within 1R of entry')"),
-	cooldown_until: z
-		.string()
+	cooldown_minutes: z
+		.number()
+		.min(1)
+		.max(15)
 		.optional()
-		.describe("ISO timestamp when direction change is next allowed on this symbol"),
+		.describe("Cooldown duration in minutes (1-15) before direction change allowed. System calculates timestamp."),
 	confidence: z
 		.number()
 		.min(0)
