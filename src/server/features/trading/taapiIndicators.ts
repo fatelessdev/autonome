@@ -48,10 +48,24 @@ const formatValue = (value: number | null | undefined, digits = 2): string => {
 
 /**
  * Format BBands result for prompt
+ * Includes Bollinger Bandwidth (BBW): ((Upper - Lower) / Mid) * 100
+ * BBW measures volatility - higher values indicate wider bands (more volatility)
  */
 const formatBBands = (bbands: BBandsResult | null): string => {
 	if (!bbands) return "Bollinger Bands: N/A";
-	return `Bollinger Bands (20): Upper=${formatValue(bbands.valueUpperBand)}, Mid=${formatValue(bbands.valueMiddleBand)}, Lower=${formatValue(bbands.valueLowerBand)}`;
+
+	const upper = bbands.valueUpperBand;
+	const mid = bbands.valueMiddleBand;
+	const lower = bbands.valueLowerBand;
+
+	// Calculate Bollinger Bandwidth (BBW)
+	let bandwidthStr = "N/A";
+	if (mid && mid !== 0 && upper !== null && lower !== null) {
+		const bandwidth = ((upper - lower) / mid) * 100;
+		bandwidthStr = `${bandwidth.toFixed(2)}%`;
+	}
+
+	return `Bollinger Bands (20): Upper=${formatValue(upper)}, Mid=${formatValue(mid)}, Lower=${formatValue(lower)} | Bandwidth=${bandwidthStr}`;
 };
 
 /**
