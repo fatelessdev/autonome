@@ -204,17 +204,17 @@ function sanitizePrices(prices: MarketPrice[]): MarketPrice[] {
 
 function TickerSkeleton() {
 	return (
-		<div className="flex w-full flex-wrap items-center justify-start gap-2.5 sm:gap-4">
+		<div className="flex items-center gap-2 sm:gap-4 flex-nowrap">
 			{TRACKED_SYMBOLS.map((symbol) => (
 				<div
 					key={symbol}
-					className="flex min-w-[92px] flex-1 flex-col items-center gap-1.5 sm:min-w-[140px] sm:gap-2"
+					className="flex min-w-[82px] flex-col items-center gap-1 sm:min-w-[140px] sm:gap-1.5"
 				>
-					<div className="flex items-center gap-1.5 sm:gap-2">
-						<Skeleton className="h-3.5 w-12 sm:h-4 sm:w-14" />
-						<Skeleton className="h-3.5 w-8 sm:h-4 sm:w-10" />
+					<div className="flex items-center gap-1 sm:gap-2">
+						<Skeleton className="h-6 w-6 rounded-full" />
+						<Skeleton className="h-3 w-8 sm:h-4 sm:w-10" />
 					</div>
-					<Skeleton className="h-4 w-20 sm:h-5 sm:w-24" />
+					<Skeleton className="h-3.5 w-16 sm:h-5 sm:w-24" />
 				</div>
 			))}
 		</div>
