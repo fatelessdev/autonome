@@ -45,6 +45,12 @@ export const env = createEnv({
 		NIM_API_KEY3: z.string().optional(),
 		OPENROUTER_API_KEY: z.string().optional(),
 		OPENROUTER_API_KEY1: z.string().optional(),
+		AIHUBMIX_API_KEY: z.string().optional(),
+		AIHUBMIX_API_KEY1: z.string().optional(),
+		AIHUBMIX_API_KEY2: z.string().optional(),
+		AIHUBMIX_API_KEY3: z.string().optional(),
+		AIHUBMIX_API_KEY4: z.string().optional(),
+		AIHUBMIX_API_KEY5: z.string().optional(),
 		MISTRAL_API_KEY: z.string().optional(),
 
 		// Lighter API configuration
@@ -115,64 +121,88 @@ export const DEFAULT_SIMULATOR_OPTIONS: ExchangeSimulatorOptions = {
 // TAAPI API key for supplementary indicators (optional)
 export const TAAPI_API_KEY = env.TAAPI_API_KEY;
 
-// ==================== NIM API Key Cycling ====================
-// Collect all available NIM API keys into an array for round-robin cycling
-const nimApiKeys: string[] = [
+type ApiKeyRotator = {
+	getNext: () => string;
+	getCount: () => number;
+};
+
+function createApiKeyRotator(name: string, keys: Array<string | undefined>): ApiKeyRotator {
+	const availableKeys = keys.filter((key): key is string => Boolean(key));
+	let requestCounter = 0;
+
+	return {
+		getNext: () => {
+			if (availableKeys.length === 0) {
+				throw new Error(`No ${name} API keys configured`);
+			}
+			const key = availableKeys[requestCounter % availableKeys.length]!;
+			requestCounter++;
+			return key;
+		},
+		getCount: () => availableKeys.length,
+	};
+}
+
+// ==================== API Key Cycling ====================
+const nimKeyRotator = createApiKeyRotator("NIM", [
 	env.NIM_API_KEY,
 	env.NIM_API_KEY1,
 	env.NIM_API_KEY2,
 	env.NIM_API_KEY3,
-].filter((key): key is string => Boolean(key));
+]);
 
-// Track request counter for round-robin cycling
-let nimRequestCounter = 0;
+const openRouterKeyRotator = createApiKeyRotator("OpenRouter", [
+	env.OPENROUTER_API_KEY,
+	env.OPENROUTER_API_KEY1,
+]);
+
+const aihubmixKeyRotator = createApiKeyRotator("AIHubMix", [
+	env.AIHUBMIX_API_KEY,
+	env.AIHUBMIX_API_KEY1,
+	env.AIHUBMIX_API_KEY2,
+]);
 
 /**
  * Get the next NIM API key using round-robin cycling.
  * This distributes requests across multiple keys to avoid rate limits.
  */
 export function getNextNimApiKey(): string {
-	if (nimApiKeys.length === 0) {
-		throw new Error("No NIM API keys configured");
-	}
-	const key = nimApiKeys[nimRequestCounter % nimApiKeys.length]!;
-	nimRequestCounter++;
-	return key;
+	return nimKeyRotator.getNext();
 }
 
 /**
  * Get all available NIM API keys count (for logging/debugging)
  */
 export function getNimApiKeyCount(): number {
-	return nimApiKeys.length;
+	return nimKeyRotator.getCount();
 }
-
-// ==================== OpenRouter API Key Cycling ====================
-// Collect all available OpenRouter API keys into an array for round-robin cycling
-const openRouterApiKeys: string[] = [
-	env.OPENROUTER_API_KEY,
-	env.OPENROUTER_API_KEY1,
-].filter((key): key is string => Boolean(key));
-
-// Track request counter for round-robin cycling
-let openRouterRequestCounter = 0;
 
 /**
  * Get the next OpenRouter API key using round-robin cycling.
  * This distributes requests across multiple keys to avoid rate limits.
  */
 export function getNextOpenRouterApiKey(): string {
-	if (openRouterApiKeys.length === 0) {
-		throw new Error("No OpenRouter API keys configured");
-	}
-	const key = openRouterApiKeys[openRouterRequestCounter % openRouterApiKeys.length]!;
-	openRouterRequestCounter++;
-	return key;
+	return openRouterKeyRotator.getNext();
 }
 
 /**
  * Get all available OpenRouter API keys count (for logging/debugging)
  */
 export function getOpenRouterApiKeyCount(): number {
-	return openRouterApiKeys.length;
+	return openRouterKeyRotator.getCount();
+}
+
+/**
+ * Get the next AIHubMix API key using round-robin cycling.
+ * This distributes requests across multiple keys to avoid rate limits.
+ */
+export function getNextAihubmixApiKey(): string {
+	return aihubmixKeyRotator.getNext();
+}
+
+/**
+ * Get all available AIHubMix API keys count (for logging/debugging)
+ */
+export function getAihubmixApiKeyCount(): number {
+	return aihubmixKeyRotator.getCount();
 }

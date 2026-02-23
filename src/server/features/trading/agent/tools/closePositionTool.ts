@@ -26,7 +26,6 @@ export function closePositionTool(ctx: ToolContext) {
 		}),
 		execute: async ({ symbols }) => {
 			// Filter out already-acted symbols
-			// TODO: Re-enable session limit filtering later
 			const skippedDuplicates: string[] = [];
 			const skippedLimitReached: string[] = [];
 			const symbolsToClose = symbols.filter((s) => {
@@ -35,11 +34,11 @@ export function closePositionTool(ctx: ToolContext) {
 					skippedDuplicates.push(upper);
 					return false;
 				}
-				// const currentCount = ctx.symbolActionCounts.get(upper) ?? 0;
-				// if (currentCount >= MAX_ACTIONS_PER_SYMBOL) {
-				// 	skippedLimitReached.push(upper);
-				// 	return false;
-				// }
+				const currentCount = ctx.symbolActionCounts.get(upper) ?? 0;
+				if (currentCount >= MAX_ACTIONS_PER_SYMBOL) {
+					skippedLimitReached.push(upper);
+					return false;
+				}
 				return true;
 			});
 

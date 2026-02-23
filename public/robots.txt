@@ -10,7 +10,7 @@ Disallow: /_build/
 Crawl-delay: 1
 
 # Sitemap
-Sitemap: https://goon.fast/sitemap.xml
+Sitemap: https://autonome.fateless.dev/sitemap.xml
 
 # Google specific
 User-agent: Googlebot

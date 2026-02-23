@@ -7,6 +7,7 @@ import { createPositionTool } from "./createPositionTool";
 import { closePositionTool } from "./closePositionTool";
 import { updateExitPlanTool } from "./updateExitPlanTool";
 import { holdingTool } from "./holdingTool";
+import { fetchIndicatorsTool } from "./fetchIndicatorsTool";
 import type { ToolContext } from "./types";
 
 export { type ToolContext } from "./types";
@@ -20,6 +21,7 @@ export function createTradingTools(ctx: ToolContext) {
 		closePosition: closePositionTool(ctx),
 		updateExitPlan: updateExitPlanTool(ctx),
 		holding: holdingTool(ctx),
+		fetchIndicators: fetchIndicatorsTool,
 	};
 }
 

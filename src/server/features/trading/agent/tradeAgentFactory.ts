@@ -5,10 +5,15 @@
 
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { createAihubmix } from "@aihubmix/ai-sdk-provider";
 import { ToolLoopAgent, stepCountIs, hasToolCall } from "ai";
 import * as Sentry from "@sentry/react";
 
-import { getNextNimApiKey, getNextOpenRouterApiKey } from "@/env";
+import {
+	getNextAihubmixApiKey,
+	getNextNimApiKey,
+	getNextOpenRouterApiKey,
+} from "@/env";
 import type { Account } from "@/server/features/trading/accounts";
 import type { StepTelemetry } from "@/server/features/trading/invocationResponse";
 import { getModelProvider } from "@/shared/models/modelConfig";
@@ -67,16 +72,20 @@ export function createTradeAgent(config: TradeAgentConfig) {
 	const openrouter = createOpenRouter({
 		apiKey: openRouterApiKey,
 	});
+	const aihubmixApiKey = getNextAihubmixApiKey();
+	const aihubmix = createAihubmix({
+		apiKey: aihubmixApiKey,
+	});
 
 	// Select model based on provider
 	const modelProvider = getModelProvider(account.name);
-	const useOpenRouter = modelProvider === "openrouter";
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const selectedModel = (
-		useOpenRouter
-			? openrouter.chat(account.modelName)
-			: nim.chatModel(account.modelName)
-	) as any;
+	// biome-ignore lint/suspicious/noExplicitAny: Provider SDKs currently resolve to incompatible model package versions.
+	const selectedModel: any =
+		modelProvider === "openrouter"
+			? openrouter(account.modelName)
+			: modelProvider === "aihubmix"
+				? aihubmix(account.modelName)
+				: nim.chatModel(account.modelName);
 
 	// Track step count for telemetry
 	let currentStepNumber = 0;

@@ -118,11 +118,12 @@ const CustomEndDot = ({
 			.toUpperCase() || "•";
 
 	const numberFlowValue = valueMode === "percent" ? value / 100 : value;
-	const numberFlowFormat = valueMode === "percent"
-		? FLOW_FORMAT_PERCENT
-		: compact
-			? FLOW_FORMAT_CURRENCY_COMPACT
-			: FLOW_FORMAT_CURRENCY;
+	const numberFlowFormat =
+		valueMode === "percent"
+			? FLOW_FORMAT_PERCENT
+			: compact
+				? FLOW_FORMAT_CURRENCY_COMPACT
+				: FLOW_FORMAT_CURRENCY;
 
 	const labelWidth = compact ? 96 : 130;
 
@@ -299,6 +300,16 @@ export function GlowingLineChart({
 
 	const isPercent = valueMode === "percent";
 
+	const hasLongXAxisLabels = useMemo(
+		() =>
+			chartData.some(
+				(row) =>
+					typeof row.month === "string" &&
+					row.month.replace(/\s+/g, " ").trim().length >= 11,
+			),
+		[chartData],
+	);
+
 	// Calculate dynamic y-axis based on actual data values
 	const yAxisConfig = useMemo(() => {
 		if (isPercent) {
@@ -393,8 +404,13 @@ export function GlowingLineChart({
 		() =>
 			compact
 				? ({ left: 0, right: 64, top: 16, bottom: 16 } as const)
-				: ({ left: 0, right: 110, top: 20, bottom: 20 } as const),
-		[compact],
+				: ({
+						left: 0,
+						right: 110,
+						top: 20,
+						bottom: hasLongXAxisLabels ? 42 : 20,
+					} as const),
+		[compact, hasLongXAxisLabels],
 	);
 
 	const setHoveredLine = (key: string | null) => {
@@ -464,17 +480,17 @@ export function GlowingLineChart({
 							</Button>
 						</div>
 					) : null}
-						{/* Account value text - center */}
-						<div className="flex flex-1 items-center justify-center text-center">
-							<h2
-								className={cn(
-									"font-semibold uppercase tracking-wider",
-									"text-sm sm:text-base",
-								)}
-							>
-								{variantLabel} / TOTAL ACCOUNT VALUE
-							</h2>
-						</div>
+					{/* Account value text - center */}
+					<div className="flex flex-1 items-center justify-center text-center">
+						<h2
+							className={cn(
+								"font-semibold uppercase tracking-wider",
+								"text-sm sm:text-base",
+							)}
+						>
+							{variantLabel} / TOTAL ACCOUNT VALUE
+						</h2>
+					</div>
 					{/* ALL and 72H buttons - desktop only */}
 					{!compact ? (
 						<div className="flex gap-2">
@@ -564,9 +580,9 @@ export function GlowingLineChart({
 								fontSize: compact ? 10 : 11,
 							}}
 							interval="preserveStartEnd"
-							angle={compact ? 0 : -45}
+							angle={compact ? 0 : hasLongXAxisLabels ? -35 : -45}
 							textAnchor={compact ? "middle" : "end"}
-							height={compact ? 40 : 60}
+							height={compact ? 40 : hasLongXAxisLabels ? 88 : 60}
 						/>
 						<YAxis
 							axisLine={false}
@@ -680,4 +696,3 @@ export function GlowingLineChart({
 		</div>
 	);
 }
-

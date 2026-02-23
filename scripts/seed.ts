@@ -33,15 +33,19 @@ const db = drizzle(pool);
 
 // Model definitions - openRouterModelName
 const MODEL_DEFINITIONS = [
-	// "deepseek-ai/deepseek-v3.2",
+	//working models
+	"stepfun-ai/step-3.5-flash",
+	"minimaxai/minimax-m2.1",
+	"z-ai/glm4.7",
 	"deepseek-ai/deepseek-v3.1-terminus",
-	"minimaxai/minimax-m2",
-	"moonshotai/kimi-k2-thinking",
-	"openai/gpt-oss-120b",
+	// not working models
 	// "xiaomi/mimo-v2-flash:free",
 	// "kwaipilot/kat-coder-pro:free",
-	"qwen/qwen3-235b-a22b",
+	// "deepseek-ai/deepseek-v3.2",
 	// "mistralai/mistral-large-3-675b-instruct-2512"
+	"kimi-for-coding-free",
+	"coding-minimax-m2.1-free",
+	"coding-glm-4.7-free",
 
 ];
 

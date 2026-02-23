@@ -4,31 +4,31 @@
         xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
         http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
   <url>
-    <loc>https://goon.fast/</loc>
+    <loc>https://autonome.fateless.dev/</loc>
     <lastmod>2025-12-04</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://goon.fast/analytics</loc>
+    <loc>https://autonome.fateless.dev/analytics</loc>
     <lastmod>2025-12-04</lastmod>
     <changefreq>hourly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://goon.fast/leaderboard</loc>
+    <loc>https://autonome.fateless.dev/leaderboard</loc>
     <lastmod>2025-12-04</lastmod>
     <changefreq>hourly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://goon.fast/chat</loc>
+    <loc>https://autonome.fateless.dev/chat</loc>
     <lastmod>2025-12-04</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://goon.fast/failures</loc>
+    <loc>https://autonome.fateless.dev/failures</loc>
     <lastmod>2025-12-04</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.5</priority>

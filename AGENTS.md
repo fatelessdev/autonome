@@ -52,7 +52,7 @@ surface intact and stub/annotate it instead of deleting it.
 5. **Polyfills**: Add `import '@/polyfill'` at top of oRPC router files
 6. **No bandaid fixes**: NEVER use workarounds or overrides to fix bugs. Always fix issues at their source/core.
 7. **Adaptive refactoring**: When modifying code, if you stumble upon sloppy code even if it's not directly related, refactor that code to improve clarity and maintainability.
-8. **Adaptive knowledge**: When working on a feature, familiarize yourself with all related files (e.g. DB schema, oRPC router, events, client code) to ensure holistic understanding and improvements and at the end update this doc with any new insights.
+8. **Adaptive knowledge**: When working on a feature, familiarize yourself with all related files (e.g. DB schema, oRPC router, events, client code) to ensure holistic understanding and improvements and at the end update this doc (AGENTS.md) with any new insights. And if you find any issues in the process of completing a task update problems.md.
 9. **Thorough implementation**: When making changes to a feature, ensure all related aspects (DB schema, oRPC procedures, frontend code, events) are updated accordingly to maintain consistency and functionality.
 10. **Critical Alignment**: Do not blindly follow instructions. Always evaluate the intent of the request against the existing codebase. If a request feels "off," partial, or doesn't solve the root user problem, you must explicitly point this out—even if it means correcting the user. Your engineering judgment is required; do not be a passive coder.
 11. **Edge Case Exhaustion**: Before finalizing any code, strictly "stress test" your solution mentally. Recursively generate failure scenarios and fix them immediately. Do not stop until you cannot find a way for the code to fail. Do not wait for a review to catch these; catch them yourself now.
@@ -153,6 +153,14 @@ const { data } = useQuery(orpc.trading.getPositions.queryOptions({ input: {} }))
 - `calculateMaxDrawdown()`, `calculateCurrentDrawdown()` - Drawdown metrics
 - `mean()`, `median()`, `standardDeviation()` - Statistical helpers
 - `INITIAL_CAPITAL` (10,000) - Constant for return calculations
+
+**API Key Rotators** (`@/env`):
+- `getNextNimApiKey()` - Retrieves the next Nim API key
+- `getNextOpenRouterApiKey()` - Retrieves the next Open Router API key
+- `getNextAihubmixApiKey()` - Retrieves the next Aihubmix API key
+- `getNimApiKeyCount()` - Returns the count of Nim API keys
+- `getOpenRouterApiKeyCount()` - Returns the count of Open Router API keys
+- `getAihubmixApiKeyCount()` - Returns the count of Aihubmix API keys
 
 **Trading Prompts** (`@/server/features/trading/prompts`):
 - Variant-specific prompts: `apex.ts`, `sovereign.ts`, `trendsurfer.ts`, `contrarian.ts`

@@ -13,10 +13,11 @@
 import { QueryClient } from "@tanstack/react-query";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { createAihubmix } from "@aihubmix/ai-sdk-provider";
 import { generateObject } from "ai";
 import { z } from "zod";
 
-import { env, getNextNimApiKey } from "@/env";
+import { getNextAihubmixApiKey, getNextNimApiKey, getNextOpenRouterApiKey } from "@/env";
 import { getModelProvider } from "@/core/shared/models/modelConfig";
 import { MARKETS } from "@/shared/markets/marketMetadata";
 import type { PortfolioSnapshot } from "@/server/features/trading/getPortfolio";
@@ -145,10 +146,14 @@ function createProviders() {
 	});
 
 	const openrouter = createOpenRouter({
-		apiKey: env.OPENROUTER_API_KEY,
+		apiKey: getNextOpenRouterApiKey(),
 	});
 
-	return { nim, openrouter };
+	const aihubmix = createAihubmix({
+		apiKey: getNextAihubmixApiKey(),
+	});
+
+	return { nim, openrouter, aihubmix };
 }
 
 // ==================== Voting Logic ====================
@@ -162,15 +167,18 @@ async function getVoterDecision(
 	portfolio: PortfolioSnapshot,
 	openPositions: EnrichedOpenPosition[],
 ): Promise<VoterResult> {
-	const { nim, openrouter } = createProviders();
+	const { nim, openrouter, aihubmix } = createProviders();
 	const startTime = Date.now();
 
 	try {
 		const provider = getModelProvider(voter.modelName);
 		const isOpenRouter = provider === "openrouter";
-		const model = isOpenRouter
-			? openrouter(voter.openRouterModelName)
-			: nim.chatModel(voter.openRouterModelName);
+		const model =
+			provider === "openrouter"
+				? openrouter(voter.openRouterModelName)
+				: provider === "aihubmix"
+					? aihubmix(voter.openRouterModelName)
+					: nim.chatModel(voter.openRouterModelName);
 
 		const availableSymbols = Object.keys(MARKETS).join(", ");
 		const riskPerTrade = portfolio.totalValue * 0.03; // 3% risk per trade

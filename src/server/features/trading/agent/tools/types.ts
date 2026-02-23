@@ -12,10 +12,8 @@ import type {
 import type { EnrichedOpenPosition } from "@/server/features/trading/openPositionEnrichment";
 import type { TradingDecisionWithContext } from "@/server/features/trading/tradingDecisions";
 
-// TODO: Re-enable symbol action limits later
-// /** Maximum actions (create/close) per symbol per session */
-// export const MAX_ACTIONS_PER_SYMBOL = 2;
-export const MAX_ACTIONS_PER_SYMBOL = Infinity;
+/** Maximum actions (create/close) per symbol per session */
+export const MAX_ACTIONS_PER_SYMBOL = 3;
 
 /**
  * Shared context passed to all tools during a trading session.

@@ -15,7 +15,7 @@ interface MyRouterContext {
 	queryClient: QueryClient;
 }
 
-const SITE_URL = "https://goon.fast";
+const SITE_URL = "https://autonome.fateless.dev";
 const SITE_NAME = "Autonome";
 const SITE_DESCRIPTION =
 	"AI-powered autonomous cryptocurrency trading platform with real-time portfolio analytics, multi-model AI strategies, and sophisticated trading simulation for both live and sandbox execution.";
@@ -25,6 +25,8 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 	head: () => ({
 		meta: [
 			// Basic
+			{ name: "author", content: "Aditya Singh (fatelessdev)" },
+			{ name: "creator", content: "fate1ess" },
 			{ charSet: "utf-8" },
 			{ name: "viewport", content: "width=device-width, initial-scale=1" },
 			{ title: `${SITE_NAME}` },
@@ -163,6 +165,12 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 								url: OG_IMAGE,
 								width: 512,
 								height: 512,
+							},
+							"author": {
+								"@id": "https://fateless.dev/#person"
+							},
+							"founder": {
+								"@id": "https://fateless.dev/#person"
 							},
 							sameAs: [],
 						},

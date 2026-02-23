@@ -3,7 +3,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
 import { models, orders } from "@/db/schema";
-import { DEFAULT_SIMULATOR_OPTIONS, IS_SIMULATION_ENABLED } from "@/env";
+import { BASE_URL, DEFAULT_SIMULATOR_OPTIONS, IS_SIMULATION_ENABLED } from "@/env";
 import {
 	DEFAULT_VARIANT,
 	isValidVariantId,
@@ -17,6 +17,7 @@ import { refreshConversationEvents } from "@/server/features/trading/conversatio
 import { formatIstTimestamp } from "@/shared/formatting/dateFormat";
 import { normalizeNumber } from "@/shared/formatting/numberFormat";
 import { MARKETS } from "@/shared/markets/marketMetadata";
+import { ApiClient, AccountApi } from "@reservoir0x/lighter-ts-sdk";
 
 // ==========================================
 // CRYPTO PRICES
@@ -240,6 +241,41 @@ export const tradesQuery = () =>
 // ==========================================
 
 /**
+ * Fetch open position symbols from the live exchange for a given account.
+ * Returns a Set of uppercase symbols currently open on the exchange.
+ */
+async function fetchLivePositionSymbols(accountIndex: string): Promise<Set<string>> {
+	const apiClient = new ApiClient({ host: BASE_URL });
+	const accountApi = new AccountApi(apiClient);
+
+	try {
+		const accountData = await accountApi.getAccount({
+			by: "index",
+			value: accountIndex,
+		});
+
+		const accounts = (accountData as any).accounts ?? [];
+		const account = accounts[0];
+		const positions = account?.positions ?? [];
+
+		// Only include positions with non-zero quantity
+		const symbols = new Set<string>();
+		for (const pos of positions) {
+			const quantity = parseFloat(pos.position ?? "0");
+			if (quantity !== 0 && pos.symbol) {
+				symbols.add(pos.symbol.toUpperCase());
+			}
+		}
+
+		await apiClient.close();
+		return symbols;
+	} catch (error) {
+		await apiClient.close();
+		throw error;
+	}
+}
+
+/**
  * Reconcile DB orders against live simulator/exchange state.
  * Closes any DB orders that are no longer present in live positions.
  */
@@ -356,6 +392,7 @@ export async function fetchPositions(options?: FetchPositionsOptions) {
 		);
 
 		// Reconcile DB orders against live state (close stale orders)
+		// This runs for both simulator and live trading modes
 		if (IS_SIMULATION_ENABLED) {
 			await Promise.all(
 				dbModels.map((model) => {
@@ -363,17 +400,33 @@ export async function fetchPositions(options?: FetchPositionsOptions) {
 					return reconcilePositionsWithLive(model.id, liveSymbols, priceMap);
 				}),
 			);
+		} else {
+			// Live trading: fetch positions from exchange for each model and reconcile
+			await Promise.all(
+				dbModels.map(async (model) => {
+					if (!model.accountIndex) return;
+					try {
+						const liveSymbols = await fetchLivePositionSymbols(model.accountIndex);
+						await reconcilePositionsWithLive(model.id, liveSymbols, priceMap);
+					} catch (error) {
+						console.error(
+							`[Reconcile] Failed to fetch live positions for model ${model.id}:`,
+							error,
+						);
+					}
+				}),
+			);
+		}
 
-			// Re-fetch open orders after reconciliation
-			const reconciled = await db.query.orders.findMany({
-				where: eq(orders.status, "OPEN"),
-			});
-			ordersByModel.clear();
-			for (const order of reconciled) {
-				const existing = ordersByModel.get(order.modelId) ?? [];
-				existing.push(order);
-				ordersByModel.set(order.modelId, existing);
-			}
+		// Re-fetch open orders after reconciliation
+		const reconciled = await db.query.orders.findMany({
+			where: eq(orders.status, "OPEN"),
+		});
+		ordersByModel.clear();
+		for (const order of reconciled) {
+			const existing = ordersByModel.get(order.modelId) ?? [];
+			existing.push(order);
+			ordersByModel.set(order.modelId, existing);
 		}
 
 		// Fetch total realized P&L per model from closed orders

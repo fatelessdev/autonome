@@ -5,7 +5,13 @@
 import { and, asc, desc, eq, gte, inArray, isNotNull } from "drizzle-orm";
 
 import { db } from "@/db";
-import { invocations, models, orders, portfolioSize, toolCalls } from "@/db/schema";
+import {
+	invocations,
+	models,
+	orders,
+	portfolioSize,
+	toolCalls,
+} from "@/db/schema";
 import { INITIAL_CAPITAL } from "./calculations";
 import type {
 	ClosedTradeData,
@@ -24,6 +30,82 @@ const WINDOW_MS: Record<LeaderboardWindow, number> = {
 };
 
 type VariantFilter = "Apex" | "Trendsurfer" | "Contrarian" | "Sovereign";
+
+function toFiniteNumber(value: unknown): number | undefined {
+	if (typeof value === "number" && Number.isFinite(value)) {
+		return value;
+	}
+
+	if (typeof value === "string" && value.trim().length > 0) {
+		const parsed = Number(value);
+		if (Number.isFinite(parsed)) {
+			return parsed;
+		}
+	}
+
+	return undefined;
+}
+
+function toNullableString(value: unknown): string | null {
+	return typeof value === "string" ? value : null;
+}
+
+function normalizeTimestamp(value: unknown): string {
+	if (typeof value === "string") {
+		return value;
+	}
+
+	if (value instanceof Date) {
+		return value.toISOString();
+	}
+
+	const numericTime = toFiniteNumber(value);
+	if (typeof numericTime === "number") {
+		return new Date(numericTime).toISOString();
+	}
+
+	return new Date().toISOString();
+}
+
+function normalizeStepTelemetry(
+	payload: Record<string, unknown> | null,
+): StepTelemetry[] | undefined {
+	const rawTelemetry = payload?.stepTelemetry;
+	if (!Array.isArray(rawTelemetry)) {
+		return undefined;
+	}
+
+	const normalized = rawTelemetry
+		.map((step, index) => {
+			if (!step || typeof step !== "object") {
+				return null;
+			}
+
+			const typedStep = step as Record<string, unknown>;
+			const stepNumber = toFiniteNumber(typedStep.stepNumber) ?? index + 1;
+			const inputTokens = toFiniteNumber(typedStep.inputTokens) ?? 0;
+			const outputTokens = toFiniteNumber(typedStep.outputTokens) ?? 0;
+			const totalTokens =
+				toFiniteNumber(typedStep.totalTokens) ?? inputTokens + outputTokens;
+			const toolNames = Array.isArray(typedStep.toolNames)
+				? typedStep.toolNames.filter(
+						(name): name is string => typeof name === "string",
+					)
+				: [];
+
+			return {
+				stepNumber,
+				toolNames,
+				inputTokens,
+				outputTokens,
+				totalTokens,
+				timestamp: normalizeTimestamp(typedStep.timestamp),
+			};
+		})
+		.filter((step): step is StepTelemetry => step !== null);
+
+	return normalized.length > 0 ? normalized : undefined;
+}
 
 /**
  * Fetch closed trades for multiple models and group them
@@ -242,10 +324,7 @@ export async function getLeaderboardData(
 		.orderBy(portfolioSize.createdAt);
 
 	// Group by model
-	const byModel = new Map<
-		string,
-		Array<{ t: number; v: number }>
-	>();
+	const byModel = new Map<string, Array<{ t: number; v: number }>>();
 	for (const row of portfolioRows) {
 		const t = row.createdAt.getTime();
 		const v = Number(row.netPortfolio);
@@ -306,7 +385,11 @@ function isInvocationFailure(
 	response: string,
 	payload: Record<string, unknown> | null,
 	toolCallMetadatas: string[],
-): { isFailure: boolean; isWorkflowFailure: boolean; isToolCallFailure: boolean } {
+): {
+	isFailure: boolean;
+	isWorkflowFailure: boolean;
+	isToolCallFailure: boolean;
+} {
 	const lowerResponse = response.toLowerCase();
 
 	// Skip placeholder/pending responses - not failures
@@ -315,7 +398,11 @@ function isInvocationFailure(
 		lowerResponse === "pending" ||
 		lowerResponse === ""
 	) {
-		return { isFailure: false, isWorkflowFailure: false, isToolCallFailure: false };
+		return {
+			isFailure: false,
+			isWorkflowFailure: false,
+			isToolCallFailure: false,
+		};
 	}
 
 	// Check for workflow-level failures (errors in response)
@@ -327,9 +414,7 @@ function isInvocationFailure(
 		lowerResponse.includes("exception");
 
 	const failureReason =
-		(payload?.failureReason as string) ??
-		(payload?.error as string) ??
-		null;
+		(payload?.failureReason as string) ?? (payload?.error as string) ?? null;
 
 	const isWorkflowFailure = hasErrorInResponse || !!failureReason;
 
@@ -338,7 +423,9 @@ function isInvocationFailure(
 	for (const metadata of toolCallMetadatas) {
 		try {
 			const meta = JSON.parse(metadata);
-			if (meta?.results?.some?.((r: { success?: boolean }) => r.success === false)) {
+			if (
+				meta?.results?.some?.((r: { success?: boolean }) => r.success === false)
+			) {
 				isToolCallFailure = true;
 				break;
 			}
@@ -361,12 +448,12 @@ export async function getModelFailureStats(
 	variantFilter?: VariantFilter,
 ): Promise<ModelFailureStats[]> {
 	// Get all models
-	const modelQuery = db.select({ id: models.id, name: models.name, variant: models.variant }).from(models);
-	const allModels = await (
-		variantFilter
-			? modelQuery.where(eq(models.variant, variantFilter))
-			: modelQuery
-	);
+	const modelQuery = db
+		.select({ id: models.id, name: models.name, variant: models.variant })
+		.from(models);
+	const allModels = await (variantFilter
+		? modelQuery.where(eq(models.variant, variantFilter))
+		: modelQuery);
 
 	if (allModels.length === 0) return [];
 
@@ -385,15 +472,16 @@ export async function getModelFailureStats(
 
 	// Get all tool calls for these invocations
 	const invocationIds = invocationRows.map((i) => i.id);
-	const toolCallRows = invocationIds.length > 0
-		? await db
-				.select({
-					invocationId: toolCalls.invocationId,
-					metadata: toolCalls.metadata,
-				})
-				.from(toolCalls)
-				.where(inArray(toolCalls.invocationId, invocationIds))
-		: [];
+	const toolCallRows =
+		invocationIds.length > 0
+			? await db
+					.select({
+						invocationId: toolCalls.invocationId,
+						metadata: toolCalls.metadata,
+					})
+					.from(toolCalls)
+					.where(inArray(toolCalls.invocationId, invocationIds))
+			: [];
 
 	// Group tool call metadata by invocation
 	const toolCallsByInvocation = new Map<string, string[]>();
@@ -404,7 +492,10 @@ export async function getModelFailureStats(
 	}
 
 	// Count failures per model
-	const stats = new Map<string, { workflow: number; toolCall: number; total: number }>();
+	const stats = new Map<
+		string,
+		{ workflow: number; toolCall: number; total: number }
+	>();
 	for (const model of allModels) {
 		stats.set(model.id, { workflow: 0, toolCall: 0, total: 0 });
 	}
@@ -430,7 +521,11 @@ export async function getModelFailureStats(
 
 	// Build result
 	return allModels.map((model) => {
-		const modelStats = stats.get(model.id) ?? { workflow: 0, toolCall: 0, total: 0 };
+		const modelStats = stats.get(model.id) ?? {
+			workflow: 0,
+			toolCall: 0,
+			total: 0,
+		};
 		return {
 			modelId: model.id,
 			modelName: model.name,
@@ -440,7 +535,8 @@ export async function getModelFailureStats(
 			invocationCount: modelStats.total,
 			failureRate:
 				modelStats.total > 0
-					? ((modelStats.workflow + modelStats.toolCall) / modelStats.total) * 100
+					? ((modelStats.workflow + modelStats.toolCall) / modelStats.total) *
+						100
 					: 0,
 		};
 	});
@@ -466,10 +562,9 @@ export async function getRecentFailures(
 		.from(invocations)
 		.innerJoin(models, eq(invocations.modelId, models.id));
 
-	const invocationRows = await (
-		variantFilter
-			? invocationQuery.where(eq(models.variant, variantFilter))
-			: invocationQuery
+	const invocationRows = await (variantFilter
+		? invocationQuery.where(eq(models.variant, variantFilter))
+		: invocationQuery
 	)
 		.orderBy(desc(invocations.createdAt))
 		.limit(limit * 2); // Get more to filter for failures
@@ -520,14 +615,28 @@ export async function getRecentFailures(
 
 		// Extract failure reason for display
 		const failureReason = isWorkflowFailure
-			? (payload?.failureReason as string) ?? (payload?.error as string) ?? null
+			? (toNullableString(payload?.failureReason) ??
+				toNullableString(payload?.error))
 			: null;
 
-		// Extract step telemetry from responsePayload
-		const stepTelemetry = (payload?.stepTelemetry as StepTelemetry[] | undefined) ?? undefined;
-		const totalSteps = (payload?.totalSteps as number | undefined) ?? stepTelemetry?.length;
-		const totalInputTokens = (payload?.totalInputTokens as number | undefined) ?? undefined;
-		const totalOutputTokens = (payload?.totalOutputTokens as number | undefined) ?? undefined;
+		// Normalize telemetry fields from JSON payload to match strict API schema.
+		const stepTelemetry = normalizeStepTelemetry(payload);
+		const totalSteps =
+			toFiniteNumber(payload?.totalSteps) ?? stepTelemetry?.length;
+		const normalizedInputTokens =
+			toFiniteNumber(payload?.totalInputTokens) ??
+			stepTelemetry?.reduce((sum, step) => sum + step.inputTokens, 0);
+		const normalizedOutputTokens =
+			toFiniteNumber(payload?.totalOutputTokens) ??
+			stepTelemetry?.reduce((sum, step) => sum + step.outputTokens, 0);
+		const totalInputTokens =
+			typeof normalizedInputTokens === "number"
+				? normalizedInputTokens
+				: undefined;
+		const totalOutputTokens =
+			typeof normalizedOutputTokens === "number"
+				? normalizedOutputTokens
+				: undefined;
 
 		entries.push({
 			invocationId: inv.id,

@@ -1,4 +1,4 @@
-	import { ExchangeSimulator } from "@/server/features/simulator/exchangeSimulator";
+import { ExchangeSimulator } from "@/server/features/simulator/exchangeSimulator";
 import {
 	API_KEY_INDEX,
 	BASE_URL,
@@ -18,8 +18,13 @@ import {
 	getOpenOrderBySymbol,
 	scaleIntoOrder,
 } from "@/server/db/ordersRepository.server";
+import type { Order } from "@/db/schema";
 import { placeSlTpOrders, cancelSlTpOrders } from "./slTpOrderManager";
 import { trackFill } from "./fillTracker";
+
+// ==========================================
+// Types
+// ==========================================
 
 export interface PositionRequest {
 	symbol: string;
@@ -46,6 +51,119 @@ export interface PositionResult {
 	orderId?: string;
 }
 
+interface ExitPlan {
+	stop: number | null;
+	target: number | null;
+	invalidation: string | null;
+	invalidationPrice: number | null;
+	confidence: number | null;
+	timeExit: string | null;
+	cooldownUntil: string | null;
+}
+
+// ==========================================
+// Helper Functions (extracted to eliminate duplication)
+// ==========================================
+
+/**
+ * Calculate weighted average entry price when scaling into a position.
+ * Formula: (prevNotional + newNotional) / totalQuantity
+ */
+function calculateWeightedAvgEntry(
+	prevQuantity: number,
+	prevEntryPrice: number,
+	newQuantity: number,
+	newEntryPrice: number,
+): number {
+	const prevNotional = prevEntryPrice * prevQuantity;
+	const newNotional = newEntryPrice * newQuantity;
+	const totalQty = prevQuantity + newQuantity;
+	return totalQty !== 0 ? (prevNotional + newNotional) / totalQty : newEntryPrice;
+}
+
+/**
+ * Build exit plan for a position, merging new values with existing plan.
+ * New values take precedence when provided.
+ */
+function buildExitPlan(
+	stopLoss: number | null,
+	profitTarget: number | null,
+	invalidationCondition: string | null,
+	confidence: number | null,
+	existingPlan?: ExitPlan | null,
+): ExitPlan {
+	return {
+		stop: stopLoss ?? existingPlan?.stop ?? null,
+		target: profitTarget ?? existingPlan?.target ?? null,
+		invalidation: invalidationCondition ?? existingPlan?.invalidation ?? null,
+		invalidationPrice: existingPlan?.invalidationPrice ?? null,
+		confidence: confidence ?? existingPlan?.confidence ?? null,
+		timeExit: existingPlan?.timeExit ?? null,
+		cooldownUntil: existingPlan?.cooldownUntil ?? null,
+	};
+}
+
+/**
+ * Persist a new order to the database
+ */
+async function persistNewOrder(params: {
+	modelId: string;
+	symbol: string;
+	side: "LONG" | "SHORT";
+	quantity: number;
+	entryPrice: number;
+	leverage: number | null;
+	exitPlan: ExitPlan;
+}): Promise<Order> {
+	return createOrder({
+		modelId: params.modelId,
+		symbol: params.symbol.toUpperCase(),
+		side: params.side,
+		quantity: params.quantity.toString(),
+		entryPrice: params.entryPrice.toString(),
+		leverage: params.leverage?.toString() ?? null,
+		exitPlan: params.exitPlan,
+	});
+}
+
+/**
+ * Scale into an existing order with new quantity and price
+ */
+async function scaleIntoExistingOrder(params: {
+	existingOrder: Order;
+	newQuantity: number;
+	newEntryPrice: number;
+	exitPlan: ExitPlan;
+}): Promise<{ order: Order; totalQuantity: number; avgEntryPrice: number }> {
+	const prevQty = parseFloat(params.existingOrder.quantity);
+	const prevEntry = parseFloat(params.existingOrder.entryPrice);
+	const totalQty = prevQty + params.newQuantity;
+	const avgEntry = calculateWeightedAvgEntry(
+		prevQty,
+		prevEntry,
+		params.newQuantity,
+		params.newEntryPrice,
+	);
+
+	const updatedOrder = await scaleIntoOrder({
+		orderId: params.existingOrder.id,
+		additionalQuantity: params.newQuantity.toString(),
+		newEntryPrice: params.newEntryPrice.toString(),
+		newAvgEntryPrice: avgEntry.toString(),
+		exitPlan: params.exitPlan,
+	});
+
+	return {
+		order: updatedOrder,
+		totalQuantity: totalQty,
+		avgEntryPrice: avgEntry,
+	};
+}
+
+// ==========================================
+// Main Function
+// ==========================================
+
 export async function createPosition(
 	account: Account,
 	positions: PositionRequest[],
@@ -55,173 +173,116 @@ export async function createPosition(
 	}
 
 	if (IS_SIMULATION_ENABLED) {
-		const simulator = await ExchangeSimulator.bootstrap(
-			DEFAULT_SIMULATOR_OPTIONS,
-		);
-		const accountId = account.id || "default";
-		const results: PositionResult[] = [];
+		return createSimulatedPositions(account, positions);
+	}
 
-		for (const {
-			symbol,
-			side,
-			quantity,
-			leverage,
-			confidence,
-			profitTarget,
-			stopLoss,
-			invalidationCondition,
-		} of positions) {
-			if (side === "HOLD") {
-				results.push({ symbol, side, quantity, leverage, success: true });
-				continue;
-			}
+	return createLivePositions(account, positions);
+}
 
+// ==========================================
+// Simulator Implementation
+// ==========================================
+
+async function createSimulatedPositions(
+	account: Account,
+	positions: PositionRequest[],
+): Promise<PositionResult[]> {
+	const simulator = await ExchangeSimulator.bootstrap(DEFAULT_SIMULATOR_OPTIONS);
+	const accountId = account.id || "default";
+	const results: PositionResult[] = [];
+
+	for (const request of positions) {
+		const { symbol, side, quantity, leverage, confidence, profitTarget, stopLoss, invalidationCondition } = request;
+
+		if (side === "HOLD") {
+			results.push({ symbol, side, quantity, leverage, success: true });
+			continue;
+		}
+
+		try {
 			const orderSide: OrderSide = side === "LONG" ? "buy" : "sell";
 			const orderQuantity = Math.abs(quantity);
-			try {
-				const execution = await simulator.placeOrder(
-					{
-						symbol,
-						side: orderSide,
-						quantity: orderQuantity,
-						type: "market",
-						leverage: leverage ?? undefined,
-						confidence: confidence ?? undefined,
-						exitPlan: {
-							stop: stopLoss ?? null,
-							target: profitTarget ?? null,
-							invalidation: invalidationCondition ?? null,
-						},
+
+			const execution = await simulator.placeOrder(
+				{
+					symbol,
+					side: orderSide,
+					quantity: orderQuantity,
+					type: "market",
+					leverage: leverage ?? undefined,
+					confidence: confidence ?? undefined,
+					exitPlan: {
+						stop: stopLoss ?? null,
+						target: profitTarget ?? null,
+						invalidation: invalidationCondition ?? null,
 					},
-					accountId,
-					{ skipValidation: false },
-				);
+				},
+				accountId,
+				{ skipValidation: false },
+			);
 
-				if (execution.status === "rejected" || execution.totalQuantity === 0) {
-					results.push({
-						symbol,
-						side,
-						quantity,
-						leverage,
-						success: false,
-						error: execution.reason ?? "Order rejected",
-					});
-				} else {
-					const entryPrice = execution.averagePrice ?? 0;
-					// Use the actual filled quantity, not the requested quantity
-					const filledQuantity = execution.totalQuantity;
-
-					// Check for existing open order to scale into
-					try {
-						const existingOrder = await getOpenOrderBySymbol(
-							accountId,
-							symbol.toUpperCase(),
-						);
-
-						if (existingOrder && existingOrder.side === side) {
-							// Scale into existing position using weighted avg formula
-							const prevQty = parseFloat(existingOrder.quantity);
-							const prevEntry = parseFloat(existingOrder.entryPrice);
-							const newQty = filledQuantity;
-							const prevNotional = prevEntry * prevQty;
-							const newNotional = entryPrice * newQty;
-							const totalQty = prevQty + newQty;
-							const newAvgEntry =
-								totalQty !== 0
-									? (prevNotional + newNotional) / totalQty
-									: entryPrice;
-
-							// When scaling in, new exit plan values REPLACE old ones (not fallback)
-							// AI provides fresh analysis, so use new values when provided
-							const updatedOrder = await scaleIntoOrder({
-								orderId: existingOrder.id,
-								additionalQuantity: newQty.toString(),
-								newEntryPrice: entryPrice.toString(),
-								newAvgEntryPrice: newAvgEntry.toString(),
-								exitPlan: {
-									stop: stopLoss ?? existingOrder.exitPlan?.stop ?? null,
-									target: profitTarget ?? existingOrder.exitPlan?.target ?? null,
-									invalidation: invalidationCondition ?? existingOrder.exitPlan?.invalidation ?? null,
-									invalidationPrice: existingOrder.exitPlan?.invalidationPrice ?? null,
-									confidence: confidence ?? existingOrder.exitPlan?.confidence ?? null,
-									timeExit: existingOrder.exitPlan?.timeExit ?? null,
-									cooldownUntil: existingOrder.exitPlan?.cooldownUntil ?? null,
-								},
-							});
-
-							results.push({
-								symbol,
-								side,
-								quantity: totalQty,
-								leverage,
-								entryPrice: newAvgEntry,
-								success: true,
-								orderId: updatedOrder.id,
-							});
-						} else {
-							// Create new order (either no existing position or opposite side)
-							const dbOrder = await createOrder({
-								modelId: accountId,
-								symbol: symbol.toUpperCase(),
-								side,
-								quantity: filledQuantity.toString(),
-								entryPrice: entryPrice.toString(),
-								leverage: leverage?.toString() ?? null,
-							exitPlan: {
-								stop: stopLoss ?? null,
-								target: profitTarget ?? null,
-								invalidation: invalidationCondition ?? null,
-								invalidationPrice: null,
-								confidence: confidence ?? null,
-								timeExit: null,
-								cooldownUntil: null,
-							},
-							});
-
-							results.push({
-								symbol,
-								side,
-								quantity: filledQuantity,
-								leverage,
-								entryPrice,
-								success: true,
-								orderId: dbOrder.id,
-							});
-						}
-					} catch (dbError) {
-						console.error(
-							`[createPosition] DB persist failed for ${symbol}:`,
-							dbError,
-						);
-						// Still return success since the order was executed
-						results.push({
-							symbol,
-							side,
-							quantity: filledQuantity,
-							leverage,
-							entryPrice,
-							success: true,
-						});
-					}
-				}
-			} catch (error) {
-				const message =
-					error instanceof Error ? error.message : "Unknown error";
+			if (execution.status === "rejected" || execution.totalQuantity === 0) {
 				results.push({
 					symbol,
 					side,
 					quantity,
 					leverage,
 					success: false,
-					error: message,
+					error: execution.reason ?? "Order rejected",
 				});
+				continue;
 			}
-		}
 
-		return results;
+			const entryPrice = execution.averagePrice ?? 0;
+			const filledQuantity = execution.totalQuantity;
+
+			// Persist to database
+			const dbResult = await persistPositionToDb({
+				modelId: accountId,
+				symbol,
+				side,
+				filledQuantity,
+				entryPrice,
+				leverage,
+				stopLoss,
+				profitTarget,
+				invalidationCondition,
+				confidence,
+			});
+
+			results.push({
+				symbol,
+				side,
+				quantity: dbResult.quantity,
+				leverage,
+				entryPrice: dbResult.entryPrice,
+				success: true,
+				orderId: dbResult.orderId,
+			});
+		} catch (error) {
+			const message = error instanceof Error ? error.message : "Unknown error";
+			results.push({
+				symbol,
+				side,
+				quantity,
+				leverage,
+				success: false,
+				error: message,
+			});
+		}
 	}
 
-	// Live trading mode - use SignerClient from new SDK
+	return results;
+}
+
+// ==========================================
+// Live Trading Implementation
+// ==========================================
+
+async function createLivePositions(
+	account: Account,
+	positions: PositionRequest[],
+): Promise<PositionResult[]> {
 	const client = await SignerClientFactory.create({
 		url: BASE_URL,
 		privateKey: account.apiKey,
@@ -231,16 +292,9 @@ export async function createPosition(
 
 	const results: PositionResult[] = [];
 
-	for (const {
-		symbol,
-		side,
-		quantity,
-		leverage,
-		profitTarget,
-		stopLoss,
-		invalidationCondition,
-		confidence,
-	} of positions) {
+	for (const request of positions) {
+		const { symbol, side, quantity, leverage, profitTarget, stopLoss, invalidationCondition, confidence } = request;
+
 		try {
 			const market = MARKETS[symbol as keyof typeof MARKETS];
 			if (!market) {
@@ -261,16 +315,9 @@ export async function createPosition(
 				continue;
 			}
 
-			// Fetch latest price using REST API directly
-			const candles = await fetchCandlesticksRest({
-				market_id: market.marketId,
-				resolution: "1m",
-				start_timestamp: Date.now() - 1000 * 60 * 5,
-				end_timestamp: Date.now(),
-				count_back: 1,
-			});
-			const latestPrice = candles?.[candles.length - 1]?.close;
-			if (!latestPrice) {
+			// Fetch latest price
+			const latestPriceNum = await fetchLatestPrice(market.marketId);
+			if (latestPriceNum === null) {
 				console.warn(`No latest price found for ${symbol}, skipping`);
 				results.push({
 					symbol,
@@ -283,212 +330,88 @@ export async function createPosition(
 				continue;
 			}
 
-			const latestPriceNum = typeof latestPrice === 'number' ? latestPrice : parseFloat(String(latestPrice));
-			const directionIsLong = side === "LONG";
-			const orderQuantity = Math.abs(quantity);
-
-			// Execute order on exchange using new SDK
-			// Returns [orderInfo, txHash, error]
-			const [orderInfo, txHash, orderError] = await client.createOrder({
-				marketIndex: market.marketId,
-				clientOrderIndex: market.clientOrderIndex,
-				baseAmount: Math.round(orderQuantity * market.qtyDecimals),
-				price: Math.round(
-					(directionIsLong ? latestPriceNum * 1.01 : latestPriceNum * 0.99) *
-						market.priceDecimals,
-				),
-				isAsk: !directionIsLong,
-				orderType: SignerClient.ORDER_TYPE_MARKET,
-				timeInForce: SignerClient.ORDER_TIME_IN_FORCE_IMMEDIATE_OR_CANCEL,
-				reduceOnly: false,
-				triggerPrice: SignerClient.NIL_TRIGGER_PRICE,
-				orderExpiry: SignerClient.DEFAULT_IOC_EXPIRY,
-			});
-
-			// Check for order creation error
-			if (orderError) {
-				console.error(`[createPosition] Order creation failed for ${symbol}:`, orderError);
-				results.push({
-					symbol,
-					side,
-					quantity,
-					leverage,
-					success: false,
-					error: `Order creation failed: ${orderError}`,
-				});
-				continue;
-			}
-
-			// Track fill with polling (SDK handles the waiting internally)
-			const fillResult = await trackFill(client, {
-				txHash,
+			// Execute order on exchange
+			const fillResult = await executeOrderOnExchange(client, {
+				market,
+				side,
+				quantity: Math.abs(quantity),
+				latestPrice: latestPriceNum,
 				accountIndex: Number(account.accountIndex),
-				marketId: market.marketId,
-				clientOrderIndex: market.clientOrderIndex,
-				requestedQuantity: orderQuantity,
-				maxWaitMs: 30_000,
-				pollIntervalMs: 500,
 			});
 
-			// Handle fill result
-			if (!fillResult.success || !fillResult.filled) {
-				console.error(`[createPosition] Order not filled for ${symbol}:`, fillResult.error);
+			if (!fillResult.success) {
 				results.push({
 					symbol,
 					side,
 					quantity,
 					leverage,
 					success: false,
-					error: fillResult.error ?? "Order not filled",
+					error: fillResult.error ?? "Order execution failed",
 				});
 				continue;
 			}
 
-			// Use actual filled quantity and price
-			const filledQuantity = fillResult.filledQuantity;
-			// Use tracked average price, or fall back to latest price if not available
-			const actualEntryPrice = fillResult.averagePrice > 0 ? fillResult.averagePrice : latestPriceNum;
+			const { filledQuantity, actualEntryPrice } = fillResult;
 
-			if (fillResult.partialFill) {
-				console.warn(
-					`[createPosition] Partial fill for ${symbol}: requested=${orderQuantity}, filled=${filledQuantity}`,
-				);
-			}
+			// Persist to database
+			const dbResult = await persistPositionToDb({
+				modelId: account.id,
+				symbol,
+				side,
+				filledQuantity,
+				entryPrice: actualEntryPrice,
+				leverage,
+				stopLoss,
+				profitTarget,
+				invalidationCondition,
+				confidence,
+			});
 
-			console.log(
-				`[createPosition] Fill confirmed for ${symbol}: qty=${filledQuantity}, price=${actualEntryPrice}`,
-			);
-
-			// Check for existing open order to scale into
-			try {
-				const existingOrder = await getOpenOrderBySymbol(
-					account.id,
-					symbol.toUpperCase(),
-				);
-
-				if (existingOrder && existingOrder.side === side) {
-					// Scale into existing position using weighted avg formula
-					const prevQty = parseFloat(existingOrder.quantity);
-					const prevEntry = parseFloat(existingOrder.entryPrice);
-					const prevNotional = prevEntry * prevQty;
-					const newNotional = actualEntryPrice * filledQuantity;
-					const totalQty = prevQty + filledQuantity;
-					const newAvgEntry =
-						totalQty !== 0
-							? (prevNotional + newNotional) / totalQty
-							: actualEntryPrice;
-
-				// When scaling in, new exit plan values REPLACE old ones
-				const updatedOrder = await scaleIntoOrder({
-						orderId: existingOrder.id,
-						additionalQuantity: filledQuantity.toString(),
-						newEntryPrice: actualEntryPrice.toString(),
-						newAvgEntryPrice: newAvgEntry.toString(),
-						exitPlan: {
-							stop: stopLoss ?? existingOrder.exitPlan?.stop ?? null,
-							target: profitTarget ?? existingOrder.exitPlan?.target ?? null,
-							invalidation: invalidationCondition ?? existingOrder.exitPlan?.invalidation ?? null,
-							invalidationPrice: existingOrder.exitPlan?.invalidationPrice ?? null,
-							confidence: confidence ?? existingOrder.exitPlan?.confidence ?? null,
-							timeExit: existingOrder.exitPlan?.timeExit ?? null,
-							cooldownUntil: existingOrder.exitPlan?.cooldownUntil ?? null,
-						},
-					});
-
-					// Update SL/TP orders on exchange (cancel old ones, place new ones)
-					const newStop = stopLoss ?? existingOrder.exitPlan?.stop ?? null;
-					const newTarget = profitTarget ?? existingOrder.exitPlan?.target ?? null;
-					if (newStop || newTarget) {
-						// Cancel existing SL/TP orders first
-						if (existingOrder.slOrderIndex || existingOrder.tpOrderIndex) {
-							await cancelSlTpOrders(
-								client,
-								symbol.toUpperCase(),
-								existingOrder.slOrderIndex,
-								existingOrder.tpOrderIndex,
-								existingOrder.id,
-							);
-						}
-						// Place new SL/TP orders with updated quantity
-						await placeSlTpOrders(client, {
-							symbol: symbol.toUpperCase(),
-							side,
-							quantity: totalQty,
-							stopLoss: newStop,
-							takeProfit: newTarget,
-							orderId: updatedOrder.id,
-						});
+			// Place SL/TP orders on exchange for new positions or updated scale-ins
+			if (dbResult.isScaleIn && dbResult.existingOrder) {
+				// Cancel existing SL/TP and place new ones with updated quantity
+				const newStop = stopLoss ?? dbResult.existingOrder.exitPlan?.stop ?? null;
+				const newTarget = profitTarget ?? dbResult.existingOrder.exitPlan?.target ?? null;
+				if (newStop || newTarget) {
+					if (dbResult.existingOrder.slOrderIndex || dbResult.existingOrder.tpOrderIndex) {
+						await cancelSlTpOrders(
+							client,
+							symbol.toUpperCase(),
+							dbResult.existingOrder.slOrderIndex,
+							dbResult.existingOrder.tpOrderIndex,
+							dbResult.existingOrder.id,
+						);
 					}
-
-					results.push({
-						symbol,
-						side,
-						quantity: totalQty,
-						leverage,
-						entryPrice: newAvgEntry,
-						success: true,
-						orderId: updatedOrder.id,
-					});
-				} else {
-					// Create new order (either no existing position or opposite side)
-					// Use actual filled quantity and price from exchange
-					const dbOrder = await createOrder({
-						modelId: account.id,
+					await placeSlTpOrders(client, {
 						symbol: symbol.toUpperCase(),
 						side,
-						quantity: filledQuantity.toString(),
-						entryPrice: actualEntryPrice.toString(),
-						leverage: leverage?.toString() ?? null,
-						exitPlan: {
-							stop: stopLoss ?? null,
-							target: profitTarget ?? null,
-							invalidation: invalidationCondition ?? null,
-							invalidationPrice: null,
-							confidence: confidence ?? null,
-							timeExit: null,
-							cooldownUntil: null,
-						},
-					});
-
-					// Place SL/TP orders on exchange
-					if (stopLoss || profitTarget) {
-						await placeSlTpOrders(client, {
-							symbol: symbol.toUpperCase(),
-							side,
-							quantity: filledQuantity,
-							stopLoss: stopLoss ?? null,
-							takeProfit: profitTarget ?? null,
-							orderId: dbOrder.id,
-						});
-					}
-
-					results.push({
-						symbol,
-						side,
-						quantity: filledQuantity,
-						leverage,
-						entryPrice: actualEntryPrice,
-						success: true,
-						orderId: dbOrder.id,
+						quantity: dbResult.quantity,
+						stopLoss: newStop,
+						takeProfit: newTarget,
+						orderId: dbResult.orderId,
 					});
 				}
-			} catch (dbError) {
-				console.error(
-					`[createPosition] DB persist failed for ${symbol}:`,
-					dbError,
-				);
-				// Position was filled on exchange but DB save failed
-				// Return success with fill info so caller knows the position exists
-				results.push({
-					symbol,
+			} else if (stopLoss || profitTarget) {
+				// New position - place SL/TP orders
+				await placeSlTpOrders(client, {
+					symbol: symbol.toUpperCase(),
 					side,
 					quantity: filledQuantity,
-					leverage,
-					entryPrice: actualEntryPrice,
-					success: true,
-					error: "DB persist failed - position opened on exchange",
+					stopLoss: stopLoss ?? null,
+					takeProfit: profitTarget ?? null,
+					orderId: dbResult.orderId,
 				});
 			}
+
+			results.push({
+				symbol,
+				side,
+				quantity: dbResult.quantity,
+				leverage,
+				entryPrice: dbResult.entryPrice,
+				success: true,
+				orderId: dbResult.orderId,
+			});
 		} catch (err) {
 			const errorMsg = err instanceof Error ? err.message : String(err);
 			console.error(`Failed to create position for ${symbol}:`, err);
@@ -504,4 +427,199 @@ export async function createPosition(
 	}
 
 	return results;
+}
+
+// ==========================================
+// Shared Helpers
+// ==========================================
+
+async function fetchLatestPrice(marketId: number): Promise<number | null> {
+	const candles = await fetchCandlesticksRest({
+		market_id: marketId,
+		resolution: "1m",
+		start_timestamp: Date.now() - 1000 * 60 * 5,
+		end_timestamp: Date.now(),
+		count_back: 1,
+	});
+	const latestPrice = candles?.[candles.length - 1]?.close;
+	if (!latestPrice) return null;
+	return typeof latestPrice === "number" ? latestPrice : parseFloat(String(latestPrice));
+}
+
+interface ExecuteOrderResult {
+	success: boolean;
+	filledQuantity: number;
+	actualEntryPrice: number;
+	error?: string;
+}
+
+async function executeOrderOnExchange(
+	client: Awaited<ReturnType<typeof SignerClientFactory.create>>,
+	params: {
+		market: (typeof MARKETS)[keyof typeof MARKETS];
+		side: "LONG" | "SHORT";
+		quantity: number;
+		latestPrice: number;
+		accountIndex: number;
+	},
+): Promise<ExecuteOrderResult> {
+	const { market, side, quantity, latestPrice, accountIndex } = params;
+	const directionIsLong = side === "LONG";
+
+	const [, txHash, orderError] = await client.createOrder({
+		marketIndex: market.marketId,
+		clientOrderIndex: market.clientOrderIndex,
+		baseAmount: Math.round(quantity * market.qtyDecimals),
+		price: Math.round(
+			(directionIsLong ? latestPrice * 1.01 : latestPrice * 0.99) * market.priceDecimals,
+		),
+		isAsk: !directionIsLong,
+		orderType: SignerClient.ORDER_TYPE_MARKET,
+		timeInForce: SignerClient.ORDER_TIME_IN_FORCE_IMMEDIATE_OR_CANCEL,
+		reduceOnly: false,
+		triggerPrice: SignerClient.NIL_TRIGGER_PRICE,
+		orderExpiry: SignerClient.DEFAULT_IOC_EXPIRY,
+	});
+
+	if (orderError) {
+		console.error(`[createPosition] Order creation failed:`, orderError);
+		return {
+			success: false,
+			filledQuantity: 0,
+			actualEntryPrice: 0,
+			error: `Order creation failed: ${orderError}`,
+		};
+	}
+
+	// Track fill with polling
+	const fillResult = await trackFill(client, {
+		txHash,
+		accountIndex,
+		marketId: market.marketId,
+		clientOrderIndex: market.clientOrderIndex,
+		requestedQuantity: quantity,
+		maxWaitMs: 30_000,
+		pollIntervalMs: 500,
+	});
+
+	if (!fillResult.success || !fillResult.filled) {
+		console.error(`[createPosition] Order not filled:`, fillResult.error);
+		return {
+			success: false,
+			filledQuantity: 0,
+			actualEntryPrice: 0,
+			error: fillResult.error ?? "Order not filled",
+		};
+	}
+
+	const filledQuantity = fillResult.filledQuantity;
+	const actualEntryPrice = fillResult.averagePrice > 0 ? fillResult.averagePrice : latestPrice;
+
+	if (fillResult.partialFill) {
+		console.warn(
+			`[createPosition] Partial fill: requested=${quantity}, filled=${filledQuantity}`,
+		);
+	}
+
+	console.log(`[createPosition] Fill confirmed: qty=${filledQuantity}, price=${actualEntryPrice}`);
+
+	return {
+		success: true,
+		filledQuantity,
+		actualEntryPrice,
+	};
+}
+
+interface PersistResult {
+	orderId: string;
+	quantity: number;
+	entryPrice: number;
+	isScaleIn: boolean;
+	existingOrder?: Order | null;
+}
+
+async function persistPositionToDb(params: {
+	modelId: string;
+	symbol: string;
+	side: "LONG" | "SHORT";
+	filledQuantity: number;
+	entryPrice: number;
+	leverage: number | null;
+	stopLoss: number | null;
+	profitTarget: number | null;
+	invalidationCondition: string | null;
+	confidence: number | null;
+}): Promise<PersistResult> {
+	const {
+		modelId,
+		symbol,
+		side,
+		filledQuantity,
+		entryPrice,
+		leverage,
+		stopLoss,
+		profitTarget,
+		invalidationCondition,
+		confidence,
+	} = params;
+
+	try {
+		const existingOrder = await getOpenOrderBySymbol(modelId, symbol.toUpperCase());
+
+		if (existingOrder && existingOrder.side === side) {
+			// Scale into existing position
+			const exitPlan = buildExitPlan(
+				stopLoss,
+				profitTarget,
+				invalidationCondition,
+				confidence,
+				existingOrder.exitPlan as ExitPlan | null,
+			);
+
+			const scaleResult = await scaleIntoExistingOrder({
+				existingOrder,
+				newQuantity: filledQuantity,
+				newEntryPrice: entryPrice,
+				exitPlan,
+			});
+
+			return {
+				orderId: scaleResult.order.id,
+				quantity: scaleResult.totalQuantity,
+				entryPrice: scaleResult.avgEntryPrice,
+				isScaleIn: true,
+				existingOrder,
+			};
+		}
+
+		// Create new order
+		const exitPlan = buildExitPlan(stopLoss, profitTarget, invalidationCondition, confidence);
+		const dbOrder = await persistNewOrder({
+			modelId,
+			symbol,
+			side,
+			quantity: filledQuantity,
+			entryPrice,
+			leverage,
+			exitPlan,
+		});
+
+		return {
+			orderId: dbOrder.id,
+			quantity: filledQuantity,
+			entryPrice,
+			isScaleIn: false,
+			existingOrder: null,
+		};
+	} catch (dbError) {
+		console.error(`[createPosition] DB persist failed for ${symbol}:`, dbError);
+		// Return a partial result - position exists but DB save failed
+		return {
+			orderId: "",
+			quantity: filledQuantity,
+			entryPrice,
+			isScaleIn: false,
+			existingOrder: null,
+		};
+	}
 }
