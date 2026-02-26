@@ -268,6 +268,8 @@ export async function fetchPortfolioSnapshots(params: {
 }
 
 export async function executeUnsafeQuery(sqlText: string): Promise<unknown[]> {
+	// WARNING: This bypasses typed query construction and must remain restricted
+	// to validated chat SQL tooling paths.
 	const result = await db.execute(sql.raw(sqlText));
 	return Array.isArray(result.rows) ? result.rows : [];
 }
