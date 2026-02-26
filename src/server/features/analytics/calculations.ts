@@ -166,7 +166,8 @@ export function calculateAdvancedStats(
 		.sort((a, b) => a - b);
 	const avgLeverage = leverages.length > 0 ? mean(leverages) : 0;
 	const medianLeverage = median(leverages);
-	const maxLeverage = leverages.length > 0 ? leverages[leverages.length - 1]! : 0;
+	const maxLeverage =
+		leverages.length > 0 ? (leverages[leverages.length - 1] ?? 0) : 0;
 
 	// Confidence stats (filter nulls)
 	const confidences = trades
@@ -175,7 +176,8 @@ export function calculateAdvancedStats(
 		.sort((a, b) => a - b);
 	const avgConfidence = confidences.length > 0 ? mean(confidences) : 0;
 	const medianConfidence = median(confidences);
-	const maxConfidence = confidences.length > 0 ? confidences[confidences.length - 1]! : 0;
+	const maxConfidence =
+		confidences.length > 0 ? (confidences[confidences.length - 1] ?? 0) : 0;
 
 	return {
 		modelId,
@@ -216,7 +218,18 @@ export function calculateModelAnalytics(
 	},
 ): ModelAnalytics {
 	return {
-		overall: calculateOverallStats(modelId, modelName, trades, currentAccountValue),
-		advanced: calculateAdvancedStats(modelId, modelName, trades, currentAccountValue, failureMetrics),
+		overall: calculateOverallStats(
+			modelId,
+			modelName,
+			trades,
+			currentAccountValue,
+		),
+		advanced: calculateAdvancedStats(
+			modelId,
+			modelName,
+			trades,
+			currentAccountValue,
+			failureMetrics,
+		),
 	};
 }

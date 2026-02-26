@@ -11,5 +11,3 @@ import { executeAllModelTrades } from "@/server/features/trading/execution/trade
 export async function tradeCycleStep() {
 	return executeAllModelTrades();
 }
-
-

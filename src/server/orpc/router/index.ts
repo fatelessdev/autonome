@@ -1,4 +1,9 @@
-import { getFailures, getLeaderboard, getModelStats, getRunInfo } from "./analytics";
+import {
+	getFailures,
+	getLeaderboard,
+	getModelStats,
+	getRunInfo,
+} from "./analytics";
 import { getInvocations, getModels } from "./models";
 import {
 	getCryptoPrices,
@@ -6,11 +11,7 @@ import {
 	getPositions,
 	getTrades,
 } from "./trading";
-import {
-	getVariants,
-	getVariantStats,
-	getVariantHistory,
-} from "./variants";
+import { getVariantHistory, getVariantStats, getVariants } from "./variants";
 
 export default {
 	// Trading procedures

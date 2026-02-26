@@ -16,4 +16,3 @@ export const portfolioQuery = (account: Account) =>
 		retry: 3,
 		retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
 	});
-

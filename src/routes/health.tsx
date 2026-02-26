@@ -1,7 +1,13 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
 import { cn } from "@/core/lib/utils";
 import { getApiBaseUrl } from "@/core/shared/api/apiConfig";
 
@@ -116,7 +122,7 @@ function HealthRoute() {
 							variant={health.status === "ok" ? "default" : "destructive"}
 							className={cn(
 								"text-sm px-3 py-1",
-								health.status === "ok" && "bg-green-600 hover:bg-green-700"
+								health.status === "ok" && "bg-green-600 hover:bg-green-700",
 							)}
 						>
 							{health.status === "ok" ? "✓ Healthy" : "⚠ Degraded"}
@@ -131,7 +137,9 @@ function HealthRoute() {
 				{healthQuery.isError && (
 					<Card className="border-destructive">
 						<CardHeader>
-							<CardTitle className="text-destructive">Connection Error</CardTitle>
+							<CardTitle className="text-destructive">
+								Connection Error
+							</CardTitle>
 							<CardDescription>
 								Unable to connect to the API server. Is the backend running?
 							</CardDescription>
@@ -170,172 +178,261 @@ function HealthRoute() {
 						</Card>
 
 						<div className="grid gap-6 md:grid-cols-2">
-						{/* Trade Scheduler */}
-						<Card>
-							<CardHeader>
-								<div className="flex items-center justify-between">
-									<CardTitle>Trade Scheduler</CardTitle>
-									<Badge
-										variant={health.schedulers.trade.healthy ? "default" : "destructive"}
-										className={cn(
-											health.schedulers.trade.healthy && "bg-green-600 hover:bg-green-700"
+							{/* Trade Scheduler */}
+							<Card>
+								<CardHeader>
+									<div className="flex items-center justify-between">
+										<CardTitle>Trade Scheduler</CardTitle>
+										<Badge
+											variant={
+												health.schedulers.trade.healthy
+													? "default"
+													: "destructive"
+											}
+											className={cn(
+												health.schedulers.trade.healthy &&
+													"bg-green-600 hover:bg-green-700",
+											)}
+										>
+											{health.schedulers.trade.healthy
+												? "Healthy"
+												: "Unhealthy"}
+										</Badge>
+									</div>
+									<CardDescription>
+										Executes model trade workflows every 5 minutes
+									</CardDescription>
+								</CardHeader>
+								<CardContent className="space-y-4">
+									<div className="space-y-2 text-sm">
+										<div className="flex justify-between">
+											<span className="text-muted-foreground">Last Run:</span>
+											<span className="font-mono">
+												{detailed.tradeScheduler.lastRun
+													? new Date(
+															detailed.tradeScheduler.lastRun,
+														).toLocaleTimeString()
+													: "Never"}
+											</span>
+										</div>
+										<div className="flex justify-between">
+											<span className="text-muted-foreground">Age:</span>
+											<span className="font-mono">
+												{detailed.tradeScheduler.ageSeconds != null
+													? `${detailed.tradeScheduler.ageSeconds}s ago`
+													: "N/A"}
+											</span>
+										</div>
+										<div className="flex justify-between">
+											<span className="text-muted-foreground">
+												Interval Handle:
+											</span>
+											<span
+												className={
+													detailed.tradeScheduler.intervalHandle
+														? "text-green-500"
+														: "text-red-500"
+												}
+											>
+												{detailed.tradeScheduler.intervalHandle
+													? "Active"
+													: "Missing"}
+											</span>
+										</div>
+									</div>
+
+									{/* Execution Health Metrics */}
+									<div className="border-t pt-4 space-y-2 text-sm">
+										<p className="font-medium text-muted-foreground">
+											Execution Health
+										</p>
+										<div className="flex justify-between">
+											<span className="text-muted-foreground">
+												Last Success:
+											</span>
+											<span
+												className={cn(
+													"font-mono",
+													detailed.tradeScheduler.lastSuccessAge &&
+														detailed.tradeScheduler.lastSuccessAge > 600 &&
+														"text-yellow-500",
+													detailed.tradeScheduler.lastSuccessAge &&
+														detailed.tradeScheduler.lastSuccessAge > 900 &&
+														"text-red-500",
+												)}
+											>
+												{detailed.tradeScheduler.lastSuccessfulCompletion
+													? new Date(
+															detailed.tradeScheduler.lastSuccessfulCompletion,
+														).toLocaleTimeString()
+													: "Never"}
+												{detailed.tradeScheduler.lastSuccessAge != null && (
+													<span className="text-muted-foreground ml-1">
+														({detailed.tradeScheduler.lastSuccessAge}s ago)
+													</span>
+												)}
+											</span>
+										</div>
+										{detailed.tradeScheduler.lastCycleStats && (
+											<div className="flex justify-between">
+												<span className="text-muted-foreground">
+													Last Cycle:
+												</span>
+												<span
+													className={cn(
+														"font-mono",
+														detailed.tradeScheduler.lastCycleStats
+															.successCount === 0 && "text-red-500",
+														detailed.tradeScheduler.lastCycleStats
+															.successCount > 0 &&
+															detailed.tradeScheduler.lastCycleStats
+																.successCount <
+																detailed.tradeScheduler.lastCycleStats
+																	.totalModels &&
+															"text-yellow-500",
+														detailed.tradeScheduler.lastCycleStats
+															.successCount ===
+															detailed.tradeScheduler.lastCycleStats
+																.totalModels && "text-green-500",
+													)}
+												>
+													{detailed.tradeScheduler.lastCycleStats.successCount}/
+													{detailed.tradeScheduler.lastCycleStats.totalModels}{" "}
+													succeeded
+												</span>
+											</div>
 										)}
-									>
-										{health.schedulers.trade.healthy ? "Healthy" : "Unhealthy"}
-									</Badge>
-								</div>
-								<CardDescription>
-									Executes model trade workflows every 5 minutes
-								</CardDescription>
-							</CardHeader>
-							<CardContent className="space-y-4">
-								<div className="space-y-2 text-sm">
+										{detailed.tradeScheduler.consecutiveFailedCycles > 0 && (
+											<div className="flex justify-between">
+												<span className="text-muted-foreground">
+													Failed Cycles:
+												</span>
+												<span className="font-mono text-red-500">
+													{detailed.tradeScheduler.consecutiveFailedCycles}{" "}
+													consecutive
+												</span>
+											</div>
+										)}
+									</div>
+
+									{detailed.tradeScheduler.modelsCurrentlyRunning.length >
+										0 && (
+										<div className="border-t pt-4">
+											<p className="mb-2 text-sm font-medium">
+												Models Currently Running:
+											</p>
+											<div className="space-y-1">
+												{detailed.tradeScheduler.modelsCurrentlyRunning.map(
+													(model) => (
+														<div
+															key={model.id}
+															className="flex items-center justify-between rounded bg-muted px-2 py-1 text-xs"
+														>
+															<span className="font-mono truncate max-w-[180px]">
+																{model.id}
+															</span>
+															<span
+																className={cn(
+																	"font-mono",
+																	model.runningForSeconds &&
+																		model.runningForSeconds > 120 &&
+																		"text-yellow-500",
+																	model.runningForSeconds &&
+																		model.runningForSeconds > 300 &&
+																		"text-orange-500",
+																	model.runningForSeconds &&
+																		model.runningForSeconds > 600 &&
+																		"text-red-500",
+																)}
+															>
+																{model.runningForSeconds != null
+																	? `${model.runningForSeconds}s`
+																	: "?"}
+															</span>
+														</div>
+													),
+												)}
+											</div>
+										</div>
+									)}
+								</CardContent>
+							</Card>
+
+							{/* Portfolio Scheduler */}
+							<Card>
+								<CardHeader>
+									<div className="flex items-center justify-between">
+										<CardTitle>Portfolio Scheduler</CardTitle>
+										<Badge
+											variant={
+												health.schedulers.portfolio.healthy
+													? "default"
+													: "destructive"
+											}
+											className={cn(
+												health.schedulers.portfolio.healthy &&
+													"bg-green-600 hover:bg-green-700",
+											)}
+										>
+											{health.schedulers.portfolio.healthy
+												? "Healthy"
+												: "Unhealthy"}
+										</Badge>
+									</div>
+									<CardDescription>
+										Records portfolio snapshots every 1 minute
+									</CardDescription>
+								</CardHeader>
+								<CardContent className="space-y-2 text-sm">
 									<div className="flex justify-between">
 										<span className="text-muted-foreground">Last Run:</span>
 										<span className="font-mono">
-											{detailed.tradeScheduler.lastRun
-												? new Date(detailed.tradeScheduler.lastRun).toLocaleTimeString()
+											{detailed.portfolioScheduler.lastRun
+												? new Date(
+														detailed.portfolioScheduler.lastRun,
+													).toLocaleTimeString()
 												: "Never"}
 										</span>
 									</div>
 									<div className="flex justify-between">
 										<span className="text-muted-foreground">Age:</span>
 										<span className="font-mono">
-											{detailed.tradeScheduler.ageSeconds != null
-												? `${detailed.tradeScheduler.ageSeconds}s ago`
+											{detailed.portfolioScheduler.ageSeconds != null
+												? `${detailed.portfolioScheduler.ageSeconds}s ago`
 												: "N/A"}
 										</span>
 									</div>
 									<div className="flex justify-between">
-										<span className="text-muted-foreground">Interval Handle:</span>
-										<span className={detailed.tradeScheduler.intervalHandle ? "text-green-500" : "text-red-500"}>
-											{detailed.tradeScheduler.intervalHandle ? "Active" : "Missing"}
+										<span className="text-muted-foreground">Initialized:</span>
+										<span
+											className={
+												detailed.portfolioScheduler.initialized
+													? "text-green-500"
+													: "text-red-500"
+											}
+										>
+											{detailed.portfolioScheduler.initialized ? "Yes" : "No"}
 										</span>
 									</div>
-								</div>
-
-								{/* Execution Health Metrics */}
-								<div className="border-t pt-4 space-y-2 text-sm">
-									<p className="font-medium text-muted-foreground">Execution Health</p>
 									<div className="flex justify-between">
-										<span className="text-muted-foreground">Last Success:</span>
-										<span className={cn(
-											"font-mono",
-											detailed.tradeScheduler.lastSuccessAge && detailed.tradeScheduler.lastSuccessAge > 600 && "text-yellow-500",
-											detailed.tradeScheduler.lastSuccessAge && detailed.tradeScheduler.lastSuccessAge > 900 && "text-red-500"
-										)}>
-											{detailed.tradeScheduler.lastSuccessfulCompletion
-												? new Date(detailed.tradeScheduler.lastSuccessfulCompletion).toLocaleTimeString()
-												: "Never"}
-											{detailed.tradeScheduler.lastSuccessAge != null && (
-												<span className="text-muted-foreground ml-1">
-													({detailed.tradeScheduler.lastSuccessAge}s ago)
-												</span>
-											)}
+										<span className="text-muted-foreground">
+											Interval Handle:
+										</span>
+										<span
+											className={
+												detailed.portfolioScheduler.intervalHandle
+													? "text-green-500"
+													: "text-red-500"
+											}
+										>
+											{detailed.portfolioScheduler.intervalHandle
+												? "Active"
+												: "Missing"}
 										</span>
 									</div>
-									{detailed.tradeScheduler.lastCycleStats && (
-										<div className="flex justify-between">
-											<span className="text-muted-foreground">Last Cycle:</span>
-											<span className={cn(
-												"font-mono",
-												detailed.tradeScheduler.lastCycleStats.successCount === 0 && "text-red-500",
-												detailed.tradeScheduler.lastCycleStats.successCount > 0 &&
-													detailed.tradeScheduler.lastCycleStats.successCount < detailed.tradeScheduler.lastCycleStats.totalModels &&
-													"text-yellow-500",
-												detailed.tradeScheduler.lastCycleStats.successCount === detailed.tradeScheduler.lastCycleStats.totalModels &&
-													"text-green-500"
-											)}>
-												{detailed.tradeScheduler.lastCycleStats.successCount}/{detailed.tradeScheduler.lastCycleStats.totalModels} succeeded
-											</span>
-										</div>
-									)}
-									{detailed.tradeScheduler.consecutiveFailedCycles > 0 && (
-										<div className="flex justify-between">
-											<span className="text-muted-foreground">Failed Cycles:</span>
-											<span className="font-mono text-red-500">
-												{detailed.tradeScheduler.consecutiveFailedCycles} consecutive
-											</span>
-										</div>
-									)}
-								</div>
-
-								{detailed.tradeScheduler.modelsCurrentlyRunning.length > 0 && (
-									<div className="border-t pt-4">
-										<p className="mb-2 text-sm font-medium">Models Currently Running:</p>
-										<div className="space-y-1">
-											{detailed.tradeScheduler.modelsCurrentlyRunning.map((model) => (
-												<div
-													key={model.id}
-													className="flex items-center justify-between rounded bg-muted px-2 py-1 text-xs"
-												>
-													<span className="font-mono truncate max-w-[180px]">{model.id}</span>
-													<span className={cn(
-														"font-mono",
-														model.runningForSeconds && model.runningForSeconds > 120 && "text-yellow-500",
-														model.runningForSeconds && model.runningForSeconds > 300 && "text-orange-500",
-														model.runningForSeconds && model.runningForSeconds > 600 && "text-red-500"
-													)}>
-														{model.runningForSeconds != null ? `${model.runningForSeconds}s` : "?"}
-													</span>
-												</div>
-											))}
-										</div>
-									</div>
-								)}
-							</CardContent>
-						</Card>
-
-						{/* Portfolio Scheduler */}
-						<Card>
-							<CardHeader>
-								<div className="flex items-center justify-between">
-									<CardTitle>Portfolio Scheduler</CardTitle>
-									<Badge
-										variant={health.schedulers.portfolio.healthy ? "default" : "destructive"}
-										className={cn(
-											health.schedulers.portfolio.healthy && "bg-green-600 hover:bg-green-700"
-										)}
-									>
-										{health.schedulers.portfolio.healthy ? "Healthy" : "Unhealthy"}
-									</Badge>
-								</div>
-								<CardDescription>
-									Records portfolio snapshots every 1 minute
-								</CardDescription>
-							</CardHeader>
-							<CardContent className="space-y-2 text-sm">
-								<div className="flex justify-between">
-									<span className="text-muted-foreground">Last Run:</span>
-									<span className="font-mono">
-										{detailed.portfolioScheduler.lastRun
-											? new Date(detailed.portfolioScheduler.lastRun).toLocaleTimeString()
-											: "Never"}
-									</span>
-								</div>
-								<div className="flex justify-between">
-									<span className="text-muted-foreground">Age:</span>
-									<span className="font-mono">
-										{detailed.portfolioScheduler.ageSeconds != null
-											? `${detailed.portfolioScheduler.ageSeconds}s ago`
-											: "N/A"}
-									</span>
-								</div>
-								<div className="flex justify-between">
-									<span className="text-muted-foreground">Initialized:</span>
-									<span className={detailed.portfolioScheduler.initialized ? "text-green-500" : "text-red-500"}>
-										{detailed.portfolioScheduler.initialized ? "Yes" : "No"}
-									</span>
-								</div>
-								<div className="flex justify-between">
-									<span className="text-muted-foreground">Interval Handle:</span>
-									<span className={detailed.portfolioScheduler.intervalHandle ? "text-green-500" : "text-red-500"}>
-										{detailed.portfolioScheduler.intervalHandle ? "Active" : "Missing"}
-									</span>
-								</div>
-							</CardContent>
-						</Card>
-					</div>
+								</CardContent>
+							</Card>
+						</div>
 					</>
 				)}
 

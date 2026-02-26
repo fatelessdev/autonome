@@ -2,7 +2,6 @@
 const RISK_PER_TRADE_PCT = 0.03;
 const MIN_CASH_BUFFER = 300;
 const MAX_SESSION_ACTIONS_PER_SYMBOL = 2;
- 
 
 export const SYSTEM_PROMPT = `You are **Autonome**, an autonomous crypto trading intelligence.
 

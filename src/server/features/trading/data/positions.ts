@@ -6,11 +6,11 @@
  * Single Alpaca code path.
  */
 
+import { getOpenOrdersByModel } from "@/server/db/ordersRepository.server";
 import type { Account } from "@/server/features/trading/contracts/accounts";
 import type { TradingSignal } from "@/server/features/trading/contracts/tradingDecisions";
 import { getTradingProvider } from "@/server/providers/alpaca";
 import { toCanonical } from "@/shared/markets/marketMetadata";
-import { getOpenOrdersByModel } from "@/server/db/ordersRepository.server";
 
 export interface ExitPlanSummary {
 	target: number | null;
@@ -62,7 +62,10 @@ export async function getOpenPositions(
 	]);
 
 	// Build exit plan lookup from DB orders (keyed by canonical symbol)
-	const exitPlanBySymbol = new Map<string, { exitPlan: ExitPlanSummary | null; confidence: number | null }>();
+	const exitPlanBySymbol = new Map<
+		string,
+		{ exitPlan: ExitPlanSummary | null; confidence: number | null }
+	>();
 	for (const order of dbOrders) {
 		const plan = order.exitPlan as {
 			stop?: number | null;
@@ -116,4 +119,3 @@ export async function getOpenPositions(
 		};
 	});
 }
-

@@ -4,12 +4,8 @@ import { os } from "@orpc/server";
 import * as Sentry from "@sentry/react";
 import { z } from "zod";
 
-import {
-	refreshConversationEvents,
-} from "@/server/features/trading/data/conversationsSnapshot.server";
-import {
-	fetchModelsList,
-} from "@/server/features/trading/data/queries.server";
+import { refreshConversationEvents } from "@/server/features/trading/data/conversationsSnapshot.server";
+import { fetchModelsList } from "@/server/features/trading/data/tradingQueries.server";
 import { InvocationsResponseSchema, ModelsResponseSchema } from "../schema";
 
 // ==================== Models ====================
@@ -46,4 +42,3 @@ export const getInvocations = os
 			}
 		});
 	});
-

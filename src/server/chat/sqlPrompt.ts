@@ -110,4 +110,3 @@ RULES:
 7. If the answer requires a derived number (profit, ROI, totals, comparisons), fetch the relevant trades or snapshots and compute it with SQL (SUM/AVG/etc.) instead of refusing.
 
 Return executable PostgreSQL that answers the user's question. If a metric does not exist yet, query the necessary rows and derive it yourself from the data.`;
-

@@ -11,9 +11,9 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { and, eq, gte, lt, sql, min, avg, count } from "drizzle-orm";
+import { and, avg, count, eq, gte, lt, min, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { portfolioSize, models, type Variant } from "@/db/schema";
+import { models, portfolioSize, type Variant } from "@/db/schema";
 
 // ==================== Retention Configuration ====================
 
@@ -33,7 +33,7 @@ export const RETENTION_CONFIG = {
 /**
  * Time-based downsampling resolution tiers for chart rendering.
  * Resolution is auto-detected from data time range.
- * 
+ *
  * Time Range → Bucket Size → Approx Points (for 7 days of data)
  * - ≤24h      → 1 min      → 1,440 points
  * - ≤3d       → 5 min      → 864 points
@@ -84,13 +84,23 @@ export async function runRetentionPolicy(): Promise<{
 	const preservedIds = new Set(firstSnapshots.map((s) => s.id));
 
 	// Step 2: Aggregate 7-30 day old raw data into hourly buckets
-	const hourlyAggregatesCreated = await aggregateToHourly(sevenDaysAgo, thirtyDaysAgo, preservedIds);
+	const hourlyAggregatesCreated = await aggregateToHourly(
+		sevenDaysAgo,
+		thirtyDaysAgo,
+		preservedIds,
+	);
 
 	// Step 3: Aggregate 30+ day old data into daily buckets
-	const dailyAggregatesCreated = await aggregateToDaily(thirtyDaysAgo, preservedIds);
+	const dailyAggregatesCreated = await aggregateToDaily(
+		thirtyDaysAgo,
+		preservedIds,
+	);
 
 	// Step 4: Delete aggregated raw records (except preserved first snapshots)
-	const rawRecordsDeleted = await deleteAggregatedRawRecords(sevenDaysAgo, preservedIds);
+	const rawRecordsDeleted = await deleteAggregatedRawRecords(
+		sevenDaysAgo,
+		preservedIds,
+	);
 
 	return {
 		hourlyAggregatesCreated,
@@ -103,7 +113,9 @@ export async function runRetentionPolicy(): Promise<{
  * Get the first (oldest) snapshot for each model.
  * These are never deleted to ensure graphs start from origin.
  */
-async function getFirstSnapshotPerModel(): Promise<Array<{ id: string; modelId: string; createdAt: Date }>> {
+async function getFirstSnapshotPerModel(): Promise<
+	Array<{ id: string; modelId: string; createdAt: Date }>
+> {
 	// Get minimum createdAt per model
 	const minDates = await db
 		.select({
@@ -122,9 +134,18 @@ async function getFirstSnapshotPerModel(): Promise<Array<{ id: string; modelId: 
 		if (!minCreatedAt) continue;
 
 		const [firstSnapshot] = await db
-			.select({ id: portfolioSize.id, modelId: portfolioSize.modelId, createdAt: portfolioSize.createdAt })
+			.select({
+				id: portfolioSize.id,
+				modelId: portfolioSize.modelId,
+				createdAt: portfolioSize.createdAt,
+			})
 			.from(portfolioSize)
-			.where(and(eq(portfolioSize.modelId, modelId), eq(portfolioSize.createdAt, minCreatedAt)))
+			.where(
+				and(
+					eq(portfolioSize.modelId, modelId),
+					eq(portfolioSize.createdAt, minCreatedAt),
+				),
+			)
 			.limit(1);
 
 		if (firstSnapshot) {
@@ -148,13 +169,24 @@ async function aggregateToHourly(
 	const hourlyAggregates = await db
 		.select({
 			modelId: portfolioSize.modelId,
-			hourBucket: sql<string>`date_trunc('hour', ${portfolioSize.createdAt})`.as("hourBucket"),
+			hourBucket:
+				sql<string>`date_trunc('hour', ${portfolioSize.createdAt})`.as(
+					"hourBucket",
+				),
 			avgPortfolio: avg(portfolioSize.netPortfolio).as("avgPortfolio"),
 			recordCount: count().as("recordCount"),
 		})
 		.from(portfolioSize)
-		.where(and(gte(portfolioSize.createdAt, endDate), lt(portfolioSize.createdAt, startDate)))
-		.groupBy(portfolioSize.modelId, sql`date_trunc('hour', ${portfolioSize.createdAt})`);
+		.where(
+			and(
+				gte(portfolioSize.createdAt, endDate),
+				lt(portfolioSize.createdAt, startDate),
+			),
+		)
+		.groupBy(
+			portfolioSize.modelId,
+			sql`date_trunc('hour', ${portfolioSize.createdAt})`,
+		);
 
 	if (hourlyAggregates.length === 0) return 0;
 
@@ -197,17 +229,25 @@ async function aggregateToHourly(
 /**
  * Aggregate data older than 30 days into daily buckets.
  */
-async function aggregateToDaily(cutoffDate: Date, _preservedIds: Set<string>): Promise<number> {
+async function aggregateToDaily(
+	cutoffDate: Date,
+	_preservedIds: Set<string>,
+): Promise<number> {
 	const dailyAggregates = await db
 		.select({
 			modelId: portfolioSize.modelId,
-			dayBucket: sql<string>`date_trunc('day', ${portfolioSize.createdAt})`.as("dayBucket"),
+			dayBucket: sql<string>`date_trunc('day', ${portfolioSize.createdAt})`.as(
+				"dayBucket",
+			),
 			avgPortfolio: avg(portfolioSize.netPortfolio).as("avgPortfolio"),
 			recordCount: count().as("recordCount"),
 		})
 		.from(portfolioSize)
 		.where(lt(portfolioSize.createdAt, cutoffDate))
-		.groupBy(portfolioSize.modelId, sql`date_trunc('day', ${portfolioSize.createdAt})`);
+		.groupBy(
+			portfolioSize.modelId,
+			sql`date_trunc('day', ${portfolioSize.createdAt})`,
+		);
 
 	if (dailyAggregates.length === 0) return 0;
 
@@ -254,7 +294,10 @@ async function aggregateToDaily(cutoffDate: Date, _preservedIds: Set<string>): P
  * - First snapshot per model (origin point)
  * - Aggregated hourly/daily records
  */
-async function deleteAggregatedRawRecords(cutoffDate: Date, preservedIds: Set<string>): Promise<number> {
+async function deleteAggregatedRawRecords(
+	cutoffDate: Date,
+	preservedIds: Set<string>,
+): Promise<number> {
 	if (preservedIds.size === 0) {
 		// If no preserved IDs, delete all old raw records
 		await db
@@ -277,7 +320,10 @@ async function deleteAggregatedRawRecords(cutoffDate: Date, preservedIds: Set<st
 	await db.execute(sql`
 		DELETE FROM "PortfolioSize"
 		WHERE "createdAt" < ${cutoffDate}
-		AND "id" NOT IN (${sql.join(preservedIdArray.map(id => sql`${id}`), sql`, `)})
+		AND "id" NOT IN (${sql.join(
+			preservedIdArray.map((id) => sql`${id}`),
+			sql`, `,
+		)})
 		AND (
 			EXTRACT(MINUTE FROM "createdAt") != 0
 			OR EXTRACT(SECOND FROM "createdAt") != 0
@@ -410,15 +456,18 @@ export async function getPortfolioHistoryWithResolution(options?: {
 /**
  * Auto-detect appropriate resolution from data time range.
  */
-function detectResolutionFromTimeRange(startMs: number, endMs: number): DownsampleResolution {
+function detectResolutionFromTimeRange(
+	startMs: number,
+	endMs: number,
+): DownsampleResolution {
 	const rangeMs = endMs - startMs;
 	const { THRESHOLDS } = DOWNSAMPLE_CONFIG;
-	
-	if (rangeMs <= THRESHOLDS.ONE_DAY) return "1m";           // ≤1 day: 1-minute buckets
-	if (rangeMs <= THRESHOLDS.THREE_DAYS) return "5m";        // ≤3 days: 5-minute buckets
-	if (rangeMs <= THRESHOLDS.SEVEN_DAYS) return "15m";       // ≤7 days: 15-minute buckets
-	if (rangeMs <= THRESHOLDS.THIRTY_DAYS) return "1h";       // ≤30 days: 1-hour buckets
-	return "4h";                                               // >30 days: 4-hour buckets
+
+	if (rangeMs <= THRESHOLDS.ONE_DAY) return "1m"; // ≤1 day: 1-minute buckets
+	if (rangeMs <= THRESHOLDS.THREE_DAYS) return "5m"; // ≤3 days: 5-minute buckets
+	if (rangeMs <= THRESHOLDS.SEVEN_DAYS) return "15m"; // ≤7 days: 15-minute buckets
+	if (rangeMs <= THRESHOLDS.THIRTY_DAYS) return "1h"; // ≤30 days: 1-hour buckets
+	return "4h"; // >30 days: 4-hour buckets
 }
 
 type PortfolioEntry = {
@@ -437,16 +486,16 @@ type PortfolioEntry = {
 /**
  * Time-based downsampling for chart rendering.
  * Groups data into time buckets and uses the LAST value per model per bucket.
- * 
+ *
  * This is similar to how OHLC charts use the "close" price - we want the value
  * at the END of each time bucket, not the average. This ensures:
  * 1. Chart lines accurately show portfolio progression over time
  * 2. Legend values match the actual current portfolio values
  * 3. No data loss from averaging that could hide gains/losses
- * 
+ *
  * After bucketing, appends the absolute latest entry per model to ensure the
  * chart always ends at the current portfolio value (not a stale bucket value).
- * 
+ *
  * @param data - Raw portfolio entries sorted by createdAt ascending
  * @param resolution - Optional forced resolution, auto-detected if not provided
  * @param averageAcrossVariants - If true, average the last values across all variants per model name (for aggregate view)
@@ -463,7 +512,8 @@ export function downsampleForChart(
 	averageAcrossVariants = false,
 ): DownsampleResult {
 	if (data.length === 0) return { entries: [], resolution: resolution ?? "1m" };
-	if (data.length === 1) return { entries: data, resolution: resolution ?? "1m" };
+	if (data.length === 1)
+		return { entries: data, resolution: resolution ?? "1m" };
 
 	// Parse timestamps and sort
 	const withTimestamps = data
@@ -474,13 +524,15 @@ export function downsampleForChart(
 		.filter((item) => Number.isFinite(item.timestamp))
 		.sort((a, b) => a.timestamp - b.timestamp);
 
-	if (withTimestamps.length === 0) return { entries: [], resolution: resolution ?? "1m" };
+	if (withTimestamps.length === 0)
+		return { entries: [], resolution: resolution ?? "1m" };
 
-	const startMs = withTimestamps[0]!.timestamp;
-	const endMs = withTimestamps[withTimestamps.length - 1]!.timestamp;
+	const startMs = withTimestamps[0]?.timestamp;
+	const endMs = withTimestamps[withTimestamps.length - 1]?.timestamp;
 
 	// Auto-detect resolution if not provided
-	const detectedResolution = resolution ?? detectResolutionFromTimeRange(startMs, endMs);
+	const detectedResolution =
+		resolution ?? detectResolutionFromTimeRange(startMs, endMs);
 	const bucketSizeMs = DOWNSAMPLE_CONFIG.RESOLUTIONS[detectedResolution];
 
 	// Track the absolute latest entry per model (before bucketing)
@@ -538,14 +590,17 @@ export function downsampleForChart(
 
 	for (const { entry, timestamp } of withTimestamps) {
 		const bucketStart = Math.floor(timestamp / bucketSizeMs) * bucketSizeMs;
-		
+
 		// Model key: model name (for grouping display)
 		const modelKey = entry.model.name;
 
 		if (!buckets.has(bucketStart)) {
 			buckets.set(bucketStart, new Map());
 		}
-		const bucketModels = buckets.get(bucketStart)!;
+		const bucketModels = buckets.get(bucketStart);
+		if (!bucketModels) {
+			continue;
+		}
 
 		const value = Number(entry.netPortfolio);
 		if (!Number.isFinite(value)) continue;
@@ -553,9 +608,17 @@ export function downsampleForChart(
 		if (!bucketModels.has(modelKey)) {
 			const variantValues = new Map<string, number>();
 			variantValues.set(entry.modelId, value);
-			bucketModels.set(modelKey, { lastEntry: entry, lastValue: value, lastTimestamp: timestamp, variantValues });
+			bucketModels.set(modelKey, {
+				lastEntry: entry,
+				lastValue: value,
+				lastTimestamp: timestamp,
+				variantValues,
+			});
 		} else {
-			const existing = bucketModels.get(modelKey)!;
+			const existing = bucketModels.get(modelKey);
+			if (!existing) {
+				continue;
+			}
 			existing.lastEntry = entry;
 			existing.lastValue = value;
 			existing.lastTimestamp = timestamp;
@@ -572,12 +635,18 @@ export function downsampleForChart(
 	const lastBucketTimePerModel = new Map<string, number>();
 
 	for (const bucketStart of sortedBuckets) {
-		const bucketModels = buckets.get(bucketStart)!;
+		const bucketModels = buckets.get(bucketStart);
+		if (!bucketModels) {
+			continue;
+		}
 		const bucketTime = new Date(bucketStart).toISOString();
 
-		for (const [modelKey, { lastEntry, lastValue, variantValues }] of bucketModels) {
+		for (const [
+			modelKey,
+			{ lastEntry, lastValue, variantValues },
+		] of bucketModels) {
 			let outputValue: number;
-			
+
 			if (averageAcrossVariants && variantValues.size > 1) {
 				// Aggregate mode: average the last values from each variant
 				const values = Array.from(variantValues.values());
@@ -586,7 +655,7 @@ export function downsampleForChart(
 				// Single variant mode: use the last value directly (like OHLC close price)
 				outputValue = lastValue;
 			}
-			
+
 			result.push({
 				id: lastEntry.id,
 				modelId: lastEntry.modelId,
@@ -609,10 +678,14 @@ export function downsampleForChart(
 
 		let latestValue: number;
 		if (averageAcrossVariants && latest.variantValues.size > 1) {
-			const values = Array.from(latest.variantValues.values()).map((v) => v.value);
+			const values = Array.from(latest.variantValues.values()).map(
+				(v) => v.value,
+			);
 			latestValue = values.reduce((sum, v) => sum + v, 0) / values.length;
 		} else {
-			latestValue = latest.variantValues.values().next().value?.value ?? Number(latest.representative.netPortfolio);
+			latestValue =
+				latest.variantValues.values().next().value?.value ??
+				Number(latest.representative.netPortfolio);
 		}
 
 		result.push({
@@ -626,7 +699,9 @@ export function downsampleForChart(
 	}
 
 	// Re-sort after appending latest entries
-	result.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+	result.sort(
+		(a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+	);
 
 	return { entries: result, resolution: detectedResolution };
 }

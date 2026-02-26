@@ -1,5 +1,5 @@
-import { createTypedEventBus } from "@/server/events/typedEventBus";
 import type { VariantId } from "@/core/shared/variants";
+import { createTypedEventBus } from "@/server/events/typedEventBus";
 
 export type PortfolioSnapshotData = {
 	modelId: string;

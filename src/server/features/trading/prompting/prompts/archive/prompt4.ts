@@ -117,7 +117,6 @@ If no clean edge: **Do nothing.** Patience beats forced churn.
 
 Aggressive execution is the goal. Risk discipline is non-negotiable.`;
 
-
 export const USER_PROMPT = `
 Session: {{TOTAL_MINUTES}} min | Interval: 5 min | Invocations: {{INVOKATION_TIMES}} | {{CURRENT_TIME}} IST
 

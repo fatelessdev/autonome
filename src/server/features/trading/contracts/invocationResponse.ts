@@ -1,5 +1,3 @@
-import type { GenerateTextResult } from "ai";
-
 /**
  * Step-level telemetry captured during agent execution via onStepFinish.
  * Useful for debugging failures and analyzing cost/performance.
@@ -79,7 +77,7 @@ export function buildInvocationResponsePayload({
 	stepTelemetry,
 }: {
 	prompt: string;
-	result: GenerateTextResult<any, any> | null;
+	result: unknown | null;
 	decisions: InvocationDecisionSummary[];
 	executionResults: InvocationExecutionResultSummary[];
 	closedPositions: InvocationClosedPositionSummary[];
@@ -106,8 +104,10 @@ export function buildInvocationResponsePayload({
 
 	// Aggregate step telemetry
 	const totalSteps = stepTelemetry?.length ?? 0;
-	const totalInputTokens = stepTelemetry?.reduce((acc, s) => acc + s.inputTokens, 0) ?? 0;
-	const totalOutputTokens = stepTelemetry?.reduce((acc, s) => acc + s.outputTokens, 0) ?? 0;
+	const totalInputTokens =
+		stepTelemetry?.reduce((acc, s) => acc + s.inputTokens, 0) ?? 0;
+	const totalOutputTokens =
+		stepTelemetry?.reduce((acc, s) => acc + s.outputTokens, 0) ?? 0;
 
 	return {
 		prompt,

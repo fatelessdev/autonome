@@ -1,11 +1,14 @@
-import NumberFlow from "@number-flow/react";
+﻿import NumberFlow from "@number-flow/react";
 import { useMemo, useRef } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
+import { useVariant } from "@/components/variant-provider";
 import { VariantSelector } from "@/components/variant-selector";
-import { useVariant } from "@/components/variant-context";
 import { SUPPORTED_MARKETS } from "@/core/shared/markets/marketMetadata";
-import { useMarketPrices, type MarketPrice } from "@/core/shared/markets/marketQueries";
+import {
+	type MarketPrice,
+	useMarketPrices,
+} from "@/core/shared/markets/marketQueries";
 
 const TRACKED_SYMBOLS = SUPPORTED_MARKETS;
 const TRACKED_SYMBOL_SET = new Set(TRACKED_SYMBOLS);
@@ -187,7 +190,7 @@ function PriceWithChange({
 					}
 				>
 					{/* {formattedChange == null
-						? "–"
+						? "â€“"
 						: `${formattedChange >= 0 ? "+" : ""}${formattedChange.toFixed(2)}%`} */}
 				</span>
 			</div>

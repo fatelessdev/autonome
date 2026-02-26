@@ -13,7 +13,7 @@ import {
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { type ChartConfig, ChartContainer } from "@/components/ui/chart";
-import { useVariant, VARIANT_TABS } from "@/components/variant-context";
+import { useVariant, VARIANT_TABS } from "@/components/variant-provider";
 import { cn } from "@/core/lib/utils";
 import { getModelInfo } from "@/shared/models/modelConfig";
 
@@ -439,7 +439,10 @@ export function GlowingLineChart({
 		ticks.sort((a, b) => a - b);
 		const uniqueTicks = Array.from(new Set(ticks));
 		return {
-			domain: [uniqueTicks[0] ?? minBound, uniqueTicks[uniqueTicks.length - 1] ?? maxBound] as [number, number],
+			domain: [
+				uniqueTicks[0] ?? minBound,
+				uniqueTicks[uniqueTicks.length - 1] ?? maxBound,
+			] as [number, number],
 			ticks: uniqueTicks,
 		};
 	}, [chartData, modelKeys, isPercent]);

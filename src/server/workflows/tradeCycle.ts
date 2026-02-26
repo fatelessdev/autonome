@@ -17,9 +17,9 @@
 "use workflow";
 
 import { sleep } from "workflow";
-import { tradeCycleStep } from "./steps/tradeCycleStep";
 import { portfolioSnapshotStep } from "./steps/portfolioSnapshotStep";
 import { retentionPolicyStep } from "./steps/retentionPolicyStep";
+import { tradeCycleStep } from "./steps/tradeCycleStep";
 
 /** How often the trade cycle runs (in milliseconds). */
 const TRADE_CYCLE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes

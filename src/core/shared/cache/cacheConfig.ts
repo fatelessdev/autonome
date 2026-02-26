@@ -82,4 +82,4 @@ export function createQueryKey(
 	return [prefix, ...parts] as const;
 }
 
-export type CacheTiming = typeof CACHE_TIMING[keyof typeof CACHE_TIMING];
+export type CacheTiming = (typeof CACHE_TIMING)[keyof typeof CACHE_TIMING];

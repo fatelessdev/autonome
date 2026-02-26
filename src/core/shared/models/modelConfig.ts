@@ -30,7 +30,7 @@ export const MODEL_INFO: Record<string, ModelInfoEntry> = {
 		logo: "/models/mimo.png",
 		color: "#FF6900",
 		label: "Mimo V2 Flash",
-		provider: "openrouter"
+		provider: "openrouter",
 	},
 	"mimo-v2-flash-free": {
 		logo: "/models/mimo.png",
@@ -109,7 +109,7 @@ export const MODEL_INFO: Record<string, ModelInfoEntry> = {
 		color: "#ef73a9",
 		label: "Coding Minimax M2.1",
 		provider: "aihubmix",
-	}
+	},
 };
 
 export type ModelInfo = ModelInfoEntry & { provider?: ModelProvider };

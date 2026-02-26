@@ -3,15 +3,23 @@
  * Re-exports all agent components for clean imports
  */
 
-export { createTradeAgent, type TradeAgentConfig, type TradeAgent } from "./tradeAgentFactory";
-export { createTradingTools, type ToolContext, type TradingTools } from "./tools";
 export {
-	decisionSchema,
-	agentOutputSchema,
-	callOptionsSchema,
-	marketSymbols,
-	type DecisionInput,
 	type AgentOutput,
+	agentOutputSchema,
 	type CallOptions,
+	callOptionsSchema,
+	type DecisionInput,
+	decisionSchema,
+	marketSymbols,
 	type NormalizedDecision,
 } from "./schemas";
+export {
+	createTradingTools,
+	type ToolContext,
+	type TradingTools,
+} from "./tools";
+export {
+	createTradeAgent,
+	type TradeAgent,
+	type TradeAgentConfig,
+} from "./tradeAgentFactory";

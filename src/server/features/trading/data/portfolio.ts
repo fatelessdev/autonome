@@ -37,4 +37,3 @@ export async function getPortfolio(
 		available: formatCurrencyString(availableCash),
 	};
 }
-

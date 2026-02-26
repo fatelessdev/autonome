@@ -2,19 +2,18 @@ import { config } from "dotenv";
 
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
-
-import * as schema from "./schema.ts";
 import { env } from "@/env.ts";
+import * as schema from "./schema.ts";
 
 config({ path: ".env.local" });
 
 /**
  * Lazy database connection singleton.
- * 
+ *
  * On Vercel (frontend-only), DATABASE_URL doesn't exist because the backend
  * runs on VPS. This lazy initialization prevents crashes during SSR when
  * server code is bundled but never actually executed.
- * 
+ *
  * The database is only connected when first accessed via `db` getter.
  */
 let _db: NodePgDatabase<typeof schema> | null = null;
@@ -25,7 +24,7 @@ function getDb(): NodePgDatabase<typeof schema> {
 		if (!env.DATABASE_URL) {
 			throw new Error(
 				"DATABASE_URL is not defined. This code path requires database access " +
-				"but is running in an environment without database configuration (e.g., Vercel frontend)."
+					"but is running in an environment without database configuration (e.g., Vercel frontend).",
 			);
 		}
 		_pool = new Pool({
@@ -43,7 +42,7 @@ function getDb(): NodePgDatabase<typeof schema> {
 export const db = new Proxy({} as NodePgDatabase<typeof schema>, {
 	get(_target, prop) {
 		const instance = getDb();
-		const value = (instance as any)[prop];
+		const value = (instance as unknown as Record<PropertyKey, unknown>)[prop];
 		return typeof value === "function" ? value.bind(instance) : value;
 	},
 });

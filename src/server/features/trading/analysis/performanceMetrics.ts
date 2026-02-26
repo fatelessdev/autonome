@@ -1,13 +1,16 @@
 import {
-	INITIAL_CAPITAL,
+	calculateCurrentDrawdown,
+	calculateMaxDrawdown,
 	calculateReturnPercent,
 	calculateSharpeRatioFromTrades,
 	calculateWinRate,
-	calculateMaxDrawdown,
-	calculateCurrentDrawdown,
+	INITIAL_CAPITAL,
 } from "@/core/shared/trading/calculations";
+import {
+	getClosedOrdersByModel,
+	getTotalRealizedPnl,
+} from "@/server/db/ordersRepository.server";
 import type { Account } from "@/server/features/trading/contracts/accounts";
-import { getClosedOrdersByModel, getTotalRealizedPnl } from "@/server/db/ordersRepository.server";
 import { getTradingProvider } from "@/server/providers/alpaca";
 
 export type PerformanceMetrics = {
@@ -64,33 +67,35 @@ export async function calculatePerformanceMetrics(
 		account.alpacaApiSecret,
 	);
 
-	const [alpacaHistory, closedTradeRealizedPnl, closedOrders] = await Promise.all([
-		trading.getPortfolioHistory({
-			period: "1M",
-			timeframe: "1D",
-			intraday_reporting: "continuous",
-		}),
-		getTotalRealizedPnl(account.id),
-		getClosedOrdersByModel(account.id),
-	]);
+	const [alpacaHistory, closedTradeRealizedPnl, closedOrders] =
+		await Promise.all([
+			trading.getPortfolioHistory({
+				period: "1M",
+				timeframe: "1D",
+				intraday_reporting: "continuous",
+			}),
+			getTotalRealizedPnl(account.id),
+			getClosedOrdersByModel(account.id),
+		]);
 
 	// Calculate trade stats
 	const tradeCount = closedOrders.length;
 	const pnls = closedOrders
 		.map((order) => parseFloat(order.realizedPnl ?? "0"))
 		.filter((pnl) => Number.isFinite(pnl));
-	const winRate = tradeCount > 0 
-		? `${calculateWinRate(pnls).toFixed(1)}%` 
-		: "N/A";
+	const winRate =
+		tradeCount > 0 ? `${calculateWinRate(pnls).toFixed(1)}%` : "N/A";
 
 	// Calculate drawdown from portfolio history
 	const portfolioValues = alpacaHistory.equity.filter(Number.isFinite);
-	const currentDrawdown = portfolioValues.length > 0
-		? `${calculateCurrentDrawdown(portfolioValues).toFixed(1)}%`
-		: "0.0%";
-	const maxDrawdown = portfolioValues.length > 1
-		? `${calculateMaxDrawdown(portfolioValues).toFixed(1)}%`
-		: "0.0%";
+	const currentDrawdown =
+		portfolioValues.length > 0
+			? `${calculateCurrentDrawdown(portfolioValues).toFixed(1)}%`
+			: "0.0%";
+	const maxDrawdown =
+		portfolioValues.length > 1
+			? `${calculateMaxDrawdown(portfolioValues).toFixed(1)}%`
+			: "0.0%";
 
 	if (portfolioValues.length < 2) {
 		const fallbackInitial = alpacaHistory.base_value || INITIAL_CAPITAL;
@@ -111,12 +116,13 @@ export async function calculatePerformanceMetrics(
 	}
 
 	const profitLossPct = alpacaHistory.profit_loss_pct;
-	const totalReturn = profitLossPct.length > 0
-		? profitLossPct[profitLossPct.length - 1] * 100
-		: calculateReturnPercent(
-			currentPortfolioValue,
-			alpacaHistory.base_value || INITIAL_CAPITAL,
-		);
+	const totalReturn =
+		profitLossPct.length > 0
+			? profitLossPct[profitLossPct.length - 1] * 100
+			: calculateReturnPercent(
+					currentPortfolioValue,
+					alpacaHistory.base_value || INITIAL_CAPITAL,
+				);
 
 	// Use trade-based Sharpe ratio (same as analytics) for consistency
 	// This avoids the explosive per-minute compounding issue
@@ -132,4 +138,3 @@ export async function calculatePerformanceMetrics(
 		maxDrawdown,
 	};
 }
-

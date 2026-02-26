@@ -9,8 +9,8 @@ import type {
 	InvocationDecisionSummary,
 	InvocationExecutionResultSummary,
 } from "@/server/features/trading/contracts/invocationResponse";
-import type { EnrichedOpenPosition } from "@/server/features/trading/data/openPositionEnrichment";
 import type { TradingDecisionWithContext } from "@/server/features/trading/contracts/tradingDecisions";
+import type { EnrichedOpenPosition } from "@/server/features/trading/data/openPositionEnrichment";
 
 export type { PositionResult } from "@/server/features/trading/execution/createPosition";
 
@@ -42,7 +42,10 @@ export interface ToolContext {
 	 * Maps symbol -> { side: "LONG"|"SHORT", cooldownUntil: ISO timestamp }
 	 * Used to enforce cooldown even after position is closed.
 	 */
-	closedPositionCooldowns: Map<string, { side: "LONG" | "SHORT"; cooldownUntil: string }>;
+	closedPositionCooldowns: Map<
+		string,
+		{ side: "LONG" | "SHORT"; cooldownUntil: string }
+	>;
 
 	/**
 	 * Per-symbol action counts for session limits.
@@ -74,4 +77,3 @@ export interface ClosePositionResult {
 	unrealizedPnl: number | null;
 	closedAt: string | null;
 }
-

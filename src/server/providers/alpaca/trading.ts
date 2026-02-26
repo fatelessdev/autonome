@@ -119,9 +119,7 @@ function parsePosition(raw: AlpacaRawPosition): BrokerPosition {
 		unrealized_pl: Number.parseFloat(raw.unrealized_pl),
 		unrealized_plpc: Number.parseFloat(raw.unrealized_plpc),
 		unrealized_intraday_pl: Number.parseFloat(raw.unrealized_intraday_pl),
-		unrealized_intraday_plpc: Number.parseFloat(
-			raw.unrealized_intraday_plpc,
-		),
+		unrealized_intraday_plpc: Number.parseFloat(raw.unrealized_intraday_plpc),
 		current_price: Number.parseFloat(raw.current_price),
 		lastday_price: Number.parseFloat(raw.lastday_price),
 		change_today: Number.parseFloat(raw.change_today),
@@ -195,8 +193,7 @@ export class AlpacaTradingProvider implements BrokerProvider {
 		};
 
 		if (params.qty !== undefined) body.qty = String(params.qty);
-		if (params.notional !== undefined)
-			body.notional = String(params.notional);
+		if (params.notional !== undefined) body.notional = String(params.notional);
 		if (params.limit_price !== undefined)
 			body.limit_price = String(params.limit_price);
 		if (params.stop_price !== undefined)
@@ -209,8 +206,7 @@ export class AlpacaTradingProvider implements BrokerProvider {
 			body.extended_hours = params.extended_hours;
 		if (params.client_order_id !== undefined)
 			body.client_order_id = params.client_order_id;
-		if (params.order_class !== undefined)
-			body.order_class = params.order_class;
+		if (params.order_class !== undefined) body.order_class = params.order_class;
 		if (params.take_profit !== undefined) {
 			body.take_profit = {
 				limit_price: String(params.take_profit.limit_price),
@@ -225,11 +221,7 @@ export class AlpacaTradingProvider implements BrokerProvider {
 			};
 		}
 
-		return this.client.tradingRequest<BrokerOrder>(
-			"POST",
-			"/v2/orders",
-			body,
-		);
+		return this.client.tradingRequest<BrokerOrder>("POST", "/v2/orders", body);
 	}
 
 	async getOrder(orderId: string): Promise<BrokerOrder> {
@@ -248,8 +240,7 @@ export class AlpacaTradingProvider implements BrokerProvider {
 			if (params.limit) searchParams.set("limit", String(params.limit));
 			if (params.after) searchParams.set("after", params.after);
 			if (params.until) searchParams.set("until", params.until);
-			if (params.direction)
-				searchParams.set("direction", params.direction);
+			if (params.direction) searchParams.set("direction", params.direction);
 			if (params.nested !== undefined)
 				searchParams.set("nested", String(params.nested));
 			if (params.symbols?.length)
@@ -310,17 +301,12 @@ export class AlpacaTradingProvider implements BrokerProvider {
 		if (params) {
 			const searchParams = new URLSearchParams();
 			if (params.period) searchParams.set("period", params.period);
-			if (params.timeframe)
-				searchParams.set("timeframe", params.timeframe);
+			if (params.timeframe) searchParams.set("timeframe", params.timeframe);
 			if (params.intraday_reporting)
-				searchParams.set(
-					"intraday_reporting",
-					params.intraday_reporting,
-				);
+				searchParams.set("intraday_reporting", params.intraday_reporting);
 			if (params.start) searchParams.set("start", params.start);
 			if (params.end) searchParams.set("end", params.end);
-			if (params.pnl_reset)
-				searchParams.set("pnl_reset", params.pnl_reset);
+			if (params.pnl_reset) searchParams.set("pnl_reset", params.pnl_reset);
 
 			const queryString = searchParams.toString();
 			if (queryString) {

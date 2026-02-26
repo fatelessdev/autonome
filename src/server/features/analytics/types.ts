@@ -117,4 +117,3 @@ export interface ModelFailureStats {
 	invocationCount: number;
 	failureRate: number;
 }
-

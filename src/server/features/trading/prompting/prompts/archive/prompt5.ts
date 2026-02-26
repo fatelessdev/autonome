@@ -1,6 +1,6 @@
 // Configuration Constants
 const RISK_PER_TRADE_PCT = 0.02; // 2% HARD LIMIT
-const MIN_VOLUME_RATIO = 0.10; // 10% of average volume
+const MIN_VOLUME_RATIO = 0.1; // 10% of average volume
 const ZOMBIE_HOURS = 24;
 const ZOMBIE_R_THRESHOLD = 1.0;
 const CHASE_THRESHOLD_PCT = 1.5; // Do not enter if moved > 1.5% already

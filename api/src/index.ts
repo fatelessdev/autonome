@@ -12,22 +12,14 @@ import { logger } from "hono/logger";
 
 import "@/polyfill";
 
-import { env } from "@/env";
-import { getWorld } from "workflow/runtime";
 import { start } from "workflow/api";
+import { getWorld } from "workflow/runtime";
+import { env } from "@/env";
 import { subscribeToWorkflowEvents } from "@/server/events/workflowEvents";
-import {
-	subscribeToPortfolioEvents,
-} from "@/server/features/portfolio/events/portfolioEvents";
-import {
-	subscribeToConversationEvents,
-} from "@/server/features/trading/events/conversationEvents";
-import {
-	subscribeToPositionEvents,
-} from "@/server/features/trading/events/positionEvents";
-import {
-	subscribeToTradeEvents,
-} from "@/server/features/trading/events/tradeEvents";
+import { subscribeToPortfolioEvents } from "@/server/features/portfolio/events/portfolioEvents";
+import { subscribeToConversationEvents } from "@/server/features/trading/events/conversationEvents";
+import { subscribeToPositionEvents } from "@/server/features/trading/events/positionEvents";
+import { subscribeToTradeEvents } from "@/server/features/trading/events/tradeEvents";
 import router from "@/server/orpc/router";
 import { createSseHandler } from "./sse";
 
@@ -133,13 +125,15 @@ app.all("/api/rpc/*", async (c) => {
 // the API starts before Vite finishes recompiling the .mjs bundles,
 // so static imports would load the stale version from the previous run.
 const loadWorkflowFlowHandler = () =>
-	// @ts-ignore — generated .mjs files have no type declarations
-	import("../../node_modules/.nitro/workflow/workflows.mjs").then((m) => m.POST);
+	// @ts-expect-error — generated .mjs files have no type declarations
+	import("../../node_modules/.nitro/workflow/workflows.mjs").then(
+		(m) => m.POST,
+	);
 const loadWorkflowStepHandler = () =>
-	// @ts-ignore — generated .mjs files have no type declarations
+	// @ts-expect-error — generated .mjs files have no type declarations
 	import("../../node_modules/.nitro/workflow/steps.mjs").then((m) => m.POST);
 const loadWebhookHandlers = () =>
-	// @ts-ignore — generated .mjs files have no type declarations
+	// @ts-expect-error — generated .mjs files have no type declarations
 	import("../../node_modules/.nitro/workflow/webhook.mjs").then((m) => ({
 		POST: m.POST,
 		GET: m.GET,
@@ -203,8 +197,12 @@ app.get(
 
 // ==================== Health Check ====================
 
-app.get("/health", (c) => c.json({ status: "ok", timestamp: new Date().toISOString() }));
-app.get("/api/health", (c) => c.json({ status: "ok", timestamp: new Date().toISOString() }));
+app.get("/health", (c) =>
+	c.json({ status: "ok", timestamp: new Date().toISOString() }),
+);
+app.get("/api/health", (c) =>
+	c.json({ status: "ok", timestamp: new Date().toISOString() }),
+);
 
 app.get("/", (c) => {
 	return c.json({
@@ -250,7 +248,10 @@ async function main() {
 		console.log("✅ Trade cycle workflow started");
 	} catch (error) {
 		// If the workflow is already running, this is expected
-		console.log("ℹ️ Trade cycle workflow:", error instanceof Error ? error.message : String(error));
+		console.log(
+			"ℹ️ Trade cycle workflow:",
+			error instanceof Error ? error.message : String(error),
+		);
 	}
 
 	console.log(`✅ API server running on http://localhost:${port}`);

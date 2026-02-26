@@ -1,7 +1,10 @@
-import { createStartHandler, defaultStreamHandler } from "@tanstack/react-start/server";
 import { stat } from "node:fs/promises";
 import { join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+	createStartHandler,
+	defaultStreamHandler,
+} from "@tanstack/react-start/server";
 
 // Port configuration for TanStack Start SSR server
 // FRONTEND_PORT: server-side only, read from process.env
@@ -10,7 +13,9 @@ const API_PORT = Number(process.env.API_PORT) || 8081;
 const FRONTEND_PORT = Number(process.env.FRONTEND_PORT) || 5173;
 const API_URL = import.meta.env.VITE_API_URL || `http://localhost:${API_PORT}`;
 
-declare const Bun: any;
+declare const Bun: {
+	file: (path: string) => Blob;
+};
 
 const startHandler = createStartHandler(defaultStreamHandler);
 const clientDistDir = fileURLToPath(new URL("../client", import.meta.url));
@@ -71,7 +76,7 @@ export default {
 			const staticResponse = await serveStatic(request);
 			if (staticResponse) return staticResponse;
 		}
-		
+
 		return startHandler(request);
 	},
 };

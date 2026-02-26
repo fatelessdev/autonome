@@ -1,15 +1,21 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import {
 	type ColumnDef,
-	type SortingState,
 	flexRender,
 	getCoreRowModel,
 	getSortedRowModel,
+	type SortingState,
 	useReactTable,
 } from "@tanstack/react-table";
-import { ArrowUpDown, ChevronDown, ChevronUp, Download, Loader2 } from "lucide-react";
+import {
+	ArrowUpDown,
+	ChevronDown,
+	ChevronUp,
+	Download,
+	Loader2,
+} from "lucide-react";
+import { useEffect, useId, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -21,19 +27,19 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { useVariant, type VariantId } from "@/components/variant-provider";
 import { VariantSelector } from "@/components/variant-selector";
-import { useVariant, type VariantId } from "@/components/variant-context";
 import { cn } from "@/core/lib/utils";
-import { normalizeIdentifier } from "@/core/shared/strings/normalizeIdentifier";
 import { getModelInfo } from "@/core/shared/models/modelConfig";
-import { getVariantBadgeClasses } from "@/core/shared/variants";
+import { normalizeIdentifier } from "@/core/shared/strings/normalizeIdentifier";
 import { formatHoldTime } from "@/core/shared/trading/calculations";
-import { orpc } from "@/server/orpc/client";
-import type {
-	OverallStats,
-	AdvancedStats,
-} from "@/server/features/analytics/types";
+import { getVariantBadgeClasses } from "@/core/shared/variants";
 import { exportAnalyticsToExcel } from "@/core/utils/excelExport";
+import type {
+	AdvancedStats,
+	OverallStats,
+} from "@/server/features/analytics/types";
+import { orpc } from "@/server/orpc/client";
 
 export const Route = createFileRoute("/analytics")({
 	component: AnalyticsRoute,
@@ -96,7 +102,9 @@ function averageOverallByModel(stats: OverallStats[]): OverallStats[] {
 		};
 
 		for (const key of numericKeys) {
-			(result as unknown as Record<string, number>)[key] = averageNumber(entries.map((entry) => entry[key] as number));
+			(result as unknown as Record<string, number>)[key] = averageNumber(
+				entries.map((entry) => entry[key] as number),
+			);
 		}
 
 		return result;
@@ -160,7 +168,9 @@ function averageAdvancedByModel(stats: AdvancedStats[]): AdvancedStats[] {
 		};
 
 		for (const key of numericKeys) {
-			(result as unknown as Record<string, number>)[key] = averageNumber(entries.map((entry) => entry[key] as number));
+			(result as unknown as Record<string, number>)[key] = averageNumber(
+				entries.map((entry) => entry[key] as number),
+			);
 		}
 
 		return result;
@@ -172,7 +182,10 @@ function SortableHeader({
 	column,
 	children,
 }: {
-	column: { getIsSorted: () => false | "asc" | "desc"; toggleSorting: () => void };
+	column: {
+		getIsSorted: () => false | "asc" | "desc";
+		toggleSorting: () => void;
+	};
 	children: React.ReactNode;
 }) {
 	const sorted = column.getIsSorted();
@@ -199,7 +212,9 @@ function getOverallColumns(showVariant: boolean): ColumnDef<OverallStats>[] {
 	const columns: ColumnDef<OverallStats>[] = [
 		{
 			accessorKey: "modelName",
-			header: ({ column }) => <SortableHeader column={column}>Model</SortableHeader>,
+			header: ({ column }) => (
+				<SortableHeader column={column}>Model</SortableHeader>
+			),
 			cell: ({ row }) => {
 				const modelName = row.getValue<string>("modelName");
 				const modelInfo = getModelInfo(modelName);
@@ -234,14 +249,18 @@ function getOverallColumns(showVariant: boolean): ColumnDef<OverallStats>[] {
 	if (showVariant) {
 		columns.push({
 			accessorKey: "variant",
-			header: ({ column }) => <SortableHeader column={column}>Variant</SortableHeader>,
+			header: ({ column }) => (
+				<SortableHeader column={column}>Variant</SortableHeader>
+			),
 			cell: ({ row }) => {
 				const variant = row.getValue<string>("variant");
 				return (
-					<span className={cn(
-						"px-2 py-0.5 rounded text-xs font-medium",
-						getVariantBadgeClasses(variant),
-					)}>
+					<span
+						className={cn(
+							"px-2 py-0.5 rounded text-xs font-medium",
+							getVariantBadgeClasses(variant),
+						)}
+					>
 						{variant}
 					</span>
 				);
@@ -337,7 +356,9 @@ function getAdvancedColumns(showVariant: boolean): ColumnDef<AdvancedStats>[] {
 	const columns: ColumnDef<AdvancedStats>[] = [
 		{
 			accessorKey: "modelName",
-			header: ({ column }) => <SortableHeader column={column}>Model</SortableHeader>,
+			header: ({ column }) => (
+				<SortableHeader column={column}>Model</SortableHeader>
+			),
 			cell: ({ row }) => {
 				const modelName = row.getValue<string>("modelName");
 				const modelInfo = getModelInfo(modelName);
@@ -372,14 +393,18 @@ function getAdvancedColumns(showVariant: boolean): ColumnDef<AdvancedStats>[] {
 	if (showVariant) {
 		columns.push({
 			accessorKey: "variant",
-			header: ({ column }) => <SortableHeader column={column}>Variant</SortableHeader>,
+			header: ({ column }) => (
+				<SortableHeader column={column}>Variant</SortableHeader>
+			),
 			cell: ({ row }) => {
 				const variant = row.getValue<string>("variant");
 				return (
-					<span className={cn(
-						"px-2 py-0.5 rounded text-xs font-medium",
-						getVariantBadgeClasses(variant),
-					)}>
+					<span
+						className={cn(
+							"px-2 py-0.5 rounded text-xs font-medium",
+							getVariantBadgeClasses(variant),
+						)}
+					>
 						{variant}
 					</span>
 				);
@@ -470,7 +495,8 @@ function getAdvancedColumns(showVariant: boolean): ColumnDef<AdvancedStats>[] {
 			header: ({ column }) => (
 				<SortableHeader column={column}>Med Lev</SortableHeader>
 			),
-			cell: ({ row }) => `${row.getValue<number>("medianLeverage").toFixed(1)}x`,
+			cell: ({ row }) =>
+				`${row.getValue<number>("medianLeverage").toFixed(1)}x`,
 		},
 		{
 			accessorKey: "maxLeverage",
@@ -486,7 +512,7 @@ function getAdvancedColumns(showVariant: boolean): ColumnDef<AdvancedStats>[] {
 			),
 			cell: ({ row }) => {
 				const val = row.getValue<number>("avgConfidence");
-				return val > 0 ? `${val.toFixed(1)}%` : "—";
+				return val > 0 ? `${val.toFixed(1)}%` : "â€”";
 			},
 		},
 		{
@@ -496,7 +522,7 @@ function getAdvancedColumns(showVariant: boolean): ColumnDef<AdvancedStats>[] {
 			),
 			cell: ({ row }) => {
 				const val = row.getValue<number>("medianConfidence");
-				return val > 0 ? `${val.toFixed(1)}%` : "—";
+				return val > 0 ? `${val.toFixed(1)}%` : "â€”";
 			},
 		},
 		{
@@ -506,7 +532,7 @@ function getAdvancedColumns(showVariant: boolean): ColumnDef<AdvancedStats>[] {
 			),
 			cell: ({ row }) => {
 				const val = row.getValue<number>("maxConfidence");
-				return val > 0 ? `${val.toFixed(1)}%` : "—";
+				return val > 0 ? `${val.toFixed(1)}%` : "â€”";
 			},
 		},
 	);
@@ -540,16 +566,13 @@ function AnalyticsTable<T extends OverallStats | AdvancedStats>({
 						{table.getHeaderGroups().map((headerGroup) => (
 							<TableRow key={headerGroup.id} className="border-zinc-800">
 								{headerGroup.headers.map((header) => (
-									<TableHead
-										key={header.id}
-										className=""
-									>
+									<TableHead key={header.id} className="">
 										{header.isPlaceholder
 											? null
 											: flexRender(
-												header.column.columnDef.header,
-												header.getContext(),
-										)}
+													header.column.columnDef.header,
+													header.getContext(),
+												)}
 									</TableHead>
 								))}
 							</TableRow>
@@ -558,15 +581,12 @@ function AnalyticsTable<T extends OverallStats | AdvancedStats>({
 					<TableBody>
 						{table.getRowModel().rows?.length ? (
 							table.getRowModel().rows.map((row) => (
-								<TableRow
-									key={row.id}
-									className="border-zinc-800"
-								>
+								<TableRow key={row.id} className="border-zinc-800">
 									{row.getVisibleCells().map((cell) => (
 										<TableCell key={cell.id} className="">
 											{flexRender(
-													cell.column.columnDef.cell,
-													cell.getContext(),
+												cell.column.columnDef.cell,
+												cell.getContext(),
 											)}
 										</TableCell>
 									))}
@@ -593,11 +613,14 @@ function AnalyticsRoute() {
 	const [mode, setMode] = useState<StatsMode>("overall");
 	const [showAverage, setShowAverage] = useState(false);
 	const [isExporting, setIsExporting] = useState(false);
+	const averageAnalyticsId = useId();
 	const { selectedVariant, setSelectedVariant } = useVariant();
 
 	// Current view data
 	const { data, isLoading, error } = useQuery(
-		orpc.analytics.getModelStats.queryOptions({ input: { mode, variant: selectedVariant } }),
+		orpc.analytics.getModelStats.queryOptions({
+			input: { mode, variant: selectedVariant },
+		}),
 	);
 
 	// Run info for export filename
@@ -607,11 +630,15 @@ function AnalyticsRoute() {
 
 	// Pre-fetch both datasets for export
 	const { data: overallData, refetch: refetchOverall } = useQuery({
-		...orpc.analytics.getModelStats.queryOptions({ input: { mode: "overall", variant: selectedVariant } }),
+		...orpc.analytics.getModelStats.queryOptions({
+			input: { mode: "overall", variant: selectedVariant },
+		}),
 		staleTime: 30000, // Cache for 30 seconds
 	});
 	const { data: advancedData, refetch: refetchAdvanced } = useQuery({
-		...orpc.analytics.getModelStats.queryOptions({ input: { mode: "advanced", variant: selectedVariant } }),
+		...orpc.analytics.getModelStats.queryOptions({
+			input: { mode: "advanced", variant: selectedVariant },
+		}),
 		staleTime: 30000,
 	});
 
@@ -623,15 +650,16 @@ function AnalyticsRoute() {
 				refetchOverall(),
 				refetchAdvanced(),
 			]);
-			
+
 			const overall = overallResult.data?.overall ?? overallData?.overall ?? [];
-			const advanced = advancedResult.data?.advanced ?? advancedData?.advanced ?? [];
-			
+			const advanced =
+				advancedResult.data?.advanced ?? advancedData?.advanced ?? [];
+
 			if (overall.length === 0 && advanced.length === 0) {
 				console.warn("No data to export");
 				return;
 			}
-			
+
 			exportAnalyticsToExcel(overall, advanced, runInfo?.runStartTime ?? null);
 		} finally {
 			setIsExporting(false);
@@ -661,11 +689,13 @@ function AnalyticsRoute() {
 			{/* Header */}
 			<header className="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-zinc-800 px-6 py-4">
 				<h1 className="text-2xl font-semibold">Analytics</h1>
-				
+
 				<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
 					{/* Variant Filter - own row on mobile */}
 					<div className="flex items-center gap-2">
-						<span className="text-sm text-muted-foreground font-mono">COMPETITION:</span>
+						<span className="text-sm text-muted-foreground font-mono">
+							COMPETITION:
+						</span>
 						<VariantSelector
 							value={selectedVariant as VariantId}
 							onChange={setSelectedVariant}
@@ -705,12 +735,14 @@ function AnalyticsRoute() {
 						{selectedVariant === "all" && (
 							<div className="flex items-center gap-1.5">
 								<Checkbox
-									id="average-analytics"
+									id={averageAnalyticsId}
 									checked={showAverage}
-									onCheckedChange={(checked) => setShowAverage(checked === true)}
+									onCheckedChange={(checked) =>
+										setShowAverage(checked === true)
+									}
 								/>
 								<label
-									htmlFor="average-analytics"
+									htmlFor={averageAnalyticsId}
 									className="text-xs sm:text-sm font-medium cursor-pointer"
 								>
 									AVG
@@ -750,10 +782,20 @@ function AnalyticsRoute() {
 							Failed to load analytics: {error.message}
 						</p>
 					</div>
-					) : mode === "overall" && displayOverall.length ? (
-						<AnalyticsTable data={displayOverall} columns={getOverallColumns(selectedVariant === "all" && !showAverage)} />
-					) : mode === "advanced" && displayAdvanced.length ? (
-						<AnalyticsTable data={displayAdvanced} columns={getAdvancedColumns(selectedVariant === "all" && !showAverage)} />
+				) : mode === "overall" && displayOverall.length ? (
+					<AnalyticsTable
+						data={displayOverall}
+						columns={getOverallColumns(
+							selectedVariant === "all" && !showAverage,
+						)}
+					/>
+				) : mode === "advanced" && displayAdvanced.length ? (
+					<AnalyticsTable
+						data={displayAdvanced}
+						columns={getAdvancedColumns(
+							selectedVariant === "all" && !showAverage,
+						)}
+					/>
 				) : (
 					<div className="flex h-64 items-center justify-center">
 						<p className="">No analytics data available</p>

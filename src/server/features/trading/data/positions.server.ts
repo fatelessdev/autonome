@@ -16,4 +16,3 @@ export const openPositionsQuery = (account: Account) =>
 		refetchInterval: 30_000, // Auto-refresh every 30 seconds
 		retry: 2,
 	});
-

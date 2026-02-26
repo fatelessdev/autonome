@@ -24,7 +24,9 @@ export const decisionSchema = z.object({
 		.number()
 		.positive()
 		.max(100_000)
-		.describe("Position size in base asset units (e.g., 0.5 BTC). Must be positive and ≤100,000."),
+		.describe(
+			"Position size in base asset units (e.g., 0.5 BTC). Must be positive and ≤100,000.",
+		),
 	profit_target: z.number().positive().describe("Take profit price level"),
 	stop_loss: z.number().positive().describe("Stop loss price level"),
 	invalidation_condition: z
@@ -38,13 +40,17 @@ export const decisionSchema = z.object({
 	time_exit: z
 		.string()
 		.optional()
-		.describe("Maximum hold duration condition (e.g., 'Close if held >24h and within 1R of entry')"),
+		.describe(
+			"Maximum hold duration condition (e.g., 'Close if held >24h and within 1R of entry')",
+		),
 	cooldown_minutes: z
 		.number()
 		.min(1)
 		.max(15)
 		.optional()
-		.describe("Cooldown duration in minutes (1-15) before direction change allowed. System calculates timestamp."),
+		.describe(
+			"Cooldown duration in minutes (1-15) before direction change allowed. System calculates timestamp.",
+		),
 	confidence: z
 		.number()
 		.min(0)
@@ -71,10 +77,7 @@ export type AgentOutput = z.infer<typeof agentOutputSchema>;
  * Schema for call options (type-safe runtime configuration)
  */
 export const callOptionsSchema = z.object({
-	maxSteps: z
-		.number()
-		.optional()
-		.describe("Override max steps for this call"),
+	maxSteps: z.number().optional().describe("Override max steps for this call"),
 	reasoningEffort: z
 		.enum(["low", "medium", "high"])
 		.optional()

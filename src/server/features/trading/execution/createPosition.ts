@@ -6,16 +6,16 @@
  * Single Alpaca code path.
  */
 
-import type { Account } from "@/server/features/trading/contracts/accounts";
-import { getTradingProvider } from "@/server/providers/alpaca";
-import { toAlpacaSymbol, toCanonical } from "@/shared/markets/marketMetadata";
+import type { Order } from "@/db/schema";
 import {
 	createOrder,
 	getOpenOrderBySymbol,
 	scaleIntoOrder,
 	updateAlpacaOrderId,
 } from "@/server/db/ordersRepository.server";
-import type { Order } from "@/db/schema";
+import type { Account } from "@/server/features/trading/contracts/accounts";
+import { getTradingProvider } from "@/server/providers/alpaca";
+import { toAlpacaSymbol, toCanonical } from "@/shared/markets/marketMetadata";
 
 // ==========================================
 // Constants
@@ -111,8 +111,7 @@ function buildExitPlan(
 			opts.invalidationPrice ?? existingPlan?.invalidationPrice ?? null,
 		confidence: opts.confidence ?? existingPlan?.confidence ?? null,
 		timeExit: opts.timeExit ?? existingPlan?.timeExit ?? null,
-		cooldownUntil:
-			opts.cooldownUntil ?? existingPlan?.cooldownUntil ?? null,
+		cooldownUntil: opts.cooldownUntil ?? existingPlan?.cooldownUntil ?? null,
 	};
 }
 
@@ -291,7 +290,8 @@ export async function createPosition(
 					// Apply 0.5% slippage buffer: for sells (long SL), limit below stop;
 					// for buys (short SL), limit above stop.
 					const slippageMultiplier = exitSide === "sell" ? 0.995 : 1.005;
-					const slLimitPrice = Math.round(stopLoss * slippageMultiplier * 100) / 100;
+					const slLimitPrice =
+						Math.round(stopLoss * slippageMultiplier * 100) / 100;
 					await trading.createOrder({
 						symbol: alpacaSymbol,
 						qty: effectiveQty,
@@ -341,10 +341,7 @@ export async function createPosition(
 			});
 		} catch (err) {
 			const errorMsg = err instanceof Error ? err.message : String(err);
-			console.error(
-				`[createPosition] Failed for ${symbol}:`,
-				errorMsg,
-			);
+			console.error(`[createPosition] Failed for ${symbol}:`, errorMsg);
 			results.push({
 				symbol,
 				side,
@@ -403,10 +400,7 @@ async function persistPositionToDb(params: {
 
 	const canonicalSymbol = toCanonical(symbol).toUpperCase();
 
-	const existingOrder = await getOpenOrderBySymbol(
-		modelId,
-		canonicalSymbol,
-	);
+	const existingOrder = await getOpenOrderBySymbol(modelId, canonicalSymbol);
 
 	if (existingOrder && existingOrder.side === side) {
 		const exitPlan = buildExitPlan(
@@ -474,4 +468,3 @@ async function persistPositionToDb(params: {
 		existingOrder: null,
 	};
 }
-

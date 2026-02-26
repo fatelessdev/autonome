@@ -163,7 +163,12 @@ export const createToolCallMutation = (params: {
  */
 export const incrementModelUsageMutation = (params: {
 	modelId: string;
-	deltas: { invocationCountDelta?: number; totalMinutesDelta?: number; failedWorkflowCountDelta?: number; failedToolCallCountDelta?: number };
+	deltas: {
+		invocationCountDelta?: number;
+		totalMinutesDelta?: number;
+		failedWorkflowCountDelta?: number;
+		failedToolCallCountDelta?: number;
+	};
 }) => {
 	return repo.incrementModelUsage(params.modelId, params.deltas);
 };

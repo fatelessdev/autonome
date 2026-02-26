@@ -72,7 +72,7 @@ export function calculateWinRate(pnls: number[]): number {
  */
 export function calculateMaxDrawdown(values: number[]): number {
 	if (values.length < 2) return 0;
-	let peak = values[0]!;
+	let peak = values[0] ?? 0;
 	let maxDd = 0;
 	for (const v of values) {
 		if (v > peak) peak = v;
@@ -89,7 +89,7 @@ export function calculateMaxDrawdown(values: number[]): number {
 export function calculateCurrentDrawdown(values: number[]): number {
 	if (values.length < 1) return 0;
 	const peak = Math.max(...values);
-	const current = values[values.length - 1]!;
+	const current = values[values.length - 1] ?? 0;
 	if (peak <= 0) return 0;
 	return ((peak - current) / peak) * 100;
 }
@@ -107,7 +107,10 @@ export function mean(values: number[]): number {
 /**
  * Calculate standard deviation (population).
  */
-export function standardDeviation(values: number[], meanValue?: number): number {
+export function standardDeviation(
+	values: number[],
+	meanValue?: number,
+): number {
 	if (values.length < 2) return 0;
 	const avg = meanValue ?? mean(values);
 	const squaredDiffs = values.map((v) => (v - avg) ** 2);
@@ -123,8 +126,8 @@ export function median(sortedValues: number[]): number {
 	if (sortedValues.length === 0) return 0;
 	const mid = Math.floor(sortedValues.length / 2);
 	return sortedValues.length % 2 !== 0
-		? sortedValues[mid]!
-		: (sortedValues[mid - 1]! + sortedValues[mid]!) / 2;
+		? (sortedValues[mid] ?? 0)
+		: ((sortedValues[mid - 1] ?? 0) + (sortedValues[mid] ?? 0)) / 2;
 }
 
 // ==================== Sharpe Ratio ====================
@@ -160,8 +163,8 @@ export function calculateSharpeRatioFromPortfolio(
 	// Calculate period returns
 	const returns: number[] = [];
 	for (let i = 1; i < portfolioValues.length; i++) {
-		const prevValue = portfolioValues[i - 1]!;
-		const currValue = portfolioValues[i]!;
+		const prevValue = portfolioValues[i - 1] ?? 0;
+		const currValue = portfolioValues[i] ?? 0;
 		if (prevValue > 0) {
 			returns.push((currValue - prevValue) / prevValue);
 		}
@@ -262,7 +265,10 @@ export function calculateReturnPercent(
 /**
  * Calculate hold time in minutes between two timestamps.
  */
-export function calculateHoldTimeMinutes(openedAt: Date, closedAt: Date): number {
+export function calculateHoldTimeMinutes(
+	openedAt: Date,
+	closedAt: Date,
+): number {
 	const diffMs = closedAt.getTime() - openedAt.getTime();
 	return Math.max(0, diffMs / (1000 * 60));
 }
@@ -281,7 +287,10 @@ export function formatHoldTime(minutes: number): string {
 /**
  * Calculate trade size (notional value at entry).
  */
-export function calculateTradeSize(quantity: number, entryPrice: number): number {
+export function calculateTradeSize(
+	quantity: number,
+	entryPrice: number,
+): number {
 	return Math.abs(quantity * entryPrice);
 }
 

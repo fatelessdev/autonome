@@ -76,9 +76,7 @@ const normalizeSignal = (value: unknown): TradingSignal | null => {
 	return null;
 };
 
-const parseDecisionCandidate = (
-	value: unknown,
-): TradingDecision | null => {
+const parseDecisionCandidate = (value: unknown): TradingDecision | null => {
 	if (typeof value !== "object" || value === null) return null;
 	const record = value as Record<string, unknown>;
 
@@ -89,12 +87,16 @@ const parseDecisionCandidate = (
 	if (!signal) return null;
 
 	// Only accept explicit base-asset size fields, NOT notional/amount (which may be USD)
-	const quantity = normalizeNumber(record.quantity ?? record.size ?? record.baseAmount);
+	const quantity = normalizeNumber(
+		record.quantity ?? record.size ?? record.baseAmount,
+	);
 	const leverage = normalizeNumber(record.leverage ?? record.leverageRatio);
 	const profitTarget = normalizeNumber(
 		record.profitTarget ?? record.target ?? record.profit_target,
 	);
-	const stopLoss = normalizeNumber(record.stopLoss ?? record.stop ?? record.stop_loss);
+	const stopLoss = normalizeNumber(
+		record.stopLoss ?? record.stop ?? record.stop_loss,
+	);
 	const invalidationCondition =
 		toStringValue(
 			record.invalidationCondition ??
@@ -105,12 +107,9 @@ const parseDecisionCandidate = (
 	const invalidationPrice = normalizeNumber(
 		record.invalidationPrice ?? record.invalidation_price,
 	);
-	const timeExit = toStringValue(
-		record.timeExit ?? record.time_exit,
-	) ?? null;
-	const cooldownUntil = toStringValue(
-		record.cooldownUntil ?? record.cooldown_until,
-	) ?? null;
+	const timeExit = toStringValue(record.timeExit ?? record.time_exit) ?? null;
+	const cooldownUntil =
+		toStringValue(record.cooldownUntil ?? record.cooldown_until) ?? null;
 	const confidence = normalizeNumber(
 		record.confidence ??
 			record.confidenceScore ??
@@ -138,9 +137,7 @@ const parseDecisionCandidate = (
 	};
 };
 
-const parseResultCandidate = (
-	value: unknown,
-): TradingDecisionResult | null => {
+const parseResultCandidate = (value: unknown): TradingDecisionResult | null => {
 	if (typeof value !== "object" || value === null) return null;
 	const record = value as Record<string, unknown>;
 

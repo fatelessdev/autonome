@@ -4,4 +4,8 @@
  */
 
 export { getSharedNewsDigest, invalidateNewsCache } from "./client";
-export type { NewsDigestItem, AlpacaNewsArticle, AlpacaNewsResponse } from "./types";
+export type {
+	AlpacaNewsArticle,
+	AlpacaNewsResponse,
+	NewsDigestItem,
+} from "./types";

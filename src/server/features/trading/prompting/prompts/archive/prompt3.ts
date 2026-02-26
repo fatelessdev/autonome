@@ -1,6 +1,6 @@
 // Configuration Constants (Backend enforces, Agent respects)
 const RISK_PER_TRADE_PCT = 0.03;
-const MIN_VOLUME_RATIO = 0.10; // 10% HARD FLOOR - NO EXCEPTIONS
+const MIN_VOLUME_RATIO = 0.1; // 10% HARD FLOOR - NO EXCEPTIONS
 const ZOMBIE_HOURS = 24;
 const ZOMBIE_R_THRESHOLD = 1.0;
 const DRAWDOWN_THROTTLE_PCT = -10;
@@ -168,7 +168,6 @@ If market is noisy, ambiguous, or illiquid: **Do nothing.** "Sitting is a positi
 
 Trade with conviction. Protect capital. Let edge find you.`;
 
-
 export const USER_PROMPT = `
 Session: {{TOTAL_MINUTES}} min | Interval: 5 min | Invocations: {{INVOKATION_TIMES}} | {{CURRENT_TIME}} IST
 
@@ -194,4 +193,4 @@ Cash: {{AVAILABLE_CASH}} | Exposure: {{EXPOSURE_TO_EQUITY_PCT}}%
 3. Deploy capital where you see highest risk-adjusted returns
 
 CRITICAL: End your response with a tool call. If no action needed, call holding() with your reasoning.
-`;  
+`;

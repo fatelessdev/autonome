@@ -1,11 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
+﻿import { createFileRoute } from "@tanstack/react-router";
 
 import CryptoTracker from "@/components/crypto-tracker";
 import Header from "@/components/header";
 import PerformanceGraph from "@/components/performance-graph";
 import TradesSidebar from "@/components/trades-sidebar";
+import { useVariant } from "@/components/variant-provider";
 import { VariantSelector } from "@/components/variant-selector";
-import { useVariant } from "@/components/variant-context";
 import { useBoolean } from "@/hooks/useBoolean";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 

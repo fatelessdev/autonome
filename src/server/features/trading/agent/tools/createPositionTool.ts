@@ -5,10 +5,9 @@
 
 import { tool } from "ai";
 import { z } from "zod";
-
+import { updateOrderCloseTrigger } from "@/server/db/ordersRepository.server";
 import { ToolCallType } from "@/server/db/tradingRepository";
 import { createToolCallMutation } from "@/server/db/tradingRepository.server";
-import { updateOrderCloseTrigger } from "@/server/db/ordersRepository.server";
 import { createPosition } from "@/server/features/trading/execution/createPosition";
 import { MARKETS } from "@/shared/markets/marketMetadata";
 
@@ -36,7 +35,7 @@ function checkCooldown(
 	closedPositionCooldowns: ToolContext["closedPositionCooldowns"],
 ): string | null {
 	const upperSymbol = symbol.toUpperCase();
-	
+
 	// Check open positions first
 	const existingPosition = openPositions.find(
 		(p) => p.symbol?.toUpperCase() === upperSymbol,
@@ -151,15 +150,19 @@ export function createPositionTool(ctx: ToolContext) {
 					confidence: entry.confidence ?? null,
 				});
 			}
- 
+
 			// Return early if all symbols were duplicates or hit limits
 			if (normalized.length === 0) {
 				const messages: string[] = [];
 				if (skippedDuplicates.length > 0) {
-					messages.push(`Already acted on ${skippedDuplicates.join(", ")} this invocation`);
+					messages.push(
+						`Already acted on ${skippedDuplicates.join(", ")} this invocation`,
+					);
 				}
 				if (skippedLimitReached.length > 0) {
-					messages.push(`Session limit (${MAX_ACTIONS_PER_SYMBOL}) reached for ${skippedLimitReached.join(", ")}`);
+					messages.push(
+						`Session limit (${MAX_ACTIONS_PER_SYMBOL}) reached for ${skippedLimitReached.join(", ")}`,
+					);
 				}
 				if (skippedCooldown.length > 0) {
 					messages.push(skippedCooldown.join("; "));
@@ -186,13 +189,20 @@ export function createPositionTool(ctx: ToolContext) {
 			// an "adjustment" so it doesn't count as a completed trade.
 			for (const result of successful) {
 				const closedSameSymbol = ctx.capturedClosedPositions.find(
-					(p) => p.symbol.toUpperCase() === result.symbol.toUpperCase() && p.orderId,
+					(p) =>
+						p.symbol.toUpperCase() === result.symbol.toUpperCase() && p.orderId,
 				);
 				if (closedSameSymbol?.orderId) {
 					try {
-						await updateOrderCloseTrigger(closedSameSymbol.orderId, "adjustment");
+						await updateOrderCloseTrigger(
+							closedSameSymbol.orderId,
+							"adjustment",
+						);
 					} catch (err) {
-						console.warn(`[createPositionTool] Failed to mark close as adjustment for ${result.symbol}:`, err);
+						console.warn(
+							`[createPositionTool] Failed to mark close as adjustment for ${result.symbol}:`,
+							err,
+						);
 					}
 				}
 			}
@@ -266,4 +276,3 @@ export function createPositionTool(ctx: ToolContext) {
 		},
 	});
 }
-

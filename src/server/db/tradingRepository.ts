@@ -80,7 +80,12 @@ export async function createToolCallRecord(params: {
 
 export async function incrementModelUsage(
 	modelId: string,
-	deltas: { invocationCountDelta?: number; totalMinutesDelta?: number; failedWorkflowCountDelta?: number; failedToolCallCountDelta?: number },
+	deltas: {
+		invocationCountDelta?: number;
+		totalMinutesDelta?: number;
+		failedWorkflowCountDelta?: number;
+		failedToolCallCountDelta?: number;
+	},
 ): Promise<void> {
 	const updates: Record<string, unknown> = {};
 
@@ -92,11 +97,17 @@ export async function incrementModelUsage(
 		updates.totalMinutes = sql`${models.totalMinutes} + ${deltas.totalMinutesDelta}`;
 	}
 
-	if (deltas.failedWorkflowCountDelta && deltas.failedWorkflowCountDelta !== 0) {
+	if (
+		deltas.failedWorkflowCountDelta &&
+		deltas.failedWorkflowCountDelta !== 0
+	) {
 		updates.failedWorkflowCount = sql`${models.failedWorkflowCount} + ${deltas.failedWorkflowCountDelta}`;
 	}
 
-	if (deltas.failedToolCallCountDelta && deltas.failedToolCallCountDelta !== 0) {
+	if (
+		deltas.failedToolCallCountDelta &&
+		deltas.failedToolCallCountDelta !== 0
+	) {
 		updates.failedToolCallCount = sql`${models.failedToolCallCount} + ${deltas.failedToolCallCountDelta}`;
 	}
 

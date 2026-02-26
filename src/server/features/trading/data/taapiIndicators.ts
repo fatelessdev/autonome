@@ -4,12 +4,12 @@
  */
 
 import {
-	taapiClient,
-	type TaapiPreFetchResult,
-	type BBandsResult,
 	type ADXResult,
-	type SupertrendResult,
+	type BBandsResult,
 	type IchimokuResult,
+	type SupertrendResult,
+	type TaapiPreFetchResult,
+	taapiClient,
 	type VWAPResult,
 } from "@/server/integrations/taapi";
 
@@ -109,12 +109,19 @@ const formatSupertrend = (supertrend: SupertrendResult | null): string => {
  * - SpanA/SpanB: Cloud boundaries (kumo)
  * - Cloud Status: Price above cloud = bullish, below = bearish, inside = neutral/choppy
  */
-const formatIchimoku = (ichimoku: IchimokuResult | null, currentPrice?: number): string => {
+const formatIchimoku = (
+	ichimoku: IchimokuResult | null,
+	currentPrice?: number,
+): string => {
 	if (!ichimoku) return "Ichimoku Cloud: N/A";
 
 	const lines: string[] = [];
-	lines.push(`Ichimoku: Tenkan=${formatValue(ichimoku.conversion)}, Kijun=${formatValue(ichimoku.base)}`);
-	lines.push(`  Cloud: SpanA=${formatValue(ichimoku.spanA)}, SpanB=${formatValue(ichimoku.spanB)}`);
+	lines.push(
+		`Ichimoku: Tenkan=${formatValue(ichimoku.conversion)}, Kijun=${formatValue(ichimoku.base)}`,
+	);
+	lines.push(
+		`  Cloud: SpanA=${formatValue(ichimoku.spanA)}, SpanB=${formatValue(ichimoku.spanB)}`,
+	);
 
 	// Determine cloud status if we have price
 	if (currentPrice !== undefined && currentPrice !== null) {

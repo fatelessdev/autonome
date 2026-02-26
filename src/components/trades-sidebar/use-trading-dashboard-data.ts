@@ -1,14 +1,14 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+﻿import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
-
-import { getSseUrl } from "@/core/shared/api/apiConfig";
 import { createSseConnection } from "@/core/lib/sseConnection";
+import { getSseUrl } from "@/core/shared/api/apiConfig";
 import { normalizeIdentifier } from "@/core/shared/strings/normalizeIdentifier";
 import type { DashboardSseEvent } from "@/core/shared/trading/dashboardEvents";
 import {
-	DASHBOARD_QUERY_KEYS,
 	DASHBOARD_QUERIES,
+	DASHBOARD_QUERY_KEYS,
 } from "@/core/shared/trading/dashboardQueries";
+import type { VariantId } from "../variant-provider";
 import type {
 	Conversation,
 	ModelOption,
@@ -17,7 +17,6 @@ import type {
 	TradingDashboardData,
 } from "./types";
 import { resolveModelIdentity } from "./utils";
-import type { VariantId } from "../variant-context";
 
 type UseTradingDashboardDataOptions = {
 	enabled?: boolean;
@@ -129,7 +128,13 @@ function buildModelOptions(
 
 		const existing = map.get(normalizedLabel);
 		const matchers = new Set(existing?.matchers ?? []);
-		[modelId, label, identity.modelName, identity.modelKey, identity.modelRouterName]
+		[
+			modelId,
+			label,
+			identity.modelName,
+			identity.modelKey,
+			identity.modelRouterName,
+		]
 			.filter((candidate): candidate is string => Boolean(candidate))
 			.forEach((candidate) => {
 				const normalized = normalizeIdentifier(candidate);

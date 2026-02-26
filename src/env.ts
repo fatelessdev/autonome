@@ -85,7 +85,10 @@ type ApiKeyRotator = {
 	getCount: () => number;
 };
 
-function createApiKeyRotator(name: string, keys: Array<string | undefined>): ApiKeyRotator {
+function createApiKeyRotator(
+	name: string,
+	keys: Array<string | undefined>,
+): ApiKeyRotator {
 	const availableKeys = keys.filter((key): key is string => Boolean(key));
 	let requestCounter = 0;
 
@@ -94,7 +97,10 @@ function createApiKeyRotator(name: string, keys: Array<string | undefined>): Api
 			if (availableKeys.length === 0) {
 				throw new Error(`No ${name} API keys configured`);
 			}
-			const key = availableKeys[requestCounter % availableKeys.length]!;
+			const key = availableKeys[requestCounter % availableKeys.length];
+			if (!key) {
+				throw new Error(`No ${name} API keys configured`);
+			}
 			requestCounter++;
 			return key;
 		},

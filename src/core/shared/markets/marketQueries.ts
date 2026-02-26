@@ -1,8 +1,11 @@
-import { type QueryClient, queryOptions, useQuery } from "@tanstack/react-query";
-
+import {
+	type QueryClient,
+	queryOptions,
+	useQuery,
+} from "@tanstack/react-query";
+import { isValidVariantId, type VariantId } from "@/core/shared/variants";
 import { orpc } from "@/server/orpc/client";
 import { SUPPORTED_MARKETS } from "./marketMetadata";
-import { type VariantId, isValidVariantId } from "@/core/shared/variants";
 
 export type MarketSymbol = (typeof SUPPORTED_MARKETS)[number];
 
@@ -40,8 +43,10 @@ const MARKET_QUERY_KEYS = {
 } as const;
 
 const PORTFOLIO_QUERY_KEYS = {
-	history: (variant?: string) => ["portfolio", "history", variant ?? "all"] as const,
-	latest: (variant?: string) => ["portfolio", "latest", variant ?? "all"] as const,
+	history: (variant?: string) =>
+		["portfolio", "history", variant ?? "all"] as const,
+	latest: (variant?: string) =>
+		["portfolio", "latest", variant ?? "all"] as const,
 } as const;
 
 function toMarketPrices(
@@ -51,7 +56,9 @@ function toMarketPrices(
 	const requestedSymbols = symbols.length > 0 ? symbols : SUPPORTED_MARKETS;
 	const priceMap = new Map(
 		prices
-			.filter((p) => SUPPORTED_MARKETS.includes(p.symbol.toUpperCase() as MarketSymbol))
+			.filter((p) =>
+				SUPPORTED_MARKETS.includes(p.symbol.toUpperCase() as MarketSymbol),
+			)
 			.map((p) => [p.symbol.toUpperCase(), p.price]),
 	);
 
@@ -104,16 +111,20 @@ function normalizePortfolioHistory(
 			model: entry.model
 				? {
 						name: entry.model.name,
-						variant: isValidVariantId(entry.model.variant) ? entry.model.variant : undefined,
+						variant: isValidVariantId(entry.model.variant)
+							? entry.model.variant
+							: undefined,
 						openRouterModelName: entry.model.openRouterModelName,
-				  }
+					}
 				: undefined,
 		})),
 		resolution: payload.resolution,
 	};
 }
 
-async function requestPortfolioHistory(variant?: VariantId): Promise<PortfolioHistoryResult> {
+async function requestPortfolioHistory(
+	variant?: VariantId,
+): Promise<PortfolioHistoryResult> {
 	// Server handles time-based downsampling automatically and returns resolution
 	// Resolution is auto-detected from data time range:
 	// - ≤24h: 1-minute buckets
@@ -137,7 +148,10 @@ export const portfolioHistoryQueryOptions = (variant?: VariantId) =>
 		refetchInterval: 3 * 60_000,
 	});
 
-export async function prefetchPortfolioHistory(queryClient: QueryClient, variant?: VariantId) {
+export async function prefetchPortfolioHistory(
+	queryClient: QueryClient,
+	variant?: VariantId,
+) {
 	return queryClient.ensureQueryData(portfolioHistoryQueryOptions(variant));
 }
 
@@ -146,7 +160,9 @@ export const MARKET_QUERIES = {
 	prefetchPrices: prefetchMarketPrices,
 };
 
-export function useMarketPrices(symbols: readonly MarketSymbol[] = SUPPORTED_MARKETS) {
+export function useMarketPrices(
+	symbols: readonly MarketSymbol[] = SUPPORTED_MARKETS,
+) {
 	return useQuery(marketPricesQueryOptions(symbols));
 }
 

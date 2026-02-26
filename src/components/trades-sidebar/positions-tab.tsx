@@ -1,9 +1,7 @@
 import NumberFlow from "@number-flow/react";
 import { useMemo } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-	formatCurrencyValue,
-} from "@/shared/formatting/numberFormat";
+import { formatCurrencyValue } from "@/shared/formatting/numberFormat";
 import { PositionsListSkeleton } from "./loading-skeletons";
 import type { ExitPlanSelection, ModelPositions } from "./types";
 import { resolveModelIdentity } from "./utils";
@@ -90,17 +88,17 @@ export function PositionsTab({
 										<div className="border-b px-4 py-3">
 											<div className="flex items-center justify-between">
 												<div className="flex items-center gap-2">
-														<div
-															className="h-6 w-6 shrink-0 overflow-hidden rounded-full"
-															style={{ backgroundColor: modelColor }}
-														>
+													<div
+														className="h-6 w-6 shrink-0 overflow-hidden rounded-full"
+														style={{ backgroundColor: modelColor }}
+													>
 														{modelInfo.logo ? (
 															<img
 																src={modelInfo.logo}
 																alt={modelLabel}
 																width={18}
 																height={18}
-																	className="h-full w-full object-cover"
+																className="h-full w-full object-cover"
 																style={{ objectFit: "contain" }}
 																loading="lazy"
 															/>
@@ -133,7 +131,13 @@ export function PositionsTab({
 													<div className="flex items-center justify-end gap-3 text-[10px] tabular-nums">
 														<span className="text-muted-foreground">
 															Unreal:{" "}
-															<span className={totalIsPositive ? "text-green-500" : "text-red-500"}>
+															<span
+																className={
+																	totalIsPositive
+																		? "text-green-500"
+																		: "text-red-500"
+																}
+															>
 																<NumberFlow
 																	value={totalUnrealizedNumeric}
 																	format={{
@@ -149,7 +153,13 @@ export function PositionsTab({
 														</span>
 														<span className="text-muted-foreground">
 															Real:{" "}
-															<span className={realizedIsPositive ? "text-green-500" : "text-red-500"}>
+															<span
+																className={
+																	realizedIsPositive
+																		? "text-green-500"
+																		: "text-red-500"
+																}
+															>
 																<NumberFlow
 																	value={totalRealizedNumeric}
 																	format={{
@@ -206,7 +216,9 @@ export function PositionsTab({
 														<div className="flex items-center justify-end whitespace-nowrap">
 															<span className="font-bold tabular-nums text-muted-foreground">
 																{position.entryPrice
-																	? formatCurrencyValue(String(position.entryPrice))
+																	? formatCurrencyValue(
+																			String(position.entryPrice),
+																		)
 																	: "—"}
 															</span>
 														</div>
@@ -239,9 +251,10 @@ export function PositionsTab({
 													</div>
 												);
 											})}
-
 										</div>
-										{modelIdx < enrichedPositions.length - 1 && <div className="h-2" />}
+										{modelIdx < enrichedPositions.length - 1 && (
+											<div className="h-2" />
+										)}
 									</div>
 								);
 							})}

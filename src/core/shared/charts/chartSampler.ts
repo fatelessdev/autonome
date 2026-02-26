@@ -51,8 +51,11 @@ export function timeBasedSample<T extends TimestampedPoint>(
 	}
 
 	// Find time range
-	const firstPoint = data[0]!;
-	const lastPoint = data[n - 1]!;
+	const firstPoint = data[0];
+	const lastPoint = data[n - 1];
+	if (!firstPoint || !lastPoint) {
+		return data;
+	}
 	const startTime = firstPoint.timestamp;
 	const endTime = lastPoint.timestamp;
 
@@ -82,7 +85,9 @@ export function timeBasedSample<T extends TimestampedPoint>(
 
 		// Scan forward to find closer point
 		while (dataIndex < n - 1) {
-			const nextDiff = Math.abs((data[dataIndex + 1]?.timestamp ?? 0) - targetTime);
+			const nextDiff = Math.abs(
+				(data[dataIndex + 1]?.timestamp ?? 0) - targetTime,
+			);
 			if (nextDiff < bestDiff) {
 				dataIndex++;
 				bestIndex = dataIndex;
@@ -94,7 +99,10 @@ export function timeBasedSample<T extends TimestampedPoint>(
 		}
 
 		// Add the best point for this bucket (avoid duplicates)
-		const point = data[bestIndex]!;
+		const point = data[bestIndex];
+		if (!point) {
+			continue;
+		}
 		if (result.length === 0 || result[result.length - 1] !== point) {
 			result.push(point);
 		}
@@ -128,7 +136,11 @@ export function uniformStrideSample<T>(data: T[], budget: number): T[] {
 	const result: T[] = [];
 
 	// Always include first point
-	result.push(data[0]!);
+	const first = data[0];
+	if (!first) {
+		return data;
+	}
+	result.push(first);
 
 	// Calculate stride for middle points
 	// We need (budget - 2) points between first and last
@@ -140,12 +152,18 @@ export function uniformStrideSample<T>(data: T[], budget: number): T[] {
 		const index = Math.round(1 + i * stride);
 		// Avoid duplicating first or last
 		if (index > 0 && index < n - 1) {
-			result.push(data[index]!);
+			const point = data[index];
+			if (point) {
+				result.push(point);
+			}
 		}
 	}
 
 	// Always include last point
-	result.push(data[n - 1]!);
+	const last = data[n - 1];
+	if (last) {
+		result.push(last);
+	}
 
 	return result;
 }
@@ -185,16 +203,18 @@ export function sampleForViewport<T extends TimestampedPoint>(
  * @param budget - Maximum points per array
  * @returns Object with sampled arrays using same indices
  */
-export function uniformStrideSampleMultiple<T extends Record<string, unknown[]>>(
-	arrays: T,
-	budget: number,
-): T {
+export function uniformStrideSampleMultiple<
+	T extends Record<string, unknown[]>,
+>(arrays: T, budget: number): T {
 	const keys = Object.keys(arrays);
 	if (keys.length === 0) return arrays;
 
 	// Use the first array's length as reference
-	const referenceKey = keys[0]!;
-	const n = arrays[referenceKey]!.length;
+	const referenceKey = keys[0];
+	if (!referenceKey) {
+		return arrays;
+	}
+	const n = arrays[referenceKey]?.length;
 
 	if (n <= budget || budget < 2) {
 		return arrays;
@@ -216,7 +236,10 @@ export function uniformStrideSampleMultiple<T extends Record<string, unknown[]>>
 	// Apply the same indices to all arrays
 	const result = {} as T;
 	for (const key of keys) {
-		const arr = arrays[key]!;
+		const arr = arrays[key];
+		if (!arr) {
+			continue;
+		}
 		result[key as keyof T] = indices.map((i) => arr[i]) as T[keyof T];
 	}
 

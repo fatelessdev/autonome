@@ -109,7 +109,13 @@ export const PortfolioSnapshotSchema = z.object({
 		.optional(),
 });
 
-export const DownsampleResolutionSchema = z.enum(["1m", "5m", "15m", "1h", "4h"]);
+export const DownsampleResolutionSchema = z.enum([
+	"1m",
+	"5m",
+	"15m",
+	"1h",
+	"4h",
+]);
 
 export const PortfolioHistoryResponseSchema = z.object({
 	history: z.array(PortfolioSnapshotSchema),

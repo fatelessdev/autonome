@@ -34,7 +34,10 @@ export const symbolSnapshotQuery = (
 	queryOptions({
 		queryKey: ["market-snapshot", symbol],
 		queryFn: async () => {
-			const snapshots = await getMarketSnapshots([{ symbol, alpacaSymbol }], credentials);
+			const snapshots = await getMarketSnapshots(
+				[{ symbol, alpacaSymbol }],
+				credentials,
+			);
 			return snapshots[0];
 		},
 		staleTime: 60_000,

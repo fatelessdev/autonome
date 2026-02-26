@@ -1,20 +1,23 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+﻿import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import ModelLegend from "@/components/model-legend";
 import type { ChartConfig } from "@/components/ui/chart";
-import { GlowingLineChart, type TimeFilter } from "@/components/ui/glowing-line";
+import {
+	GlowingLineChart,
+	type TimeFilter,
+} from "@/components/ui/glowing-line";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useVariant } from "@/components/variant-context";
+import { useVariant } from "@/components/variant-provider";
+import { createSseConnection } from "@/core/lib/sseConnection";
 import { getSseUrl } from "@/core/shared/api/apiConfig";
 import { sampleForViewport } from "@/core/shared/charts/chartSampler";
-import type { DashboardSseEvent } from "@/core/shared/trading/dashboardEvents";
 import {
+	type DownsampleResolution,
 	PORTFOLIO_QUERIES,
 	type PortfolioHistoryEntry,
-	type DownsampleResolution,
 } from "@/core/shared/markets/marketQueries";
+import type { DashboardSseEvent } from "@/core/shared/trading/dashboardEvents";
 import type { VariantId } from "@/core/shared/variants";
-import { createSseConnection } from "@/core/lib/sseConnection";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { getModelInfo } from "@/shared/models/modelConfig";
 
@@ -66,7 +69,9 @@ export default function PerformanceGraph() {
 				try {
 					const payload = JSON.parse(event.data) as DashboardSseEvent;
 					if (payload.type === "portfolio:changed") {
-						void queryClient.invalidateQueries({ queryKey: ["portfolio", "history"] });
+						void queryClient.invalidateQueries({
+							queryKey: ["portfolio", "history"],
+						});
 					}
 				} catch (error) {
 					console.error("[SSE][dashboard] Failed to parse payload", error);
@@ -118,10 +123,12 @@ export default function PerformanceGraph() {
 				</div>
 				<div className="flex-shrink-0 border-t px-4 py-4 sm:px-6">
 					<div className="flex gap-2 overflow-x-auto sm:grid sm:grid-cols-3 sm:gap-2 lg:grid-cols-3 xl:grid-cols-6">
-						{Array.from({ length: 6 }).map((_, index) => (
+						{Array.from(
+							{ length: 6 },
+							(_, idx) => `legend-skeleton-${idx}`,
+						).map((skeletonKey) => (
 							<Skeleton
-								// eslint-disable-next-line react/no-array-index-key
-								key={index}
+								key={skeletonKey}
 								className="h-12 min-w-[140px] rounded-md sm:min-w-0"
 							/>
 						))}
@@ -180,9 +187,12 @@ export default function PerformanceGraph() {
  * - 1h: "Jan 10 14:00" (date + time - data spans days)
  * - 4h: "Jan 10" (date only - data spans weeks/months)
  */
-function formatTimestampForResolution(timestamp: number, resolution: DownsampleResolution): string {
+function formatTimestampForResolution(
+	timestamp: number,
+	resolution: DownsampleResolution,
+): string {
 	const date = new Date(timestamp);
-	
+
 	switch (resolution) {
 		case "1m":
 		case "5m":
@@ -226,12 +236,15 @@ function buildChartArtifacts(
 	// Server returns pre-downsampled data with time-based buckets and latest entries appended
 	// Each entry is already averaged per model per time bucket
 	// Client just converts to chart format without further aggregation
-	
+
 	const points = portfolioData
-		.filter((entry) => entry.model) // Filter out entries without model
+		.filter(
+			(entry): entry is PortfolioHistoryEntry & { model: { name: string } } =>
+				Boolean(entry.model?.name),
+		) // Filter out entries without model names
 		.map((entry) => ({
 			t: new Date(entry.createdAt).getTime(),
-			name: entry.model!.name,
+			name: entry.model.name,
 			modelId: entry.modelId,
 			v: Number(entry.netPortfolio),
 		}))
@@ -260,12 +273,15 @@ function buildChartArtifacts(
 
 	// Group by timestamp (server already bucketed, so same timestamps = same bucket)
 	const timeGroups = new Map<number, Map<string, number>>();
-	
+
 	for (const point of points) {
 		if (!timeGroups.has(point.t)) {
 			timeGroups.set(point.t, new Map());
 		}
-		const group = timeGroups.get(point.t)!;
+		const group = timeGroups.get(point.t);
+		if (!group) {
+			continue;
+		}
 		const safeKey = nameToSeriesKey.get(point.name);
 		if (safeKey) {
 			group.set(safeKey, point.v);
@@ -278,7 +294,10 @@ function buildChartArtifacts(
 	const sortedTimes = Array.from(timeGroups.keys()).sort((a, b) => a - b);
 
 	for (const timestamp of sortedTimes) {
-		const group = timeGroups.get(timestamp)!;
+		const group = timeGroups.get(timestamp);
+		if (!group) {
+			continue;
+		}
 		// Use resolution-based formatting for x-axis labels
 		const timeLabel = formatTimestampForResolution(timestamp, resolution);
 
@@ -286,7 +305,7 @@ function buildChartArtifacts(
 
 		for (const [_originalName, safeKey] of nameToSeriesKey.entries()) {
 			const value = group.get(safeKey);
-			
+
 			if (typeof value === "number" && Number.isFinite(value)) {
 				row[safeKey] = value;
 				lastKnown[safeKey] = value;

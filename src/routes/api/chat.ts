@@ -1,8 +1,13 @@
 import "@/polyfill";
-import { type MistralLanguageModelOptions } from "@ai-sdk/mistral";
+import type { MistralLanguageModelOptions } from "@ai-sdk/mistral";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
-import { convertToModelMessages, ToolLoopAgent, stepCountIs } from "ai";
 import { createFileRoute } from "@tanstack/react-router";
+import {
+	convertToModelMessages,
+	type LanguageModel,
+	stepCountIs,
+	ToolLoopAgent,
+} from "ai";
 
 import { env } from "@/env";
 import { SQL_ASSISTANT_PROMPT } from "@/server/chat/sqlPrompt";
@@ -30,7 +35,9 @@ async function handleChat({ request }: { request: Request }) {
 
 		const sqlAgent = new ToolLoopAgent({
 			// model: primaryModel,
-			model: openrouter("xiaomi/mimo-v2-flash:free") as any,
+			model: openrouter(
+				"xiaomi/mimo-v2-flash:free",
+			) as unknown as LanguageModel,
 			instructions: SQL_ASSISTANT_PROMPT,
 			// instructions: "You are an helpful assistant",
 			providerOptions: {
@@ -48,9 +55,7 @@ async function handleChat({ request }: { request: Request }) {
 						effort: "low",
 						exclude: false, // Set true to hide thinking from final output
 					},
-                    plugins: [
-                        { id: 'response-healing' }
-                    ]
+					plugins: [{ id: "response-healing" }],
 				},
 			},
 			tools,

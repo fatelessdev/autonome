@@ -1,7 +1,7 @@
-﻿import { useMemo, useState, useEffect, useCallback } from "react";
+﻿import { useQueries, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useQueries } from "@tanstack/react-query";
-import { Loader2, Download } from "lucide-react";
+import { Download, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -20,12 +20,15 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { useVariant, type VariantId } from "@/components/variant-provider";
 import { VariantSelector } from "@/components/variant-selector";
-import { useVariant, type VariantId } from "@/components/variant-context";
 import { cn } from "@/core/lib/utils";
 import { getModelInfo } from "@/core/shared/models/modelConfig";
-import { VARIANT_IDS, getVariantBadgeClasses } from "@/core/shared/variants";
-import { exportLeaderboardToExcel, type LeaderboardVariantData } from "@/core/utils/excelExport";
+import { getVariantBadgeClasses, VARIANT_IDS } from "@/core/shared/variants";
+import {
+	exportLeaderboardToExcel,
+	type LeaderboardVariantData,
+} from "@/core/utils/excelExport";
 import { orpc } from "@/server/orpc/client";
 
 export const Route = createFileRoute("/leaderboard")({
@@ -50,6 +53,7 @@ function LeaderboardRoute() {
 	const [sortBy, setSortBy] = useState<SortKey>("pnlPercent");
 	const [showAverage, setShowAverage] = useState(false);
 	const [isExporting, setIsExporting] = useState(false);
+	const averageId = useId();
 	const { selectedVariant, setSelectedVariant } = useVariant();
 
 	// Main query for current view
@@ -79,18 +83,20 @@ function LeaderboardRoute() {
 		setIsExporting(true);
 		try {
 			// Build variant data from queries
-			const variantData: LeaderboardVariantData[] = VARIANT_IDS.map((variant, idx) => ({
-				variant,
-				entries: (variantQueries[idx]?.data?.entries ?? []).map((e) => ({
-					modelName: e.modelName,
-					variant: e.variant,
-					pnlPercent: e.pnlPercent,
-					pnlAbsolute: e.pnlAbsolute,
-					maxDrawdown: e.maxDrawdown,
-					startValue: e.startValue,
-					endValue: e.endValue,
-				})),
-			}));
+			const variantData: LeaderboardVariantData[] = VARIANT_IDS.map(
+				(variant, idx) => ({
+					variant,
+					entries: (variantQueries[idx]?.data?.entries ?? []).map((e) => ({
+						modelName: e.modelName,
+						variant: e.variant,
+						pnlPercent: e.pnlPercent,
+						pnlAbsolute: e.pnlAbsolute,
+						maxDrawdown: e.maxDrawdown,
+						startValue: e.startValue,
+						endValue: e.endValue,
+					})),
+				}),
+			);
 
 			exportLeaderboardToExcel(variantData, window);
 		} catch (err) {
@@ -117,28 +123,35 @@ function LeaderboardRoute() {
 		}
 
 		// Average the stats across variants for each model
-		return Array.from(byModelName.entries()).map(([modelName, entries]) => {
-			const avgPnlPercent = entries.reduce((sum, e) => sum + e.pnlPercent, 0) / entries.length;
-			const avgPnlAbsolute = entries.reduce((sum, e) => sum + e.pnlAbsolute, 0) / entries.length;
-			const avgMaxDrawdown = entries.reduce((sum, e) => sum + e.maxDrawdown, 0) / entries.length;
-			const avgStartValue = entries.reduce((sum, e) => sum + e.startValue, 0) / entries.length;
-			const avgEndValue = entries.reduce((sum, e) => sum + e.endValue, 0) / entries.length;
+		return Array.from(byModelName.entries())
+			.map(([modelName, entries]) => {
+				const avgPnlPercent =
+					entries.reduce((sum, e) => sum + e.pnlPercent, 0) / entries.length;
+				const avgPnlAbsolute =
+					entries.reduce((sum, e) => sum + e.pnlAbsolute, 0) / entries.length;
+				const avgMaxDrawdown =
+					entries.reduce((sum, e) => sum + e.maxDrawdown, 0) / entries.length;
+				const avgStartValue =
+					entries.reduce((sum, e) => sum + e.startValue, 0) / entries.length;
+				const avgEndValue =
+					entries.reduce((sum, e) => sum + e.endValue, 0) / entries.length;
 
-			return {
-				modelId: entries[0].modelId,
-				modelName,
-				variant: "AVG",
-				pnlPercent: avgPnlPercent,
-				pnlAbsolute: avgPnlAbsolute,
-				maxDrawdown: avgMaxDrawdown,
-				startValue: avgStartValue,
-				endValue: avgEndValue,
-			};
-		}).sort((a, b) => {
-			if (sortBy === "pnlPercent") return b.pnlPercent - a.pnlPercent;
-			if (sortBy === "pnlAbsolute") return b.pnlAbsolute - a.pnlAbsolute;
-			return b.maxDrawdown - a.maxDrawdown;
-		});
+				return {
+					modelId: entries[0].modelId,
+					modelName,
+					variant: "AVG",
+					pnlPercent: avgPnlPercent,
+					pnlAbsolute: avgPnlAbsolute,
+					maxDrawdown: avgMaxDrawdown,
+					startValue: avgStartValue,
+					endValue: avgEndValue,
+				};
+			})
+			.sort((a, b) => {
+				if (sortBy === "pnlPercent") return b.pnlPercent - a.pnlPercent;
+				if (sortBy === "pnlAbsolute") return b.pnlAbsolute - a.pnlAbsolute;
+				return b.maxDrawdown - a.maxDrawdown;
+			});
 	}, [data?.entries, selectedVariant, showAverage, sortBy]);
 
 	return (
@@ -182,12 +195,14 @@ function LeaderboardRoute() {
 								{selectedVariant === "all" && (
 									<div className="flex items-center gap-2">
 										<Checkbox
-											id="average"
+											id={averageId}
 											checked={showAverage}
-											onCheckedChange={(checked) => setShowAverage(checked === true)}
+											onCheckedChange={(checked) =>
+												setShowAverage(checked === true)
+											}
 										/>
 										<label
-											htmlFor="average"
+											htmlFor={averageId}
 											className="text-sm font-medium cursor-pointer"
 										>
 											AVERAGE
@@ -198,7 +213,11 @@ function LeaderboardRoute() {
 									variant="outline"
 									size="sm"
 									onClick={handleExport}
-									disabled={isLoading || isExporting || variantQueries.some((q) => q.isLoading)}
+									disabled={
+										isLoading ||
+										isExporting ||
+										variantQueries.some((q) => q.isLoading)
+									}
 									className="gap-2"
 								>
 									{isExporting ? (
@@ -213,9 +232,7 @@ function LeaderboardRoute() {
 							{/* Right side: Window + Sort selectors */}
 							<div className="flex items-center gap-4">
 								<div className="flex items-center gap-2">
-									<label className="text-sm text-muted-foreground">
-										Window
-									</label>
+									<span className="text-sm text-muted-foreground">Window</span>
 									<Select
 										value={window}
 										onValueChange={(v) => setWindow(v as WindowKey)}
@@ -231,7 +248,7 @@ function LeaderboardRoute() {
 									</Select>
 								</div>
 								<div className="flex items-center gap-2">
-									<label className="text-sm text-muted-foreground">Sort</label>
+									<span className="text-sm text-muted-foreground">Sort</span>
 									<Select
 										value={sortBy}
 										onValueChange={(v) => setSortBy(v as SortKey)}
@@ -320,10 +337,12 @@ function LeaderboardRoute() {
 													</TableCell>
 													{selectedVariant === "all" && !showAverage && (
 														<TableCell className="px-4 py-3">
-															<span className={cn(
-																"px-2 py-0.5 rounded text-xs font-medium",
-																getVariantBadgeClasses(entry.variant),
-															)}>
+															<span
+																className={cn(
+																	"px-2 py-0.5 rounded text-xs font-medium",
+																	getVariantBadgeClasses(entry.variant),
+																)}
+															>
 																{entry.variant}
 															</span>
 														</TableCell>

@@ -1,8 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
-
+import { isValidVariantId } from "@/core/shared/variants";
 import { orpc } from "@/server/orpc/client";
 import { normalizeNumber } from "@/shared/formatting/numberFormat";
-import { isValidVariantId } from "@/core/shared/variants";
 
 import type {
 	Conversation,
@@ -43,7 +42,8 @@ function normalizeTrades(payload: TradesResponse): Trade[] {
 			if (!entry || typeof entry !== "object") return null;
 			const record = entry as Record<string, unknown>;
 			const id = typeof record.id === "string" ? record.id : null;
-			const modelId = typeof record.modelId === "string" ? record.modelId : null;
+			const modelId =
+				typeof record.modelId === "string" ? record.modelId : null;
 
 			if (!id || !modelId) return null;
 
@@ -52,7 +52,8 @@ function normalizeTrades(payload: TradesResponse): Trade[] {
 				modelId,
 				modelName: typeof record.modelName === "string" ? record.modelName : "",
 				modelVariant:
-					typeof record.modelVariant === "string" && isValidVariantId(record.modelVariant)
+					typeof record.modelVariant === "string" &&
+					isValidVariantId(record.modelVariant)
 						? record.modelVariant
 						: undefined,
 				modelRouterName:
@@ -62,7 +63,8 @@ function normalizeTrades(payload: TradesResponse): Trade[] {
 				modelKey:
 					typeof record.modelKey === "string" && record.modelKey.length > 0
 						? record.modelKey
-						: typeof record.modelRouterName === "string" && record.modelRouterName.length > 0
+						: typeof record.modelRouterName === "string" &&
+								record.modelRouterName.length > 0
 							? record.modelRouterName
 							: modelId,
 				symbol: typeof record.symbol === "string" ? record.symbol : "",
@@ -94,11 +96,16 @@ function normalizeExitPlan(plan: unknown): PositionExitPlan | null {
 		typeof record.invalidation === "string"
 			? record.invalidation
 			: typeof record.invalidation === "object" && record.invalidation !== null
-				? (record.invalidation as { message?: string }).message ?? null
+				? ((record.invalidation as { message?: string }).message ?? null)
 				: null;
 	const confidence = normalizeNumber(record.confidence);
 
-	if (target == null && stop == null && invalidation == null && confidence == null) {
+	if (
+		target == null &&
+		stop == null &&
+		invalidation == null &&
+		confidence == null
+	) {
 		return null;
 	}
 
@@ -131,7 +138,8 @@ function normalizePosition(entry: unknown): Position | null {
 			typeof record.leverage === "number" && Number.isFinite(record.leverage)
 				? record.leverage
 				: undefined,
-		notional: normalizedNotional != null ? String(normalizedNotional) : undefined,
+		notional:
+			normalizedNotional != null ? String(normalizedNotional) : undefined,
 		exitPlan: normalizeExitPlan(record.exitPlan),
 		confidence: normalizeNumber(record.confidence),
 		signal:
@@ -152,8 +160,10 @@ function normalizePositions(payload: PositionsResponse): ModelPositions[] {
 		.map((entry) => {
 			if (!entry || typeof entry !== "object") return null;
 			const record = entry as Record<string, unknown>;
-			const modelId = typeof record.modelId === "string" ? record.modelId : null;
-			const modelName = typeof record.modelName === "string" ? record.modelName : modelId;
+			const modelId =
+				typeof record.modelId === "string" ? record.modelId : null;
+			const modelName =
+				typeof record.modelName === "string" ? record.modelName : modelId;
 
 			if (!modelId || !modelName) return null;
 
@@ -168,7 +178,8 @@ function normalizePositions(payload: PositionsResponse): ModelPositions[] {
 				modelId,
 				modelName,
 				modelVariant:
-					typeof record.modelVariant === "string" && isValidVariantId(record.modelVariant)
+					typeof record.modelVariant === "string" &&
+					isValidVariantId(record.modelVariant)
 						? record.modelVariant
 						: undefined,
 				modelLogo:
@@ -252,7 +263,8 @@ function normalizeConversations(
 				modelName:
 					typeof record.modelName === "string" ? record.modelName : "Unknown",
 				modelVariant:
-					typeof record.modelVariant === "string" && isValidVariantId(record.modelVariant)
+					typeof record.modelVariant === "string" &&
+					isValidVariantId(record.modelVariant)
 						? record.modelVariant
 						: undefined,
 				modelLogo:

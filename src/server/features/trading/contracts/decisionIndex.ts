@@ -31,4 +31,3 @@ export async function fetchLatestDecisionIndex(
 		return new Map<string, TradingDecisionWithContext>();
 	}
 }
-

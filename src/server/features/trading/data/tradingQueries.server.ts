@@ -6,20 +6,19 @@
 
 import { queryOptions } from "@tanstack/react-query";
 import { and, asc, desc, eq, inArray, isNull, ne, or } from "drizzle-orm";
-
-import { db } from "@/db";
-import { models, orders } from "@/db/schema";
 import {
 	DEFAULT_VARIANT,
 	isValidVariantId,
 	VARIANT_IDS,
 	type VariantId,
 } from "@/core/shared/variants";
-import { toAlpacaSymbol, toCanonical } from "@/shared/markets/marketMetadata";
+import { db } from "@/db";
+import { models, orders } from "@/db/schema";
 import { refreshConversationEvents } from "@/server/features/trading/data/conversationsSnapshot.server";
-import { formatIstTimestamp } from "@/shared/formatting/dateFormat";
-import { getMarketDataProvider } from "@/server/providers/alpaca";
 import { getOpenPositions } from "@/server/features/trading/data/positions";
+import { getMarketDataProvider } from "@/server/providers/alpaca";
+import { formatIstTimestamp } from "@/shared/formatting/dateFormat";
+import { toAlpacaSymbol, toCanonical } from "@/shared/markets/marketMetadata";
 
 // ==========================================
 // CRYPTO PRICES
@@ -91,7 +90,9 @@ export async function fetchCryptoPrices(
 	try {
 		const creds = await getAnyAlpacaCredentials();
 		if (!creds) {
-			console.warn("[crypto-prices] No Alpaca credentials available in any model");
+			console.warn(
+				"[crypto-prices] No Alpaca credentials available in any model",
+			);
 			return normalized.map((s) => ({ symbol: s, price: null }));
 		}
 
@@ -101,7 +102,8 @@ export async function fetchCryptoPrices(
 
 		return normalized.map((canonical, i) => {
 			const snap = snapshots[alpacaSymbols[i]];
-			const price = snap?.latest_trade?.price ?? snap?.latest_quote?.ask_price ?? null;
+			const price =
+				snap?.latest_trade?.price ?? snap?.latest_quote?.ask_price ?? null;
 			return { symbol: canonical, price };
 		});
 	} catch (error) {
@@ -178,8 +180,7 @@ export async function fetchTrades(
 	const closedOrders = variantResults
 		.flat()
 		.sort(
-			(a, b) =>
-				(b.closedAt?.getTime() ?? 0) - (a.closedAt?.getTime() ?? 0),
+			(a, b) => (b.closedAt?.getTime() ?? 0) - (a.closedAt?.getTime() ?? 0),
 		);
 
 	return closedOrders.map((order) => {
@@ -258,9 +259,84 @@ export async function fetchPositions(options?: FetchPositionsOptions) {
 			.from(models)
 			.where(modelFilter);
 
-		const results = await Promise.all(dbModels.map(async (model) => {
-			try {
-				if (!model.alpacaApiKey || !model.alpacaApiSecret) {
+		const results = await Promise.all(
+			dbModels.map(async (model) => {
+				try {
+					if (!model.alpacaApiKey || !model.alpacaApiSecret) {
+						return {
+							modelId: model.id,
+							modelName: model.name,
+							modelLogo: model.modelLogo,
+							modelVariant: model.variant,
+							positions: [],
+							totalUnrealizedPnl: 0,
+						};
+					}
+
+					const livePositions = await getOpenPositions({
+						id: model.id,
+						name: model.name,
+						modelName: model.modelLogo,
+						alpacaApiKey: model.alpacaApiKey,
+						alpacaApiSecret: model.alpacaApiSecret,
+						invocationCount: model.invocationCount,
+						totalMinutes: model.totalMinutes,
+						variant: model.variant,
+					});
+
+					const positions = livePositions.map((pos) => {
+						if (pos.entryPrice == null) {
+							throw new Error(
+								`Missing entryPrice for open position ${pos.symbol} on model ${model.id}`,
+							);
+						}
+
+						return {
+							symbol: pos.symbol,
+							position: pos.position,
+							sign: pos.sign,
+							side: pos.sign,
+							quantity: pos.quantity,
+							entryPrice: pos.entryPrice,
+							markPrice: pos.markPrice ?? null,
+							currentPrice: pos.markPrice ?? null,
+							notional: pos.notional ?? "0.00",
+							unrealizedPnl: pos.unrealizedPnl,
+							realizedPnl: pos.realizedPnl,
+							liquidationPrice: pos.liquidationPrice ?? "N/A",
+							leverage: null,
+							confidence: pos.confidence ?? null,
+							signal: pos.signal ?? pos.sign,
+							exitPlan: pos.exitPlan
+								? {
+										...pos.exitPlan,
+										confidence: pos.confidence ?? null,
+									}
+								: null,
+							lastDecisionAt: pos.lastDecisionAt ?? null,
+							decisionStatus: pos.decisionStatus ?? null,
+						};
+					});
+
+					const totalUnrealizedPnl = positions.reduce((sum, position) => {
+						const pnl = parseFiniteNumber(
+							position.unrealizedPnl,
+							"unrealizedPnl",
+							`model:${model.id}:${position.symbol}`,
+						);
+						return sum + (pnl ?? 0);
+					}, 0);
+
+					return {
+						modelId: model.id,
+						modelName: model.name,
+						modelLogo: model.modelLogo,
+						modelVariant: model.variant,
+						positions,
+						totalUnrealizedPnl,
+					};
+				} catch (error) {
+					console.error(`Error fetching positions for ${model.id}`, error);
 					return {
 						modelId: model.id,
 						modelName: model.name,
@@ -270,81 +346,8 @@ export async function fetchPositions(options?: FetchPositionsOptions) {
 						totalUnrealizedPnl: 0,
 					};
 				}
-
-				const livePositions = await getOpenPositions({
-					id: model.id,
-					name: model.name,
-					modelName: model.modelLogo,
-					alpacaApiKey: model.alpacaApiKey,
-					alpacaApiSecret: model.alpacaApiSecret,
-					invocationCount: model.invocationCount,
-					totalMinutes: model.totalMinutes,
-					variant: model.variant,
-				});
-
-				const positions = livePositions.map((pos) => {
-					if (pos.entryPrice == null) {
-						throw new Error(
-							`Missing entryPrice for open position ${pos.symbol} on model ${model.id}`,
-						);
-					}
-
-					return {
-					symbol: pos.symbol,
-					position: pos.position,
-					sign: pos.sign,
-					side: pos.sign,
-					quantity: pos.quantity,
-					entryPrice: pos.entryPrice,
-					markPrice: pos.markPrice ?? null,
-					currentPrice: pos.markPrice ?? null,
-					notional: pos.notional ?? "0.00",
-					unrealizedPnl: pos.unrealizedPnl,
-					realizedPnl: pos.realizedPnl,
-					liquidationPrice: pos.liquidationPrice ?? "N/A",
-					leverage: null,
-					confidence: pos.confidence ?? null,
-					signal: pos.signal ?? pos.sign,
-					exitPlan: pos.exitPlan
-						? {
-							...pos.exitPlan,
-							confidence: pos.confidence ?? null,
-						}
-						: null,
-					lastDecisionAt: pos.lastDecisionAt ?? null,
-					decisionStatus: pos.decisionStatus ?? null,
-					};
-				});
-
-				const totalUnrealizedPnl = positions.reduce((sum, position) => {
-					const pnl = parseFiniteNumber(
-						position.unrealizedPnl,
-						"unrealizedPnl",
-						`model:${model.id}:${position.symbol}`,
-					);
-					return sum + (pnl ?? 0);
-				}, 0);
-
-				return {
-					modelId: model.id,
-					modelName: model.name,
-					modelLogo: model.modelLogo,
-					modelVariant: model.variant,
-					positions,
-					totalUnrealizedPnl,
-				};
-			} catch (error) {
-				console.error(`Error fetching positions for ${model.id}`, error);
-				return {
-					modelId: model.id,
-					modelName: model.name,
-					modelLogo: model.modelLogo,
-					modelVariant: model.variant,
-					positions: [],
-					totalUnrealizedPnl: 0,
-				};
-			}
-		}));
+			}),
+		);
 
 		return results;
 	} catch (error) {
@@ -358,10 +361,10 @@ export async function fetchPositions(options?: FetchPositionsOptions) {
 // ==========================================
 
 import {
-	getPortfolioHistoryWithResolution,
-	downsampleForChart,
 	type DownsampleResolution,
 	type DownsampleResult,
+	downsampleForChart,
+	getPortfolioHistoryWithResolution,
 } from "@/server/features/portfolio/retentionService";
 
 export type { DownsampleResolution };
@@ -457,5 +460,3 @@ export const modelsListQuery = () =>
 		staleTime: 30_000,
 		gcTime: 5 * 60_000,
 	});
-
-

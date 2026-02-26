@@ -1,6 +1,6 @@
+import { mistral } from "@ai-sdk/mistral";
 import { generateText } from "ai";
 import { incrementModelUsage } from "@/server/db/tradingRepository";
-import { mistral } from "@ai-sdk/mistral";
 
 interface InvocationAnalysisInput {
 	modelId: string;
@@ -24,19 +24,19 @@ interface InvocationAnalysisInput {
 
 /**
  * Analyzes an invocation to detect if the model intended to call a tool but failed to do so.
- * 
+ *
  * APPROACH: Deterministic checks first, LLM only for clear intent mismatch.
- * 
+ *
  * Deterministic NOT-a-failure cases:
  * 1. Schema validation errors (e.g., "reason too long") - model tried, tool rejected
  * 2. Any successful tool call executed - action was taken
  * 3. Holding tool was called - explicit no-action is valid
  * 4. Error invocation with tool calls - workflow aborted mid-execution
- * 
+ *
  * LLM-checked failure case (lenient):
  * - Model explicitly states "I am executing X trade now" with specific coin and direction,
  *   but no matching tool call exists and no holding was called.
- * 
+ *
  * Returns true if a failed tool call was detected.
  */
 export async function analyzeToolCallFailure(
@@ -144,7 +144,7 @@ BE LENIENT - only answer YES if:
 Answer YES or NO:`;
 
 		const result = await generateText({
-			model: mistral('codestral-latest') as any,
+			model: mistral("codestral-latest"),
 			prompt: analysisPrompt,
 			temperature: 0,
 		});

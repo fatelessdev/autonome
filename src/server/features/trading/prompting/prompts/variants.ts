@@ -13,17 +13,12 @@
  */
 
 import {
-	VARIANT_IDS,
-	VARIANT_CONFIG,
 	DEFAULT_VARIANT,
-	type VariantId,
 	type VariantConfig as SharedVariantConfig,
+	VARIANT_CONFIG,
+	VARIANT_IDS,
+	type VariantId,
 } from "@/core/shared/variants";
-
-import {
-	SYSTEM_PROMPT as SYSTEM_PROMPT_TRENDSURFER,
-	USER_PROMPT as USER_PROMPT_TRENDSURFER,
-} from "./trendsurfer";
 import {
 	SYSTEM_PROMPT as SYSTEM_PROMPT_CONTRARIAN,
 	USER_PROMPT as USER_PROMPT_CONTRARIAN,
@@ -32,6 +27,10 @@ import {
 	SYSTEM_PROMPT as SYSTEM_PROMPT_SOVEREIGN,
 	USER_PROMPT as USER_PROMPT_SOVEREIGN,
 } from "./sovereign";
+import {
+	SYSTEM_PROMPT as SYSTEM_PROMPT_TRENDSURFER,
+	USER_PROMPT as USER_PROMPT_TRENDSURFER,
+} from "./trendsurfer";
 
 // Re-export from SSOT for backward compatibility
 export { VARIANT_IDS, VARIANT_CONFIG as VARIANTS, DEFAULT_VARIANT };

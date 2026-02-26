@@ -3,7 +3,7 @@
  */
 
 import { and, asc, desc, eq, gte, inArray, isNotNull } from "drizzle-orm";
-
+import type { VariantId } from "@/core/shared/variants";
 import { db } from "@/db";
 import {
 	invocations,
@@ -12,7 +12,6 @@ import {
 	portfolioSize,
 	toolCalls,
 } from "@/db/schema";
-import type { VariantId } from "@/core/shared/variants";
 import { INITIAL_CAPITAL } from "./calculations";
 import type {
 	ClosedTradeData,

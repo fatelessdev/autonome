@@ -1,4 +1,4 @@
-import { ChevronDown } from "lucide-react";
+﻿import { ChevronDown } from "lucide-react";
 
 import {
 	DropdownMenu,
@@ -7,7 +7,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/core/lib/utils";
-import { useVariant, VARIANT_TABS, type VariantId } from "./variant-context";
+import { useVariant, VARIANT_TABS, type VariantId } from "./variant-provider";
 
 const TEXT_COLOR_FALLBACK = "#0f172a";
 
@@ -32,7 +32,12 @@ const resolveHandlers = (
 	};
 };
 
-export function VariantSelector({ layout = "desktop", value, onChange, className }: VariantSelectorProps) {
+export function VariantSelector({
+	layout = "desktop",
+	value,
+	onChange,
+	className,
+}: VariantSelectorProps) {
 	const handlers = resolveHandlers(value, onChange);
 
 	if (layout === "mobile") {
@@ -48,7 +53,8 @@ export function VariantSelectorDesktop({
 	className,
 }: BaseProps) {
 	const current = value ?? "all";
-	const tab = VARIANT_TABS.find((item) => item.id === current) ?? VARIANT_TABS[0];
+	const tab =
+		VARIANT_TABS.find((item) => item.id === current) ?? VARIANT_TABS[0];
 
 	return (
 		<DropdownMenu>
@@ -71,7 +77,10 @@ export function VariantSelectorDesktop({
 					<ChevronDown className="h-4 w-4 opacity-70" />
 				</button>
 			</DropdownMenuTrigger>
-			<DropdownMenuContent align="end" className="min-w-[200px] p-0 overflow-hidden">
+			<DropdownMenuContent
+				align="end"
+				className="min-w-[200px] p-0 overflow-hidden"
+			>
 				{VARIANT_TABS.map((item) => {
 					const isActive = item.id === current;
 					return (

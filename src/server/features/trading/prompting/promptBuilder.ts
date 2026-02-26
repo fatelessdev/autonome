@@ -1,16 +1,11 @@
+import type { CompetitionSnapshot } from "@/server/features/trading/analysis/competitionSnapshot";
+import type { PerformanceMetrics } from "@/server/features/trading/analysis/performanceMetrics";
 import type { Account } from "@/server/features/trading/contracts/accounts";
-import type { PortfolioSnapshot } from "@/server/features/trading/data/portfolio";
 import type {
 	EnrichedOpenPosition,
 	ExposureSummary,
 } from "@/server/features/trading/data/openPositionEnrichment";
-import type { PerformanceMetrics } from "@/server/features/trading/analysis/performanceMetrics";
-import {
-	type VariantId,
-	DEFAULT_VARIANT,
-	getVariantConfig,
-} from "@/server/features/trading/prompting/prompts/variants";
-import type { CompetitionSnapshot } from "@/server/features/trading/analysis/competitionSnapshot";
+import type { PortfolioSnapshot } from "@/server/features/trading/data/portfolio";
 import {
 	buildOpenPositionsSection,
 	buildPerformanceOverview,
@@ -18,6 +13,11 @@ import {
 	calculateExposureToEquityPct,
 	formatUsd,
 } from "@/server/features/trading/prompting/promptSections";
+import {
+	DEFAULT_VARIANT,
+	getVariantConfig,
+	type VariantId,
+} from "@/server/features/trading/prompting/prompts/variants";
 
 interface TradingPromptParams {
 	account: Account;
@@ -49,7 +49,10 @@ export function buildStateSummary(params: {
 }): string {
 	const { portfolio, openPositions, exposureSummary } = params;
 
-	const exposureRatio = calculateExposureToEquityPct(portfolio, exposureSummary);
+	const exposureRatio = calculateExposureToEquityPct(
+		portfolio,
+		exposureSummary,
+	);
 	const exposurePct =
 		exposureRatio != null && Number.isFinite(exposureRatio)
 			? exposureRatio.toFixed(1)
@@ -101,7 +104,10 @@ export function buildTradingPrompts(params: TradingPromptParams): {
 	const SYSTEM_PROMPT = variantConfig.systemPrompt;
 	const USER_PROMPT = variantConfig.userPrompt;
 
-	const exposureRatio = calculateExposureToEquityPct(portfolio, exposureSummary);
+	const exposureRatio = calculateExposureToEquityPct(
+		portfolio,
+		exposureSummary,
+	);
 	const exposurePercentLabel =
 		exposureRatio != null && Number.isFinite(exposureRatio)
 			? exposureRatio.toFixed(1)
@@ -160,11 +166,7 @@ export function buildTradingPrompts(params: TradingPromptParams): {
 			"{{COMPETITION_OPEN_POSITIONS}}",
 			competition?.openPositionsSummary ?? "No peer position data",
 		)
-		.replaceAll(
-			"{{NEWS}}",
-			newsDigest || "No recent news.",
-		)
-		;
+		.replaceAll("{{NEWS}}", newsDigest || "No recent news.");
 
 	// Build compact state summary for prepareStep updates
 	const stateSummary = buildStateSummary({
@@ -189,5 +191,3 @@ export function buildTradingPrompt(params: TradingPromptParams): string {
 	const { systemPrompt, userPrompt } = buildTradingPrompts(params);
 	return `${systemPrompt}\n\n${userPrompt}`;
 }
-
-

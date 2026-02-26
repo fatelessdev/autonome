@@ -3,30 +3,30 @@
  * Technical Analysis API integration for supplementary indicators
  */
 
-export { taapiClient, TaapiClient } from "./client";
 export { taapiCache } from "./cache";
+export { TaapiClient, taapiClient } from "./client";
 export type {
-	TaapiIndicatorConfig,
+	ADXResult,
+	BBandsResult,
+	CCIResult,
+	DonchianResult,
+	IchimokuResult,
+	KeltnerResult,
+	MACDResult,
+	MFIResult,
+	OBVResult,
+	SARResult,
+	StochResult,
+	StochRSIResult,
+	SupertrendResult,
 	TaapiBulkPayload,
 	TaapiBulkResponse,
 	TaapiBulkResponseItem,
-	TaapiPreFetchResult,
 	TaapiConstruct,
-	BBandsResult,
-	ADXResult,
-	SupertrendResult,
-	StochRSIResult,
-	IchimokuResult,
-	MACDResult,
-	KeltnerResult,
-	DonchianResult,
-	VWAPResult,
-	OBVResult,
-	CCIResult,
-	WillRResult,
-	MFIResult,
-	SARResult,
-	StochResult,
+	TaapiIndicatorConfig,
 	TaapiIndicatorName,
+	TaapiPreFetchResult,
+	VWAPResult,
+	WillRResult,
 } from "./types";
 export { AVAILABLE_TAAPI_INDICATORS, TAAPI_FREE_PLAN_SYMBOLS } from "./types";

@@ -13,9 +13,14 @@ import {
 	incrementModelUsageMutation,
 	updateInvocationMutation,
 } from "@/server/db/tradingRepository.server";
+import {
+	emitAllDataChanged,
+	emitBatchComplete,
+} from "@/server/events/workflowEvents";
+import { buildCompetitionSnapshot } from "@/server/features/trading/analysis/competitionSnapshot";
+import { calculatePerformanceMetrics } from "@/server/features/trading/analysis/performanceMetrics";
 import type { Account } from "@/server/features/trading/contracts/accounts";
 import { fetchLatestDecisionIndex } from "@/server/features/trading/contracts/decisionIndex";
-import { portfolioQuery } from "@/server/features/trading/data/portfolio.server";
 import {
 	buildInvocationResponsePayload,
 	type InvocationClosedPositionSummary,
@@ -23,35 +28,28 @@ import {
 	type InvocationExecutionResultSummary,
 	type StepTelemetry,
 } from "@/server/features/trading/contracts/invocationResponse";
+import type { TradingDecisionWithContext } from "@/server/features/trading/contracts/tradingDecisions";
 import {
 	getSharedMarketIntelligence,
 	invalidateMarketIntelligenceCache,
 } from "@/server/features/trading/data/marketIntelligenceCache";
 import {
-	getSharedNewsDigest,
-	invalidateNewsCache,
-} from "@/server/integrations/alpaca-news";
-import {
 	enrichOpenPositions,
 	summarizePositionRisk,
 } from "@/server/features/trading/data/openPositionEnrichment";
+import { portfolioQuery } from "@/server/features/trading/data/portfolio.server";
 import { openPositionsQuery } from "@/server/features/trading/data/positions.server";
-import { calculatePerformanceMetrics } from "@/server/features/trading/analysis/performanceMetrics";
+import { CONSENSUS_MODEL_NAME } from "@/server/features/trading/execution/orchestrator";
 import { buildTradingPrompts } from "@/server/features/trading/prompting/promptBuilder";
-import { buildCompetitionSnapshot } from "@/server/features/trading/analysis/competitionSnapshot";
-import type { TradingDecisionWithContext } from "@/server/features/trading/contracts/tradingDecisions";
 import {
-	type VariantId,
 	DEFAULT_VARIANT,
+	type VariantId,
 } from "@/server/features/trading/prompting/prompts/variants";
+import {
+	getSharedNewsDigest,
+	invalidateNewsCache,
+} from "@/server/integrations/alpaca-news";
 import { TRADEABLE_VARIANT_IDS } from "@/shared/variants";
-import {
-	emitAllDataChanged,
-	emitBatchComplete,
-} from "@/server/events/workflowEvents";
-import {
-	CONSENSUS_MODEL_NAME,
-} from "@/server/features/trading/execution/orchestrator";
 
 import { createTradeAgent, type ToolContext } from "../agent";
 
@@ -76,9 +74,7 @@ export async function runTradeWorkflow(account: Account): Promise<string> {
 		queryClient.fetchQuery(openPositionsQuery(account)),
 		account.id
 			? fetchLatestDecisionIndex(account.id)
-			: Promise.resolve(
-					new Map<string, TradingDecisionWithContext>(),
-				),
+			: Promise.resolve(new Map<string, TradingDecisionWithContext>()),
 	]);
 
 	const openPositions = enrichOpenPositions(openPositionsRaw, decisionIndex);
@@ -184,9 +180,7 @@ export async function runTradeWorkflow(account: Account): Promise<string> {
 				freshQueryClient.fetchQuery(openPositionsQuery(account)),
 				account.id
 					? fetchLatestDecisionIndex(account.id)
-					: Promise.resolve(
-							new Map<string, TradingDecisionWithContext>(),
-						),
+					: Promise.resolve(new Map<string, TradingDecisionWithContext>()),
 			]);
 
 		const freshPositions = enrichOpenPositions(
@@ -234,10 +228,7 @@ export async function runTradeWorkflow(account: Account): Promise<string> {
 		});
 	} catch (error) {
 		const failureMessage = `Trade workflow aborted: ${error instanceof Error ? error.message : String(error)}`;
-		console.error(
-			`[TradeAgent] ${account.name} execution failed`,
-			error,
-		);
+		console.error(`[TradeAgent] ${account.name} execution failed`, error);
 
 		await incrementModelUsageMutation({
 			modelId: account.id,
@@ -315,15 +306,11 @@ export async function executeAllModelTrades(): Promise<{
 
 	// Separate consensus model from regular models
 	const consensusModel = models.find((m) => m.name === CONSENSUS_MODEL_NAME);
-	const regularModels = models.filter(
-		(m) => m.name !== CONSENSUS_MODEL_NAME,
-	);
+	const regularModels = models.filter((m) => m.name !== CONSENSUS_MODEL_NAME);
 
 	const validModels = regularModels.filter((model) => {
 		if (!model.alpacaApiKey || !model.alpacaApiSecret) {
-			console.warn(
-				`Model ${model.id} missing Alpaca credentials; skipping`,
-			);
+			console.warn(`Model ${model.id} missing Alpaca credentials; skipping`);
 			return false;
 		}
 		const variant = (model.variant as VariantId) ?? DEFAULT_VARIANT;
@@ -352,15 +339,11 @@ export async function executeAllModelTrades(): Promise<{
 				invocationCount: model.invocationCount,
 				id: model.id,
 				totalMinutes: model.totalMinutes,
-				variant:
-					(model.variant as VariantId) ?? DEFAULT_VARIANT,
+				variant: (model.variant as VariantId) ?? DEFAULT_VARIANT,
 			});
 			return { modelId: model.id, success: true };
 		} catch (error) {
-			console.error(
-				`[TradeExecutor] Model ${model.name} failed:`,
-				error,
-			);
+			console.error(`[TradeExecutor] Model ${model.name} failed:`, error);
 			return { modelId: model.id, success: false };
 		}
 	};
@@ -382,16 +365,10 @@ export async function executeAllModelTrades(): Promise<{
 	}
 
 	const status =
-		successCount === totalModels
-			? "✅"
-			: successCount > 0
-				? "⚠️"
-				: "❌";
+		successCount === totalModels ? "✅" : successCount > 0 ? "⚠️" : "❌";
 	console.log(
 		`[TradeExecutor] Cycle complete: ${status} ${successCount}/${totalModels} models succeeded`,
 	);
 
 	return { successCount, failureCount, totalModels };
 }
-
-

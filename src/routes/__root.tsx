@@ -64,8 +64,16 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			{ name: "generator", content: "TanStack Start" },
 
 			// Robots
-			{ name: "robots", content: "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" },
-			{ name: "googlebot", content: "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" },
+			{
+				name: "robots",
+				content:
+					"index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
+			},
+			{
+				name: "googlebot",
+				content:
+					"index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
+			},
 
 			// Open Graph
 			{ property: "og:type", content: "website" },
@@ -93,7 +101,10 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			{ name: "application-name", content: SITE_NAME },
 			{ name: "apple-mobile-web-app-title", content: SITE_NAME },
 			{ name: "apple-mobile-web-app-capable", content: "yes" },
-			{ name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+			{
+				name: "apple-mobile-web-app-status-bar-style",
+				content: "black-translucent",
+			},
 			{ name: "mobile-web-app-capable", content: "yes" },
 
 			// Microsoft
@@ -101,7 +112,10 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			{ name: "msapplication-TileImage", content: "/logo.png" },
 
 			// Format Detection
-			{ name: "format-detection", content: "telephone=no, date=no, email=no, address=no" },
+			{
+				name: "format-detection",
+				content: "telephone=no, date=no, email=no, address=no",
+			},
 
 			// Referrer
 			{ name: "referrer", content: "origin-when-cross-origin" },
@@ -126,7 +140,11 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 			// Preconnect for performance
 			{ rel: "preconnect", href: "https://fonts.googleapis.com" },
-			{ rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+			{
+				rel: "preconnect",
+				href: "https://fonts.gstatic.com",
+				crossOrigin: "anonymous",
+			},
 
 			// DNS Prefetch
 			{ rel: "dns-prefetch", href: "https://fonts.googleapis.com" },
@@ -166,11 +184,11 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 								width: 512,
 								height: 512,
 							},
-							"author": {
-								"@id": "https://fateless.dev/#person"
+							author: {
+								"@id": "https://fateless.dev/#person",
 							},
-							"founder": {
-								"@id": "https://fateless.dev/#person"
+							founder: {
+								"@id": "https://fateless.dev/#person",
 							},
 							sameAs: [],
 						},
@@ -216,7 +234,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 	shellComponent: RootDocument,
 	notFoundComponent: () => {
 		return <div>404 - Page Not Found</div>;
-	}
+	},
 });
 
 function RootDocument({ children }: { children: React.ReactNode }) {

@@ -91,9 +91,7 @@ function ChatInterface() {
 							{status === "submitted" && (
 								<div className="flex items-center gap-3 text-sm">
 									<Loader className="" />
-									<Shimmer className="">
-										Thinking through your data…
-									</Shimmer>
+									<Shimmer className="">Thinking through your data…</Shimmer>
 								</div>
 							)}
 
@@ -108,10 +106,7 @@ function ChatInterface() {
 				</div>
 			</section>
 
-			<PromptInput
-				onSubmit={handlePromptSubmit}
-				className=""
-			>
+			<PromptInput onSubmit={handlePromptSubmit} className="">
 				<PromptInputBody className="">
 					<PromptInputTextarea className="min-h-16 resize-none px-5 py-4 text-base focus-visible:ring-0 focus-visible:ring-offset-0" />
 				</PromptInputBody>
@@ -251,9 +246,7 @@ function isSqlPayload(payload: unknown): payload is SqlResultPayload {
 function EmptyState() {
 	return (
 		<div className="mx-auto w-full max-w-2xl space-y-3 text-sm">
-			<p className="text-xs uppercase tracking-wider mt-10">
-				Example queries
-			</p>
+			<p className="text-xs uppercase tracking-wider mt-10">Example queries</p>
 			<div className="space-y-2">
 				<div className="rounded-xl  p-3 transition-colors">
 					"Summarize the most profitable model this week and include closed

@@ -1,5 +1,5 @@
-import { Component, type ErrorInfo, type ReactNode } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
+import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 
 interface ErrorBoundaryProps {
@@ -35,7 +35,10 @@ interface ErrorBoundaryState {
  * </ErrorBoundary>
  * ```
  */
-export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+export class ErrorBoundary extends Component<
+	ErrorBoundaryProps,
+	ErrorBoundaryState
+> {
 	constructor(props: ErrorBoundaryProps) {
 		super(props);
 		this.state = { hasError: false, error: null };
@@ -79,9 +82,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 						<h3 className="text-lg font-semibold">Something went wrong</h3>
 					</div>
 					{name && (
-						<p className="text-sm text-muted-foreground">
-							Error in: {name}
-						</p>
+						<p className="text-sm text-muted-foreground">Error in: {name}</p>
 					)}
 					{error && (
 						<p className="max-w-md text-center text-sm text-muted-foreground">
@@ -117,7 +118,8 @@ export function withErrorBoundary<P extends object>(
 	WrappedComponent: React.ComponentType<P>,
 	name?: string,
 ) {
-	const displayName = WrappedComponent.displayName || WrappedComponent.name || "Component";
+	const displayName =
+		WrappedComponent.displayName || WrappedComponent.name || "Component";
 
 	const WithErrorBoundary = (props: P) => (
 		<ErrorBoundary name={name || displayName}>

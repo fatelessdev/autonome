@@ -211,24 +211,22 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
 		const result: Record<string, Bar> = {};
 
 		if (stockSymbols.length > 0) {
-			const response =
-				await this.client.dataRequest<AlpacaLatestBarsResponse>(
-					"GET",
-					"/v2/stocks/bars/latest",
-					{ symbols: stockSymbols.join(",") },
-				);
+			const response = await this.client.dataRequest<AlpacaLatestBarsResponse>(
+				"GET",
+				"/v2/stocks/bars/latest",
+				{ symbols: stockSymbols.join(",") },
+			);
 			for (const [symbol, bar] of Object.entries(response.bars)) {
 				result[symbol] = parseBar(bar);
 			}
 		}
 
 		if (cryptoSymbols.length > 0) {
-			const response =
-				await this.client.dataRequest<AlpacaLatestBarsResponse>(
-					"GET",
-					"/v1beta3/crypto/us/latest/bars",
-					{ symbols: cryptoSymbols.join(",") },
-				);
+			const response = await this.client.dataRequest<AlpacaLatestBarsResponse>(
+				"GET",
+				"/v1beta3/crypto/us/latest/bars",
+				{ symbols: cryptoSymbols.join(",") },
+			);
 			for (const [symbol, bar] of Object.entries(response.bars)) {
 				result[symbol] = parseBar(bar);
 			}
@@ -266,24 +264,22 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
 		const result: Record<string, Quote> = {};
 
 		if (stockSymbols.length > 0) {
-			const response =
-				await this.client.dataRequest<AlpacaQuotesResponse>(
-					"GET",
-					"/v2/stocks/quotes/latest",
-					{ symbols: stockSymbols.join(",") },
-				);
+			const response = await this.client.dataRequest<AlpacaQuotesResponse>(
+				"GET",
+				"/v2/stocks/quotes/latest",
+				{ symbols: stockSymbols.join(",") },
+			);
 			for (const [symbol, quote] of Object.entries(response.quotes)) {
 				result[symbol] = parseQuote(symbol, quote);
 			}
 		}
 
 		if (cryptoSymbols.length > 0) {
-			const response =
-				await this.client.dataRequest<AlpacaQuotesResponse>(
-					"GET",
-					"/v1beta3/crypto/us/latest/quotes",
-					{ symbols: cryptoSymbols.join(",") },
-				);
+			const response = await this.client.dataRequest<AlpacaQuotesResponse>(
+				"GET",
+				"/v1beta3/crypto/us/latest/quotes",
+				{ symbols: cryptoSymbols.join(",") },
+			);
 			for (const [symbol, quote] of Object.entries(response.quotes)) {
 				result[symbol] = parseQuote(symbol, quote);
 			}
@@ -300,15 +296,10 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
 
 		const response = await this.client.dataRequest<
 			AlpacaSnapshotsResponse | AlpacaSnapshot
-		>(
-			"GET",
-			`/v2/stocks/${encodeURIComponent(symbol)}/snapshot`,
-		);
+		>("GET", `/v2/stocks/${encodeURIComponent(symbol)}/snapshot`);
 
 		if (!response) {
-			throw new Error(
-				`No snapshot data for ${symbol} (market may be closed)`,
-			);
+			throw new Error(`No snapshot data for ${symbol} (market may be closed)`);
 		}
 
 		if ("latestTrade" in response) {
@@ -317,9 +308,7 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
 
 		const snapshot = (response as AlpacaSnapshotsResponse)[symbol];
 		if (!snapshot) {
-			throw new Error(
-				`No snapshot data for ${symbol} (market may be closed)`,
-			);
+			throw new Error(`No snapshot data for ${symbol} (market may be closed)`);
 		}
 		return parseSnapshot(symbol, snapshot);
 	}
@@ -330,12 +319,11 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
 		const result: Record<string, Snapshot> = {};
 
 		if (stockSymbols.length > 0) {
-			const response =
-				await this.client.dataRequest<AlpacaSnapshotsResponse>(
-					"GET",
-					"/v2/stocks/snapshots",
-					{ symbols: stockSymbols.join(",") },
-				);
+			const response = await this.client.dataRequest<AlpacaSnapshotsResponse>(
+				"GET",
+				"/v2/stocks/snapshots",
+				{ symbols: stockSymbols.join(",") },
+			);
 			for (const [symbol, snapshot] of Object.entries(response)) {
 				result[symbol] = parseSnapshot(symbol, snapshot);
 			}
@@ -344,11 +332,9 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
 		if (cryptoSymbols.length > 0) {
 			const response = await this.client.dataRequest<{
 				snapshots: AlpacaSnapshotsResponse;
-			}>(
-				"GET",
-				"/v1beta3/crypto/us/snapshots",
-				{ symbols: cryptoSymbols.join(",") },
-			);
+			}>("GET", "/v1beta3/crypto/us/snapshots", {
+				symbols: cryptoSymbols.join(","),
+			});
 			for (const [symbol, snapshot] of Object.entries(
 				response.snapshots ?? {},
 			)) {

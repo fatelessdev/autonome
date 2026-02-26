@@ -10,31 +10,37 @@
  * - Exploits diverse reasoning styles
  */
 
-import { QueryClient } from "@tanstack/react-query";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createAihubmix } from "@aihubmix/ai-sdk-provider";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { QueryClient } from "@tanstack/react-query";
 import { generateObject } from "ai";
 import { z } from "zod";
-
-import { getNextAihubmixApiKey, getNextNimApiKey, getNextOpenRouterApiKey } from "@/env";
 import { getModelProvider } from "@/core/shared/models/modelConfig";
-import { MARKETS } from "@/shared/markets/marketMetadata";
-import type { PortfolioSnapshot } from "@/server/features/trading/data/portfolio";
-import type { EnrichedOpenPosition } from "@/server/features/trading/data/openPositionEnrichment";
-import { createPosition, type PositionRequest } from "@/server/features/trading/execution/createPosition";
-import type { Account } from "@/server/features/trading/contracts/accounts";
-import { getSharedMarketIntelligence } from "@/server/features/trading/data/marketIntelligenceCache";
-import { getSharedNewsDigest } from "@/server/integrations/alpaca-news";
-import { portfolioQuery } from "@/server/features/trading/data/portfolio.server";
-import { openPositionsQuery } from "@/server/features/trading/data/positions.server";
-import { enrichOpenPositions } from "@/server/features/trading/data/openPositionEnrichment";
+import {
+	getNextAihubmixApiKey,
+	getNextNimApiKey,
+	getNextOpenRouterApiKey,
+} from "@/env";
 import {
 	createInvocationMutation,
 	incrementModelUsageMutation,
 	updateInvocationMutation,
 } from "@/server/db/tradingRepository.server";
 import { emitAllDataChanged } from "@/server/events/workflowEvents";
+import type { Account } from "@/server/features/trading/contracts/accounts";
+import { getSharedMarketIntelligence } from "@/server/features/trading/data/marketIntelligenceCache";
+import type { EnrichedOpenPosition } from "@/server/features/trading/data/openPositionEnrichment";
+import { enrichOpenPositions } from "@/server/features/trading/data/openPositionEnrichment";
+import type { PortfolioSnapshot } from "@/server/features/trading/data/portfolio";
+import { portfolioQuery } from "@/server/features/trading/data/portfolio.server";
+import { openPositionsQuery } from "@/server/features/trading/data/positions.server";
+import {
+	createPosition,
+	type PositionRequest,
+} from "@/server/features/trading/execution/createPosition";
+import { getSharedNewsDigest } from "@/server/integrations/alpaca-news";
+import { MARKETS } from "@/shared/markets/marketMetadata";
 
 // ==================== Types ====================
 
@@ -96,7 +102,9 @@ export interface ConsensusResult {
 const voterDecisionSchema = z.object({
 	action: z
 		.enum(["BUY", "SELL", "HOLD"])
-		.describe("Trading action: BUY to open long, SELL to open short, HOLD for no action"),
+		.describe(
+			"Trading action: BUY to open long, SELL to open short, HOLD for no action",
+		),
 	symbol: z
 		.string()
 		.nullable()
@@ -109,7 +117,9 @@ const voterDecisionSchema = z.object({
 		.number()
 		.min(0)
 		.max(10)
-		.describe("Confidence in this decision (0=no confidence, 10=extremely confident)"),
+		.describe(
+			"Confidence in this decision (0=no confidence, 10=extremely confident)",
+		),
 	quantity: z
 		.number()
 		.nullable()
@@ -128,9 +138,7 @@ const voterDecisionSchema = z.object({
 		.number()
 		.nullable()
 		.describe("Take profit price level. Null if HOLD"),
-	reasoning: z
-		.string()
-		.describe("Brief explanation of the decision rationale"),
+	reasoning: z.string().describe("Brief explanation of the decision rationale"),
 });
 
 // ==================== Provider Setup ====================
@@ -203,18 +211,16 @@ ${
 	openPositions.length === 0
 		? "None - portfolio is fully in cash"
 		: openPositions
-				.map(
-					(p) => {
-						let line = `- ${p.symbol} ${p.sign}: ${p.quantity} @ $${p.entryPrice} (Unrealized PnL: $${p.unrealizedPnl ?? "N/A"})`;
-						if (p.unrealizedIntradayPl != null) {
-							line += ` (Intraday: $${p.unrealizedIntradayPl.toFixed(2)})`;
-						}
-						if (p.changeToday != null) {
-							line += ` (Change Today: ${(p.changeToday * 100).toFixed(2)}%)`;
-						}
-						return line;
-					},
-				)
+				.map((p) => {
+					let line = `- ${p.symbol} ${p.sign}: ${p.quantity} @ $${p.entryPrice} (Unrealized PnL: $${p.unrealizedPnl ?? "N/A"})`;
+					if (p.unrealizedIntradayPl != null) {
+						line += ` (Intraday: $${p.unrealizedIntradayPl.toFixed(2)})`;
+					}
+					if (p.changeToday != null) {
+						line += ` (Change Today: ${(p.changeToday * 100).toFixed(2)}%)`;
+					}
+					return line;
+				})
 				.join("\n")
 }
 
@@ -260,7 +266,9 @@ Vote with confidence 1-10 (only vote BUY/SELL if confidence >= 6).`;
 			}),
 		});
 
-		console.log(`[Consensus] ${voter.modelName} voted: ${result.object.action} ${result.object.symbol ?? ""} (confidence: ${result.object.confidence})`);
+		console.log(
+			`[Consensus] ${voter.modelName} voted: ${result.object.action} ${result.object.symbol ?? ""} (confidence: ${result.object.confidence})`,
+		);
 
 		return {
 			voterId: voter.modelId,
@@ -340,13 +348,14 @@ function aggregateVotes(
 	const hasMinAgreement = agreementCount >= config.minAgreement;
 	const meetsConfidenceThreshold = avgConfidence >= config.confidenceThreshold;
 	const isActionable = winningAction !== "HOLD";
-	const shouldExecute = hasMinAgreement && meetsConfidenceThreshold && isActionable;
+	const shouldExecute =
+		hasMinAgreement && meetsConfidenceThreshold && isActionable;
 
 	// Debug logging for why we're not executing
 	if (!shouldExecute && isActionable) {
 		console.log(
 			`[Consensus] Not executing: hasMinAgreement=${hasMinAgreement} (${agreementCount}/${config.minAgreement}), ` +
-			`meetsConfidence=${meetsConfidenceThreshold} (${avgConfidence.toFixed(1)}/${config.confidenceThreshold})`
+				`meetsConfidence=${meetsConfidenceThreshold} (${avgConfidence.toFixed(1)}/${config.confidenceThreshold})`,
 		);
 	}
 
@@ -412,7 +421,12 @@ function aggregateVotes(
 	return {
 		consensus: winningAction,
 		symbol: consensusSymbol,
-		side: winningAction === "BUY" ? "LONG" : winningAction === "SELL" ? "SHORT" : null,
+		side:
+			winningAction === "BUY"
+				? "LONG"
+				: winningAction === "SELL"
+					? "SHORT"
+					: null,
 		agreementCount,
 		totalVoters,
 		averageConfidence: avgConfidence,
@@ -439,7 +453,13 @@ export async function runConsensusVoting(
 	// Run all voters in parallel with timeout
 	const voterPromises = config.voters.map((voter) =>
 		Promise.race([
-			getVoterDecision(voter, marketIntelligence, newsDigest, portfolio, openPositions),
+			getVoterDecision(
+				voter,
+				marketIntelligence,
+				newsDigest,
+				portfolio,
+				openPositions,
+			),
 			new Promise<VoterResult>((_, reject) =>
 				setTimeout(
 					() => reject(new Error(`Timeout after ${config.timeoutMs}ms`)),
@@ -510,7 +530,7 @@ export const DEFAULT_CONSENSUS_CONFIG: ConsensusConfig = {
 			modelName: "kat-coder-pro",
 			openRouterModelName: "kwaipilot/kat-coder-pro:free",
 			weight: 1.0,
-		}
+		},
 	],
 	minAgreement: 2, // At least 2/3 must agree
 	confidenceThreshold: 6, // Average confidence must be >= 6
@@ -568,7 +588,9 @@ export async function runConsensusWorkflow(
 
 	try {
 		// Run consensus voting
-		console.log(`[Consensus] Starting voting with ${config.voters.length} voters`);
+		console.log(
+			`[Consensus] Starting voting with ${config.voters.length} voters`,
+		);
 		const consensusResult = await runConsensusVoting(
 			config,
 			marketIntelligence,
@@ -581,8 +603,8 @@ export async function runConsensusWorkflow(
 		for (const voter of consensusResult.voterResults) {
 			console.log(
 				`[Consensus] ${voter.voterName}: ${voter.decision.action} ${voter.decision.symbol ?? "N/A"} ` +
-				`conf=${voter.decision.confidence} qty=${voter.decision.quantity} ` +
-				`(${voter.latencyMs}ms)${voter.error ? ` ERROR: ${voter.error}` : ""}`
+					`conf=${voter.decision.confidence} qty=${voter.decision.quantity} ` +
+					`(${voter.latencyMs}ms)${voter.error ? ` ERROR: ${voter.error}` : ""}`,
 			);
 		}
 
@@ -593,7 +615,12 @@ export async function runConsensusWorkflow(
 		let executionResult = "";
 
 		// Execute trade if consensus is reached
-		if (consensusResult.shouldExecute && consensusResult.symbol && consensusResult.side && consensusResult.executionParams) {
+		if (
+			consensusResult.shouldExecute &&
+			consensusResult.symbol &&
+			consensusResult.side &&
+			consensusResult.executionParams
+		) {
 			const positionRequest: PositionRequest = {
 				symbol: consensusResult.symbol,
 				side: consensusResult.side,
@@ -607,7 +634,9 @@ export async function runConsensusWorkflow(
 				confidence: consensusResult.averageConfidence,
 			};
 
-			console.log(`[Consensus] Executing trade: ${positionRequest.side} ${positionRequest.symbol} qty=${positionRequest.quantity}`);
+			console.log(
+				`[Consensus] Executing trade: ${positionRequest.side} ${positionRequest.symbol} qty=${positionRequest.quantity}`,
+			);
 
 			const results = await createPosition(consensusAccount, [positionRequest]);
 			const success = results.filter((r) => r.success);
@@ -620,7 +649,8 @@ export async function runConsensusWorkflow(
 				executionResult += ` Failed: ${failed.map((r) => `${r.symbol}: ${r.error}`).join(", ")}`;
 			}
 		} else {
-			executionResult = "No trade executed (insufficient consensus or HOLD decision)";
+			executionResult =
+				"No trade executed (insufficient consensus or HOLD decision)";
 		}
 
 		// Build response
@@ -697,5 +727,3 @@ export async function runConsensusWorkflow(
 		return failureMessage;
 	}
 }
-
-

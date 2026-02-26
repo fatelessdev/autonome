@@ -227,7 +227,7 @@ export const queryPortfolioSql = createTool({
 
 			// Coerce and limit results
 			const rows = rawRows.slice(0, MAX_RESULT_ROWS).map(coerceRow);
-			const columns = rows.length > 0 ? Object.keys(rows[0]!) : [];
+			const columns = rows.length > 0 ? Object.keys(rows[0] ?? {}) : [];
 
 			// Validate results
 			const validation = validateQueryResult(
@@ -442,18 +442,18 @@ export const getOpenPositionsTool = createTool({
 				models.map(async (model) => {
 					try {
 						const account = {
-								alpacaApiKey: model.alpacaApiKey,
-								alpacaApiSecret: model.alpacaApiSecret,
-								id: model.id,
-								modelName: model.openRouterModelName,
-								name: model.name,
-								invocationCount: model.invocationCount,
-								totalMinutes: model.totalMinutes,
-							};
-							const [positions, portfolio] = await Promise.all([
-								queryClient.fetchQuery(openPositionsQuery(account)),
-								queryClient.fetchQuery(portfolioQuery(account)),
-							]);
+							alpacaApiKey: model.alpacaApiKey,
+							alpacaApiSecret: model.alpacaApiSecret,
+							id: model.id,
+							modelName: model.openRouterModelName,
+							name: model.name,
+							invocationCount: model.invocationCount,
+							totalMinutes: model.totalMinutes,
+						};
+						const [positions, portfolio] = await Promise.all([
+							queryClient.fetchQuery(openPositionsQuery(account)),
+							queryClient.fetchQuery(portfolioQuery(account)),
+						]);
 
 						return {
 							modelId: model.id,
@@ -677,7 +677,15 @@ export const compareModelsPerformance = createTool({
 						const latestPortfolio = portfolioSnapshots[0];
 
 						// Optionally get recent trades
-						let tradeStats;
+						let tradeStats:
+							| {
+									totalTrades: number;
+									totalPositions: number;
+									profitablePositions: number;
+									winRate: number;
+									totalPnl: number;
+							  }
+							| undefined;
 						if (includeRecentTrades) {
 							const recentTrades = await queryClient.fetchQuery(
 								recentToolCallsWithModelQuery({
@@ -784,5 +792,3 @@ export const tools = {
 	getRecentTradesTool,
 	compareModelsPerformance,
 };
-
-

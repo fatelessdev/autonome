@@ -47,7 +47,14 @@ async function fetchNewsFromAlpaca(credentials: {
 
 	// Alpaca news uses symbols without "/" (BTCUSD not BTC/USD)
 	// Include all our traded symbols + DOGE for broader crypto context
-	const cryptoSymbols = ["BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "DOGEUSD", "HYPEUSD"];
+	const cryptoSymbols = [
+		"BTCUSD",
+		"ETHUSD",
+		"SOLUSD",
+		"XRPUSD",
+		"DOGEUSD",
+		"HYPEUSD",
+	];
 
 	const params = new URLSearchParams({
 		start: start.toISOString(),
@@ -76,7 +83,9 @@ async function fetchNewsFromAlpaca(credentials: {
 		clearTimeout(timeoutId);
 
 		if (!response.ok) {
-			console.warn(`[AlpacaNews] API returned ${response.status}: ${await response.text()}`);
+			console.warn(
+				`[AlpacaNews] API returned ${response.status}: ${await response.text()}`,
+			);
 			return [];
 		}
 
@@ -110,13 +119,16 @@ function formatNewsDigest(items: NewsDigestItem[]): string {
 	lines.push("## RECENT NEWS (Last 5 min)");
 
 	for (const article of items) {
-		const symbols = article.symbols.length > 0 ? ` [${article.symbols.join(", ")}]` : "";
+		const symbols =
+			article.symbols.length > 0 ? ` [${article.symbols.join(", ")}]` : "";
 		const time = new Date(article.publishedAt).toLocaleTimeString("en-US", {
 			hour: "2-digit",
 			minute: "2-digit",
 			hour12: true,
 		});
-		lines.push(`- **${article.headline}**${symbols} (${article.source}, ${time})`);
+		lines.push(
+			`- **${article.headline}**${symbols} (${article.source}, ${time})`,
+		);
 		if (article.summary) {
 			lines.push(`  ${article.summary}`);
 		}

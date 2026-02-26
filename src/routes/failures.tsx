@@ -1,10 +1,12 @@
-import { useState, useMemo, useEffect } from "react";
+﻿import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, ChevronRight, Loader2, AlertTriangle } from "lucide-react";
-
-import { VariantSelector } from "@/components/variant-selector";
-import { useVariant, type VariantId } from "@/components/variant-context";
+import {
+	AlertTriangle,
+	ChevronDown,
+	ChevronRight,
+	Loader2,
+} from "lucide-react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,11 +30,13 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { useVariant, type VariantId } from "@/components/variant-provider";
+import { VariantSelector } from "@/components/variant-selector";
 import { cn } from "@/core/lib/utils";
 import { getModelInfo } from "@/core/shared/models/modelConfig";
 import { getVariantBadgeClasses } from "@/core/shared/variants";
-import { orpc } from "@/server/orpc/client";
 import type { FailureEntry } from "@/server/features/analytics/types";
+import { orpc } from "@/server/orpc/client";
 
 export const Route = createFileRoute("/failures")({
 	component: FailuresRoute,
@@ -103,11 +107,11 @@ function FailureCard({ failure }: { failure: FailureEntry }) {
 									</CardTitle>
 									<CardDescription className="flex items-center gap-3">
 										<span>{formatDate(failure.createdAt)}</span>
-										<span>•</span>
+										<span>â€¢</span>
 										<span>{failure.toolCalls.length} tool calls</span>
 										{failedExecutions.length > 0 && (
 											<span className="text-red-500">
-												• {failedExecutions.length} failed
+												â€¢ {failedExecutions.length} failed
 											</span>
 										)}
 									</CardDescription>
@@ -254,6 +258,7 @@ function FailureCard({ failure }: { failure: FailureEntry }) {
 
 function FailuresRoute() {
 	const [showTotal, setShowTotal] = useState(false);
+	const totalFailuresId = useId();
 	const { selectedVariant, setSelectedVariant } = useVariant();
 	const { data, isLoading, error } = useQuery(
 		orpc.analytics.getFailures.queryOptions({
@@ -282,9 +287,18 @@ function FailuresRoute() {
 		}
 
 		return Array.from(byModelName.entries()).map(([modelName, entries]) => {
-			const totalWorkflow = entries.reduce((sum, e) => sum + e.failedWorkflowCount, 0);
-			const totalToolCall = entries.reduce((sum, e) => sum + e.failedToolCallCount, 0);
-			const totalInvocations = entries.reduce((sum, e) => sum + e.invocationCount, 0);
+			const totalWorkflow = entries.reduce(
+				(sum, e) => sum + e.failedWorkflowCount,
+				0,
+			);
+			const totalToolCall = entries.reduce(
+				(sum, e) => sum + e.failedToolCallCount,
+				0,
+			);
+			const totalInvocations = entries.reduce(
+				(sum, e) => sum + e.invocationCount,
+				0,
+			);
 			return {
 				modelId: entries[0].modelId,
 				modelName,
@@ -314,7 +328,9 @@ function FailuresRoute() {
 						</p>
 					</div>
 					<div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
-						<span className="text-sm text-muted-foreground font-mono">COMPETITION:</span>
+						<span className="text-sm text-muted-foreground font-mono">
+							COMPETITION:
+						</span>
 						<VariantSelector
 							value={selectedVariant as VariantId}
 							onChange={setSelectedVariant}
@@ -329,12 +345,12 @@ function FailuresRoute() {
 						{selectedVariant === "all" && (
 							<div className="flex items-center gap-2">
 								<Checkbox
-									id="total-failures"
+									id={totalFailuresId}
 									checked={showTotal}
 									onCheckedChange={(checked) => setShowTotal(checked === true)}
 								/>
 								<label
-									htmlFor="total-failures"
+									htmlFor={totalFailuresId}
 									className="text-sm font-medium cursor-pointer"
 								>
 									TOTAL
@@ -401,10 +417,12 @@ function FailuresRoute() {
 												</TableCell>
 												{selectedVariant === "all" && !showTotal && (
 													<TableCell>
-														<span className={cn(
-															"px-2 py-0.5 rounded text-xs font-medium",
-															getVariantBadgeClasses(stat.variant),
-														)}>
+														<span
+															className={cn(
+																"px-2 py-0.5 rounded text-xs font-medium",
+																getVariantBadgeClasses(stat.variant),
+															)}
+														>
 															{stat.variant}
 														</span>
 													</TableCell>
@@ -466,7 +484,7 @@ function FailuresRoute() {
 					) : !data?.failures?.length ? (
 						<div className="flex h-64 items-center justify-center">
 							<p className="text-muted-foreground">
-								No failures detected. All systems nominal! 🎉
+								No failures detected. All systems nominal! ðŸŽ‰
 							</p>
 						</div>
 					) : (

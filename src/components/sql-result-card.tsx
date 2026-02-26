@@ -104,23 +104,29 @@ export function SqlResultCard({
 									</tr>
 								</thead>
 								<tbody className="divide-y divide-border/60">
-									{payload.rows.map((row, rowIndex) => (
-										<tr
-											key={`row-${rowIndex}`}
-											className="odd:bg-background even:bg-muted/40"
-										>
-											{columnHeaders.map((column) => (
-												<td
-													key={`${rowIndex}-${column}`}
-													className="px-4 py-3 align-top text-sm text-foreground/90"
-												>
-													<span className="whitespace-pre-wrap break-words">
-														{formatCellValue(row[column])}
-													</span>
-												</td>
-											))}
-										</tr>
-									))}
+									{payload.rows.map((row, rowIndex) => {
+										const rowKey = `${columnHeaders
+											.map((column) => String(row[column] ?? ""))
+											.join("|")}-${rowIndex}`;
+
+										return (
+											<tr
+												key={rowKey}
+												className="odd:bg-background even:bg-muted/40"
+											>
+												{columnHeaders.map((column) => (
+													<td
+														key={`${rowKey}-${column}`}
+														className="px-4 py-3 align-top text-sm text-foreground/90"
+													>
+														<span className="whitespace-pre-wrap break-words">
+															{formatCellValue(row[column])}
+														</span>
+													</td>
+												))}
+											</tr>
+										);
+									})}
 									{payload.rows.length === 0 && (
 										<tr>
 											<td

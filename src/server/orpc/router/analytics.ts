@@ -7,16 +7,16 @@ import { z } from "zod";
 import { variantIdWithAllSchema } from "@/core/shared/variants";
 
 import {
-	INITIAL_CAPITAL,
 	calculateAdvancedStats,
 	calculateOverallStats,
-	getClosedTradesForModels,
-	getModelAccountValues,
-	getLeaderboardData,
-	getRecentFailures,
-	getModelFailureStats,
 	getAllModelsWithFailureCounts,
+	getClosedTradesForModels,
+	getLeaderboardData,
+	getModelAccountValues,
+	getModelFailureStats,
+	getRecentFailures,
 	getRunStartTime,
+	INITIAL_CAPITAL,
 } from "@/server/features/analytics";
 
 // ==================== Schema Definitions ====================
@@ -85,7 +85,9 @@ const LeaderboardEntrySchema = z.object({
 
 const GetLeaderboardInputSchema = z.object({
 	window: z.enum(["24h", "7d", "30d"]).default("7d"),
-	sortBy: z.enum(["pnlPercent", "pnlAbsolute", "maxDrawdown"]).default("pnlPercent"),
+	sortBy: z
+		.enum(["pnlPercent", "pnlAbsolute", "maxDrawdown"])
+		.default("pnlPercent"),
 	variant: VariantFilterSchema,
 });
 
@@ -154,12 +156,12 @@ export const getModelStats = os
 		return Sentry.startSpan({ name: "analytics.getModelStats" }, async () => {
 			const { mode, variant } = input;
 			let modelsData = await getAllModelsWithFailureCounts();
-			
+
 			// Filter by variant if not "all"
 			if (variant !== "all") {
 				modelsData = modelsData.filter((m) => m.variant === variant);
 			}
-			
+
 			const modelIds = modelsData.map((model) => model.id);
 			const [tradesByModel, accountValues] = await Promise.all([
 				getClosedTradesForModels(modelIds),
@@ -207,7 +209,10 @@ export const getLeaderboard = os
 	.handler(async ({ input }) => {
 		return Sentry.startSpan({ name: "analytics.getLeaderboard" }, async () => {
 			const { window, sortBy, variant } = input;
-			const entries = await getLeaderboardData(window, variant === "all" ? undefined : variant);
+			const entries = await getLeaderboardData(
+				window,
+				variant === "all" ? undefined : variant,
+			);
 
 			// Sort entries
 			const sorted = [...entries].sort((a, b) => {

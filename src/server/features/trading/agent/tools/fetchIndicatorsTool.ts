@@ -7,8 +7,8 @@
 import { tool } from "ai";
 import { z } from "zod";
 import {
-	taapiClient,
 	AVAILABLE_TAAPI_INDICATORS,
+	taapiClient,
 } from "@/server/integrations/taapi";
 
 const indicatorSchema = z.object({

@@ -1,10 +1,10 @@
-import type { PortfolioSnapshot } from "@/server/features/trading/data/portfolio";
+import type { PerformanceMetrics } from "@/server/features/trading/analysis/performanceMetrics";
 import type {
 	EnrichedOpenPosition,
 	ExposureSummary,
 } from "@/server/features/trading/data/openPositionEnrichment";
 import { toNumeric } from "@/server/features/trading/data/openPositionEnrichment";
-import type { PerformanceMetrics } from "@/server/features/trading/analysis/performanceMetrics";
+import type { PortfolioSnapshot } from "@/server/features/trading/data/portfolio";
 
 /**
  * Calculate exposure to equity as the percentage of equity that is actually deployed.
@@ -16,7 +16,10 @@ export function calculateExposureToEquityPct(
 	_exposure: ExposureSummary,
 ): number | null {
 	if (!(portfolio.totalValue > 0)) return null;
-	const deployedEquity = Math.max(portfolio.totalValue - portfolio.availableCash, 0);
+	const deployedEquity = Math.max(
+		portfolio.totalValue - portfolio.availableCash,
+		0,
+	);
 	const pct = (deployedEquity / portfolio.totalValue) * 100;
 	return Number.isFinite(pct) ? pct : null;
 }
@@ -75,7 +78,9 @@ export function buildOpenPositionsSection(
 		];
 		// Only include liquidation if available (omit N/A)
 		if (position.liquidationPrice != null) {
-			mainParts.push(`liquidation ${formatNullableNumber(position.liquidationPrice, 2)}`);
+			mainParts.push(
+				`liquidation ${formatNullableNumber(position.liquidationPrice, 2)}`,
+			);
 		}
 		const mainLine = mainParts.join(" | ");
 
@@ -85,13 +90,19 @@ export function buildOpenPositionsSection(
 			`scaled_realized ${formatUsd(position.realizedPnl, 2)}`,
 		];
 		if (position.unrealizedIntradayPl != null) {
-			pnlParts.push(`intraday_pl ${formatUsd(position.unrealizedIntradayPl, 2)}`);
+			pnlParts.push(
+				`intraday_pl ${formatUsd(position.unrealizedIntradayPl, 2)}`,
+			);
 		}
 		if (position.unrealizedIntradayPlpc != null) {
-			pnlParts.push(`intraday_pl_pct ${formatPercent(position.unrealizedIntradayPlpc * 100, 2)}`);
+			pnlParts.push(
+				`intraday_pl_pct ${formatPercent(position.unrealizedIntradayPlpc * 100, 2)}`,
+			);
 		}
 		if (position.changeToday != null) {
-			pnlParts.push(`change_today ${formatPercent(position.changeToday * 100, 2)}`);
+			pnlParts.push(
+				`change_today ${formatPercent(position.changeToday * 100, 2)}`,
+			);
 		}
 		const pnlLine = pnlParts.join(" | ");
 
@@ -147,13 +158,17 @@ export function buildPortfolioSnapshotSection({
 			: 0;
 	const cashUtilizationPct =
 		portfolio.totalValue > 0
-			? ((portfolio.totalValue - portfolio.availableCash) / portfolio.totalValue) * 100
+			? ((portfolio.totalValue - portfolio.availableCash) /
+					portfolio.totalValue) *
+				100
 			: 0;
 
-	const netExposure = exposureSummary.longExposure - exposureSummary.shortExposure;
-	const exposurePctLabel = exposurePct !== null && Number.isFinite(exposurePct) 
-		? exposurePct.toFixed(1) 
-		: "0.0";
+	const netExposure =
+		exposureSummary.longExposure - exposureSummary.shortExposure;
+	const exposurePctLabel =
+		exposurePct !== null && Number.isFinite(exposurePct)
+			? exposurePct.toFixed(1)
+			: "0.0";
 
 	// All fields always shown - zeros are meaningful, AI should never infer
 	return [
@@ -179,5 +194,3 @@ export function buildPerformanceOverview({
 }
 
 export { formatUsd };
-
-

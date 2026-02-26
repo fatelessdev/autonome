@@ -107,8 +107,7 @@ export class AlpacaClient {
 				429: "RATE_LIMITED",
 			};
 
-			const errorCode =
-				statusErrors[response.status] ?? "PROVIDER_ERROR";
+			const errorCode = statusErrors[response.status] ?? "PROVIDER_ERROR";
 			throw new AlpacaError(
 				`Alpaca ${errorCode} (${response.status}): ${errorMessage}`,
 				errorCode,

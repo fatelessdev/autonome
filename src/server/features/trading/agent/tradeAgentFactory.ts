@@ -4,10 +4,10 @@
  */
 
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { createAihubmix } from "@aihubmix/ai-sdk-provider";
-import { ToolLoopAgent, stepCountIs, hasToolCall } from "ai";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import * as Sentry from "@sentry/react";
+import { hasToolCall, stepCountIs, ToolLoopAgent } from "ai";
 
 import {
 	getNextAihubmixApiKey,
@@ -45,7 +45,13 @@ export interface TradeAgentConfig {
  * Creates a configured ToolLoopAgent for trading
  */
 export function createTradeAgent(config: TradeAgentConfig) {
-	const { account, systemPrompt, toolContext, onStepTelemetry, rebuildUserPrompt } = config;
+	const {
+		account,
+		systemPrompt,
+		toolContext,
+		onStepTelemetry,
+		rebuildUserPrompt,
+	} = config;
 
 	// Initialize providers - use cycling API key for NIM to avoid rate limits
 	const nimApiKey = getNextNimApiKey();
@@ -117,7 +123,7 @@ export function createTradeAgent(config: TradeAgentConfig) {
 				"gpt-oss",
 				"qwen3-next",
 				"deepseek-r1",
-				"mistral-large-3-675b-instruct-2512"
+				"mistral-large-3-675b-instruct-2512",
 			];
 			const requiresAutoToolChoice = autoToolModels.some((id) =>
 				modelId.includes(id),
@@ -231,4 +237,3 @@ export function createTradeAgent(config: TradeAgentConfig) {
 }
 
 export type TradeAgent = ReturnType<typeof createTradeAgent>;
-

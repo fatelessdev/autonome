@@ -11,4 +11,3 @@ export interface Account {
 	/** Strategy variant - determines which prompt set to use */
 	variant?: VariantId;
 }
-

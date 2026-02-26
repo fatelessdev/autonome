@@ -130,12 +130,9 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
 		return null;
 	}
 
-	return (
-		<style
-			dangerouslySetInnerHTML={{
-				__html: Object.entries(THEMES)
-					.map(
-						([theme, prefix]) => `
+	const cssText = Object.entries(THEMES)
+		.map(
+			([theme, prefix]) => `
 ${prefix} [data-chart=${id}] {
 ${colorConfig
 	.map(([key, itemConfig]) => {
@@ -147,14 +144,30 @@ ${colorConfig
 	.join("\n")}
 }
 `,
-					)
-					.join("\n"),
-			}}
-		/>
-	);
+		)
+		.join("\n");
+
+	return <style>{cssText}</style>;
 };
 
 const ChartTooltip = RechartsPrimitive.Tooltip;
+
+type ChartPayloadItem = {
+	type?: string;
+	name?: string;
+	dataKey?: string;
+	value?: number | string;
+	color?: string;
+	payload: Record<string, unknown>;
+};
+
+type ChartTooltipFormatter = (
+	value: number | string,
+	name: string,
+	item: ChartPayloadItem,
+	index: number,
+	payload: Record<string, unknown>,
+) => React.ReactNode;
 
 function ChartTooltipContent({
 	active,
@@ -170,12 +183,22 @@ function ChartTooltipContent({
 	color,
 	nameKey,
 	labelKey,
-}: any & {
+}: React.ComponentProps<"div"> & {
+	active?: boolean;
+	payload?: ChartPayloadItem[];
+	label?: unknown;
 	hideLabel?: boolean;
 	hideIndicator?: boolean;
 	indicator?: "line" | "dot" | "dashed";
 	nameKey?: string;
 	labelKey?: string;
+	labelFormatter?: (
+		value: unknown,
+		payload: ChartPayloadItem[],
+	) => React.ReactNode;
+	formatter?: ChartTooltipFormatter;
+	color?: string;
+	labelClassName?: string;
 }) {
 	const { config } = useChart();
 
@@ -231,11 +254,15 @@ function ChartTooltipContent({
 			{!nestLabel ? tooltipLabel : null}
 			<div className="grid gap-1.5">
 				{payload
-					.filter((item: any) => item.type !== "none")
-					.map((item: any, index: number) => {
+					.filter((item) => item.type !== "none")
+					.map((item, index: number) => {
 						const key = `${nameKey || item.name || item.dataKey || "value"}`;
 						const itemConfig = getPayloadConfigFromPayload(config, item, key);
-						const indicatorColor = color || item.payload.fill || item.color;
+						const itemFill =
+							typeof item.payload.fill === "string"
+								? item.payload.fill
+								: undefined;
+						const indicatorColor = color || itemFill || item.color;
 
 						return (
 							<div
@@ -309,11 +336,13 @@ function ChartLegendContent({
 	payload,
 	verticalAlign = "bottom",
 	nameKey,
-}: React.ComponentProps<"div"> &
-	any & {
-		hideIcon?: boolean;
-		nameKey?: string;
-	}) {
+	...props
+}: React.ComponentProps<"div"> & {
+	payload?: ChartPayloadItem[];
+	hideIcon?: boolean;
+	nameKey?: string;
+	verticalAlign?: "top" | "bottom";
+}) {
 	const { config } = useChart();
 
 	if (!payload?.length) {
@@ -327,10 +356,11 @@ function ChartLegendContent({
 				verticalAlign === "top" ? "pb-3" : "pt-3",
 				className,
 			)}
+			{...props}
 		>
 			{payload
-				.filter((item: any) => item.type !== "none")
-				.map((item: any) => {
+				.filter((item) => item.type !== "none")
+				.map((item) => {
 					const key = `${nameKey || item.dataKey || "value"}`;
 					const itemConfig = getPayloadConfigFromPayload(config, item, key);
 

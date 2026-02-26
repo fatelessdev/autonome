@@ -1,4 +1,4 @@
-import { gsap } from "gsap";
+﻿import { gsap } from "gsap";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ExitPlanDialog } from "@/components/trades-sidebar/exit-plan-dialog";
 import { ModelChatTab } from "@/components/trades-sidebar/model-chat-tab";
@@ -14,7 +14,7 @@ import type {
 	ModelOption,
 } from "@/components/trades-sidebar/types";
 import { useTradingDashboardData } from "@/components/trades-sidebar/use-trading-dashboard-data";
-import { useVariant } from "@/components/variant-context";
+import { useVariant } from "@/components/variant-provider";
 import { normalizeIdentifier } from "@/core/shared/strings/normalizeIdentifier";
 import { getModelInfo } from "@/shared/models/modelConfig";
 
@@ -93,8 +93,8 @@ export default function TradesSidebar({
 			return modelOptions;
 		}
 
-		return modelOptions.filter((option) =>
-			option.variants?.includes(selectedVariant) ?? true,
+		return modelOptions.filter(
+			(option) => option.variants?.includes(selectedVariant) ?? true,
 		);
 	}, [modelOptions, selectedVariant]);
 
@@ -103,11 +103,14 @@ export default function TradesSidebar({
 
 	const modelOptionsLookup = useMemo(() => {
 		const lookup = new Map<string, ModelOption>();
-		filterOptions.forEach((option) => lookup.set(option.id, option));
+		for (const option of filterOptions) {
+			lookup.set(option.id, option);
+		}
 		return lookup;
 	}, [filterOptions]);
 
-	const selectedOption = filter === "all" ? null : modelOptionsLookup.get(filter);
+	const selectedOption =
+		filter === "all" ? null : modelOptionsLookup.get(filter);
 	const selectedModelLabel =
 		filter === "all"
 			? "All Models"
@@ -116,7 +119,8 @@ export default function TradesSidebar({
 		() =>
 			filter === "all"
 				? null
-				: (selectedOption?.matchers ?? [normalizeModelKey(filter)].filter(Boolean)),
+				: (selectedOption?.matchers ??
+					[normalizeModelKey(filter)].filter(Boolean)),
 		[selectedOption?.matchers, filter],
 	);
 
@@ -187,7 +191,9 @@ export default function TradesSidebar({
 		let result = conversations;
 		// First filter by variant (from header tabs)
 		if (selectedVariant !== "all") {
-			result = result.filter((conversation) => conversation.modelVariant === selectedVariant);
+			result = result.filter(
+				(conversation) => conversation.modelVariant === selectedVariant,
+			);
 		}
 		// Then filter by model
 		if (filterMatchers) {
@@ -207,7 +213,9 @@ export default function TradesSidebar({
 		let result = positions;
 		// First filter by variant (from header tabs)
 		if (selectedVariant !== "all") {
-			result = result.filter((positionGroup) => positionGroup.modelVariant === selectedVariant);
+			result = result.filter(
+				(positionGroup) => positionGroup.modelVariant === selectedVariant,
+			);
 		}
 		// Then filter by model
 		if (filterMatchers) {

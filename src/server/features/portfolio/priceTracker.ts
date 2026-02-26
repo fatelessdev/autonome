@@ -6,16 +6,16 @@
  * Also runs retention policy to downsample old data.
  */
 
+import { QueryClient } from "@tanstack/react-query";
 import { sql } from "drizzle-orm";
+import { INITIAL_CAPITAL } from "@/core/shared/trading/calculations";
 import { db } from "@/db";
 import { models, portfolioSize } from "@/db/schema";
 import { createPortfolioSnapshotMutation } from "@/server/db/tradingRepository.server";
-import { portfolioQuery } from "@/server/features/trading/data/portfolio.server";
-import { runRetentionPolicy } from "@/server/features/portfolio/retentionService";
-import { INITIAL_CAPITAL } from "@/core/shared/trading/calculations";
 import { emitPortfolioEvent } from "@/server/features/portfolio/events/portfolioEvents";
-import { QueryClient } from "@tanstack/react-query";
+import { runRetentionPolicy } from "@/server/features/portfolio/retentionService";
 import type { Account } from "@/server/features/trading/contracts/accounts";
+import { portfolioQuery } from "@/server/features/trading/data/portfolio.server";
 
 declare global {
 	var __portfolioQueryClient: QueryClient | undefined;
@@ -133,13 +133,19 @@ export async function recordPortfolios() {
 	// Batch create snapshots for valid portfolios
 	const validSnapshots = portfolioResults
 		.filter(
-			({ portfolio }) =>
-				portfolio?.total &&
-				!Number.isNaN(Number.parseFloat(portfolio.total)),
+			(
+				item,
+			): item is typeof item & {
+				portfolio: NonNullable<typeof item.portfolio>;
+			} =>
+				Boolean(
+					item.portfolio?.total &&
+						!Number.isNaN(Number.parseFloat(item.portfolio.total)),
+				),
 		)
 		.map(({ model, portfolio }) => ({
 			modelId: model.id,
-			netPortfolio: portfolio!.total,
+			netPortfolio: portfolio.total,
 		}));
 
 	await Promise.all(
@@ -168,5 +174,3 @@ export async function recordPortfolios() {
 		}
 	}
 }
-
-

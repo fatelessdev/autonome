@@ -1,9 +1,11 @@
-import { getLeaderboardData } from "@/server/features/analytics";
-import type { LeaderboardEntry, LeaderboardWindow } from "@/server/features/analytics";
 import { and, desc, eq, inArray } from "drizzle-orm";
-
 import { db } from "@/db";
-import { models, orders, OrderStatus } from "@/db/schema";
+import { models, OrderStatus, orders } from "@/db/schema";
+import type {
+	LeaderboardEntry,
+	LeaderboardWindow,
+} from "@/server/features/analytics";
+import { getLeaderboardData } from "@/server/features/analytics";
 import type { VariantId } from "@/server/features/trading/prompting/prompts/variants";
 
 export interface CompetitionSnapshot {
@@ -61,7 +63,9 @@ function formatOpenPositionsSummary(params: {
 				: positions
 						.slice(0, 2)
 						.map((p) => {
-							const lev = p.leverage ? `${parseFloat(p.leverage).toFixed(1)}x` : "1.0x";
+							const lev = p.leverage
+								? `${parseFloat(p.leverage).toFixed(1)}x`
+								: "1.0x";
 							return `${p.symbol} ${p.side} ${lev}`;
 						})
 						.join(", ");
@@ -142,9 +146,8 @@ export async function buildCompetitionSnapshot(params: {
 	}
 
 	const delta = leader.pnlPercent - self.pnlPercent;
-	const pnlDeltaToLeader = selfIndex === 0
-		? "You are leading"
-		: `${delta.toFixed(2)}pp behind leader`;
+	const pnlDeltaToLeader =
+		selfIndex === 0 ? "You are leading" : `${delta.toFixed(2)}pp behind leader`;
 
 	return {
 		standings,
@@ -156,4 +159,3 @@ export async function buildCompetitionSnapshot(params: {
 		window,
 	};
 }
-

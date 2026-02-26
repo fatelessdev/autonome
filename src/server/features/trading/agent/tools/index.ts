@@ -3,13 +3,13 @@
  * Combines all trading tools into a ToolSet for the agent
  */
 
-import { createPositionTool } from "./createPositionTool";
 import { closePositionTool } from "./closePositionTool";
-import { holdingTool } from "./holdingTool";
+import { createPositionTool } from "./createPositionTool";
 import { fetchIndicatorsTool } from "./fetchIndicatorsTool";
+import { holdingTool } from "./holdingTool";
 import type { ToolContext } from "./types";
 
-export { type ToolContext } from "./types";
+export type { ToolContext } from "./types";
 
 /**
  * Creates all trading tools with shared context.

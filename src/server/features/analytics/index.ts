@@ -2,6 +2,6 @@
  * Analytics feature module exports
  */
 
-export * from "./types";
+export * from "./analyticsQueries.server";
 export * from "./calculations";
-export * from "./queries.server";
+export * from "./types";

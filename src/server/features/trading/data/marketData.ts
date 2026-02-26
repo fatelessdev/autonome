@@ -6,7 +6,7 @@
  * Indicator computation logic (EMA, RSI, MACD, ATR) is preserved from the original.
  */
 
-import type { Candlestick } from "@/server/features/trading/data/indicators";
+import type { Candlestick } from "@/server/features/trading/data/technicalIndicators";
 import {
 	getAtr,
 	getCloses,
@@ -17,7 +17,7 @@ import {
 	getVolumes,
 	roundSeries,
 	roundValue,
-} from "@/server/features/trading/data/indicators";
+} from "@/server/features/trading/data/technicalIndicators";
 import { getMarketDataProvider } from "@/server/providers/alpaca";
 import type { AlpacaMarketDataProvider } from "@/server/providers/alpaca/market-data";
 import type { Bar } from "@/server/providers/types";
@@ -79,8 +79,8 @@ const toIsoTimestamps = (candles: Candlestick[], count: number): string[] =>
 type Numberish = number | null | undefined;
 
 const computeAverage = (values: Numberish[]): number | null => {
-	const filtered = values.filter(
-		(value): value is number => Number.isFinite(value),
+	const filtered = values.filter((value): value is number =>
+		Number.isFinite(value),
 	);
 	if (filtered.length === 0) return null;
 	return filtered.reduce((total, value) => total + value, 0) / filtered.length;
@@ -159,7 +159,15 @@ const buildLatestSnapshot = (
 	);
 
 	return {
-		price, ema20, ema50, macd, rsi7, rsi14, atr10, atr14, volume,
+		price,
+		ema20,
+		ema50,
+		macd,
+		rsi7,
+		rsi14,
+		atr10,
+		atr14,
+		volume,
 		averageVolume: volumeAverage,
 	};
 };
@@ -174,13 +182,10 @@ async function fetchBars(
 	timeframe: string,
 	limit: number,
 ): Promise<Candlestick[]> {
-
 	// Calculate start time based on timeframe and limit
 	const now = new Date();
 	const lookbackMs =
-		timeframe === "5Min"
-			? 1000 * 60 * 5 * limit
-			: 1000 * 60 * 60 * 4 * limit;
+		timeframe === "5Min" ? 1000 * 60 * 5 * limit : 1000 * 60 * 60 * 4 * limit;
 	const start = new Date(now.getTime() - lookbackMs);
 
 	const bars = await provider.getBars(alpacaSymbol, timeframe, {
@@ -200,7 +205,10 @@ export async function getMarketSnapshots(
 	markets: Array<{ symbol: string; alpacaSymbol: string }>,
 	credentials: { alpacaApiKey: string; alpacaApiSecret: string },
 ): Promise<MarketSnapshot[]> {
-	const provider = getMarketDataProvider(credentials.alpacaApiKey, credentials.alpacaApiSecret);
+	const provider = getMarketDataProvider(
+		credentials.alpacaApiKey,
+		credentials.alpacaApiSecret,
+	);
 	const snapshots: MarketSnapshot[] = [];
 
 	for (const market of markets) {
@@ -241,10 +249,7 @@ export async function getMarketSnapshots(
 // Formatting (for prompts)
 // ==========================================
 
-const formatNumber = (
-	value: number | null | undefined,
-	digits = 3,
-): string => {
+const formatNumber = (value: number | null | undefined, digits = 3): string => {
 	if (!Number.isFinite(value ?? NaN)) {
 		return "N/A";
 	}
@@ -273,9 +278,7 @@ export const formatMarketSnapshots = (snapshots: MarketSnapshot[]): string => {
 		);
 
 		lines.push("**Intraday (5m, oldest -> newest)**");
-		lines.push(
-			formatSeries("Mid prices", snapshot.series.intraday.midPrices),
-		);
+		lines.push(formatSeries("Mid prices", snapshot.series.intraday.midPrices));
 		lines.push(formatSeries("EMA20", snapshot.series.intraday.ema20));
 		lines.push(formatSeries("EMA50", snapshot.series.intraday.ema50));
 		lines.push(formatSeries("MACD", snapshot.series.intraday.macd));
@@ -287,32 +290,15 @@ export const formatMarketSnapshots = (snapshots: MarketSnapshot[]): string => {
 
 		lines.push("**Higher timeframe (4h, oldest -> newest)**");
 		lines.push(
-			formatSeries(
-				"Mid prices",
-				snapshot.series.higherTimeframe.midPrices,
-			),
+			formatSeries("Mid prices", snapshot.series.higherTimeframe.midPrices),
 		);
-		lines.push(
-			formatSeries("EMA20", snapshot.series.higherTimeframe.ema20),
-		);
-		lines.push(
-			formatSeries("EMA50", snapshot.series.higherTimeframe.ema50),
-		);
-		lines.push(
-			formatSeries("MACD", snapshot.series.higherTimeframe.macd),
-		);
-		lines.push(
-			formatSeries("RSI (7)", snapshot.series.higherTimeframe.rsi7),
-		);
-		lines.push(
-			formatSeries("RSI (14)", snapshot.series.higherTimeframe.rsi14),
-		);
-		lines.push(
-			formatSeries("ATR (10)", snapshot.series.higherTimeframe.atr10),
-		);
-		lines.push(
-			formatSeries("ATR (14)", snapshot.series.higherTimeframe.atr14),
-		);
+		lines.push(formatSeries("EMA20", snapshot.series.higherTimeframe.ema20));
+		lines.push(formatSeries("EMA50", snapshot.series.higherTimeframe.ema50));
+		lines.push(formatSeries("MACD", snapshot.series.higherTimeframe.macd));
+		lines.push(formatSeries("RSI (7)", snapshot.series.higherTimeframe.rsi7));
+		lines.push(formatSeries("RSI (14)", snapshot.series.higherTimeframe.rsi14));
+		lines.push(formatSeries("ATR (10)", snapshot.series.higherTimeframe.atr10));
+		lines.push(formatSeries("ATR (14)", snapshot.series.higherTimeframe.atr14));
 		lines.push(
 			formatSeries("Volumes", snapshot.series.higherTimeframe.volumes, 6),
 		);
@@ -322,4 +308,3 @@ export const formatMarketSnapshots = (snapshots: MarketSnapshot[]): string => {
 
 	return sections.join("\n\n");
 };
-

@@ -18,20 +18,14 @@
  */
 
 import { EventEmitter } from "node:events";
-import {
-	emitPositionEvent,
-} from "@/server/features/trading/events/positionEvents";
-import {
-	emitTradeEvent,
-} from "@/server/features/trading/events/tradeEvents";
-import {
-	emitConversationEvent,
-} from "@/server/features/trading/events/conversationEvents";
+import { emitConversationEvent } from "@/server/features/trading/events/conversationEvents";
+import { emitPositionEvent } from "@/server/features/trading/events/positionEvents";
+import { emitTradeEvent } from "@/server/features/trading/events/tradeEvents";
 import {
 	mapConversationToEventData,
 	mapPositionToEventData,
 	mapTradeToEventData,
-} from "@/server/features/trading/events/eventPayloadMappers";
+} from "@/server/features/trading/events/tradingEventPayloadMappers";
 
 // ============================================================================
 // Event Types
@@ -164,13 +158,11 @@ export async function emitAllDataChanged(modelId: string): Promise<void> {
 
 	// Also trigger data SSE streams so clients get immediate updates
 	// Import dynamically to avoid circular dependencies
-	const [
-		{ fetchPositions, fetchTrades },
-		{ refreshConversationEvents },
-	] = await Promise.all([
-		import("@/server/features/trading/data/queries.server"),
-		import("@/server/features/trading/data/conversationsSnapshot.server"),
-	]);
+	const [{ fetchPositions, fetchTrades }, { refreshConversationEvents }] =
+		await Promise.all([
+			import("@/server/features/trading/data/tradingQueries.server"),
+			import("@/server/features/trading/data/conversationsSnapshot.server"),
+		]);
 
 	const [positions, trades, conversations] = await Promise.all([
 		fetchPositions(),
@@ -222,4 +214,3 @@ export function subscribeToWorkflowEvents(
 export function getListenerCount(): number {
 	return emitter.listenerCount(EVENT_KEY);
 }
-

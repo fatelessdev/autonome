@@ -1,10 +1,6 @@
 import { and, desc, eq, inArray, isNull, ne, or } from "drizzle-orm";
 import { db } from "@/db";
-import {
-	orders,
-	OrderStatus,
-	type Order,
-} from "@/db/schema";
+import { type Order, OrderStatus, orders } from "@/db/schema";
 import { toCanonical } from "@/shared/markets/marketMetadata";
 
 // ==========================================
@@ -168,11 +164,12 @@ export async function scaleIntoOrder(params: ScaleOrderParams): Promise<Order> {
 /**
  * Get all open orders (active positions) for a model
  */
-export async function getOpenOrdersByModel(
-	modelId: string,
-): Promise<Order[]> {
+export async function getOpenOrdersByModel(modelId: string): Promise<Order[]> {
 	return db.query.orders.findMany({
-		where: and(eq(orders.modelId, modelId), eq(orders.status, OrderStatus.OPEN)),
+		where: and(
+			eq(orders.modelId, modelId),
+			eq(orders.status, OrderStatus.OPEN),
+		),
 		orderBy: desc(orders.openedAt),
 	});
 }
@@ -266,7 +263,9 @@ export async function getAllClosedOrders(
 /**
  * Get order by ID
  */
-export async function getOrderById(orderId: string): Promise<Order | undefined> {
+export async function getOrderById(
+	orderId: string,
+): Promise<Order | undefined> {
 	return db.query.orders.findFirst({
 		where: eq(orders.id, orderId),
 	});

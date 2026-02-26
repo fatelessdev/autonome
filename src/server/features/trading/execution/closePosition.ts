@@ -7,18 +7,18 @@
  * For crypto: we cancel independent SL/TP orders before closing the position.
  */
 
+import {
+	closeOrder,
+	getOpenOrderBySymbol,
+} from "@/server/db/ordersRepository.server";
 import type { Account } from "@/server/features/trading/contracts/accounts";
-import { normalizeNumber } from "@/shared/formatting/numberFormat";
 import {
 	getOpenPositions,
 	type OpenPositionSummary,
 } from "@/server/features/trading/data/positions";
 import { getTradingProvider } from "@/server/providers/alpaca";
+import { normalizeNumber } from "@/shared/formatting/numberFormat";
 import { toAlpacaSymbol, toCanonical } from "@/shared/markets/marketMetadata";
-import {
-	closeOrder,
-	getOpenOrderBySymbol,
-} from "@/server/db/ordersRepository.server";
 
 export interface ClosedPositionSummary {
 	symbol: string;
@@ -63,8 +63,9 @@ const buildSummary = (
 	const markPrice = position.markPrice;
 	const resolvedExitPrice = exitPrice ?? markPrice;
 	// Prefer Alpaca's cost_basis (avg_entry_price × qty) over manual recomputation
-	const entryNotional = position.costBasis
-		?? (entryPrice != null && absQuantity != null
+	const entryNotional =
+		position.costBasis ??
+		(entryPrice != null && absQuantity != null
 			? entryPrice * absQuantity
 			: null);
 	const exitNotional =
@@ -75,11 +76,7 @@ const buildSummary = (
 	const unrealizedPnl = normalizeNumber(position.unrealizedPnl);
 
 	let netPnl: number | null = null;
-	if (
-		entryPrice != null &&
-		resolvedExitPrice != null &&
-		absQuantity != null
-	) {
+	if (entryPrice != null && resolvedExitPrice != null && absQuantity != null) {
 		const isLong = position.sign === "LONG";
 		netPnl =
 			(isLong
@@ -165,21 +162,13 @@ export async function closePosition(
 			// Extract exit price from close order
 			const exitPrice = closeResult.filled_avg_price
 				? Number.parseFloat(closeResult.filled_avg_price)
-				: position.markPrice ?? null;
+				: (position.markPrice ?? null);
 
-			const summary = buildSummary(
-				symbol,
-				position,
-				exitPrice,
-				closedAtIso,
-			);
+			const summary = buildSummary(symbol, position, exitPrice, closedAtIso);
 
 			summaries.push(summary);
 
-			const dbOrder = await getOpenOrderBySymbol(
-				account.id,
-				key,
-			);
+			const dbOrder = await getOpenOrderBySymbol(account.id, key);
 			if (!dbOrder) {
 				throw new Error(
 					`No DB OPEN order found for ${symbol} (accountId=${account.id}, key=${key})`,
@@ -207,5 +196,3 @@ export async function closePosition(
 
 	return summaries;
 }
-
-

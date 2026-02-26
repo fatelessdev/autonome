@@ -1,9 +1,6 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, type ReactNode, useContext, useState } from "react";
 
-import {
-	type VariantIdWithAll,
-	VARIANT_TABS,
-} from "@/core/shared/variants";
+import { VARIANT_TABS, type VariantIdWithAll } from "@/core/shared/variants";
 
 // Re-export types and VARIANT_TABS for backward compatibility
 export type VariantId = VariantIdWithAll;

@@ -1,11 +1,11 @@
 import type {
-	ExitPlanSummary,
-	OpenPositionSummary,
-} from "@/server/features/trading/data/positions";
-import type {
 	TradingDecisionWithContext,
 	TradingSignal,
 } from "@/server/features/trading/contracts/tradingDecisions";
+import type {
+	ExitPlanSummary,
+	OpenPositionSummary,
+} from "@/server/features/trading/data/positions";
 
 export interface EnrichedOpenPosition extends OpenPositionSummary {
 	exitPlan: ExitPlanSummary | null;
@@ -95,7 +95,8 @@ const mergeExitPlans = (
 		target,
 		stop,
 		invalidation,
-		invalidationPrice: decision?.invalidationPrice ?? fallback?.invalidationPrice ?? null,
+		invalidationPrice:
+			decision?.invalidationPrice ?? fallback?.invalidationPrice ?? null,
 		timeExit: decision?.timeExit ?? fallback?.timeExit ?? null,
 		cooldownUntil: decision?.cooldownUntil ?? fallback?.cooldownUntil ?? null,
 	};
@@ -234,5 +235,3 @@ export const summarizePositionRisk = (positions: EnrichedOpenPosition[]) => {
 };
 
 export type ExposureSummary = ReturnType<typeof summarizePositionRisk>;
-
-

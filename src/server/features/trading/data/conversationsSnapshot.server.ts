@@ -1,5 +1,5 @@
 import { eq, inArray } from "drizzle-orm";
-
+import { VARIANT_IDS, type VariantId } from "@/core/shared/variants";
 import { db } from "@/db";
 import { invocations, models } from "@/db/schema";
 import {
@@ -7,7 +7,6 @@ import {
 	type TradingDecision,
 	type TradingDecisionResult,
 } from "@/server/features/trading/contracts/tradingDecisions";
-import { VARIANT_IDS, type VariantId } from "@/core/shared/variants";
 import { safeJsonParse } from "@/utils/json";
 
 export type ConversationSnapshot = {
@@ -103,9 +102,7 @@ export async function fetchConversationSnapshots(
 	const variantResults = await Promise.all(variantQueries);
 	const invocationsWithRelations = variantResults
 		.flat()
-		.sort(
-			(a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
-		);
+		.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
 	// Filter out invocations that only contain auto-triggered closes
 	const filtered = invocationsWithRelations.filter(
@@ -142,4 +139,3 @@ export async function refreshConversationEvents() {
 	const conversations = await fetchConversationSnapshots();
 	return conversations;
 }
-

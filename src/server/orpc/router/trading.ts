@@ -3,12 +3,12 @@ import "@/polyfill";
 import { os } from "@orpc/server";
 import * as Sentry from "@sentry/react";
 import { z } from "zod";
-import { parseSymbols } from "@/shared/formatting/numberFormat";
 import {
-	variantIdSchema,
 	isValidVariantId,
 	type VariantId,
+	variantIdSchema,
 } from "@/core/shared/variants";
+import { parseSymbols } from "@/shared/formatting/numberFormat";
 import {
 	CryptoPricesInputSchema,
 	CryptoPricesResponseSchema,
@@ -36,8 +36,10 @@ export const getTrades = os
 		return Sentry.startSpan({ name: "getTrades" }, async () => {
 			try {
 				const result = await import(
-					"@/server/features/trading/data/queries.server"
-				).then((module) => module.fetchTrades({ variant: input.variant, limit: input.limit }));
+					"@/server/features/trading/data/tradingQueries.server"
+				).then((module) =>
+					module.fetchTrades({ variant: input.variant, limit: input.limit }),
+				);
 				const trades = result.map((trade) => ({
 					id: trade.id,
 					modelId: trade.modelId,
@@ -79,7 +81,7 @@ export const getPositions = os
 		return Sentry.startSpan({ name: "getPositions" }, async () => {
 			try {
 				const result = await import(
-					"@/server/features/trading/data/queries.server"
+					"@/server/features/trading/data/tradingQueries.server"
 				).then((module) => module.fetchPositions({ variant: input.variant }));
 				const positions = result.map((modelPos) => ({
 					modelId: modelPos.modelId,
@@ -88,9 +90,7 @@ export const getPositions = os
 					modelLogo: modelPos.modelLogo ?? undefined,
 					positions: modelPos.positions.map((pos) => ({
 						symbol: pos.symbol,
-						side: (pos.sign === "SHORT" ? "short" : "long") as
-							| "short"
-							| "long",
+						side: (pos.sign === "SHORT" ? "short" : "long") as "short" | "long",
 						quantity: pos.quantity,
 						entryPrice: pos.entryPrice,
 						notional: Number.isFinite(Number(pos.notional))
@@ -102,15 +102,15 @@ export const getPositions = os
 							: undefined,
 						exitPlan: pos.exitPlan
 							? {
-								target: pos.exitPlan.target ?? undefined,
-								stop: pos.exitPlan.stop ?? undefined,
-								invalidation: pos.exitPlan.invalidation
-									? {
-											enabled: true,
-											message: pos.exitPlan.invalidation,
-									  }
-									: undefined,
-							}
+									target: pos.exitPlan.target ?? undefined,
+									stop: pos.exitPlan.stop ?? undefined,
+									invalidation: pos.exitPlan.invalidation
+										? {
+												enabled: true,
+												message: pos.exitPlan.invalidation,
+											}
+										: undefined,
+								}
 							: undefined,
 						signal: pos.signal ?? undefined,
 						leverage: pos.leverage ?? undefined,
@@ -140,7 +140,7 @@ export const getCryptoPrices = os
 
 			try {
 				const result = await import(
-					"@/server/features/trading/data/queries.server"
+					"@/server/features/trading/data/tradingQueries.server"
 				).then((module) => module.fetchCryptoPrices(normalizedSymbols));
 				const prices = result
 					.filter((price) => price.symbol)
@@ -174,7 +174,7 @@ export const getPortfolioHistory = os
 		return Sentry.startSpan({ name: "getPortfolioHistory" }, async () => {
 			try {
 				const result = await import(
-					"@/server/features/trading/data/queries.server"
+					"@/server/features/trading/data/tradingQueries.server"
 				).then((module) =>
 					module.fetchPortfolioHistory({
 						variant: input.variant,
@@ -195,7 +195,7 @@ export const getPortfolioHistory = os
 								variant: toVariant(entry.model.variant),
 								openRouterModelName:
 									entry.model.openRouterModelName ?? undefined,
-						  }
+							}
 						: undefined,
 				}));
 				return { history, resolution: result.resolution };
@@ -209,4 +209,3 @@ export const getPortfolioHistory = os
 			}
 		});
 	});
-

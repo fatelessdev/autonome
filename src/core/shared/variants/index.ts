@@ -112,7 +112,8 @@ export const VARIANT_CONFIG: Record<VariantId, VariantConfig> = {
 	Sovereign: {
 		id: "Sovereign",
 		label: "Sovereign (Adaptive)",
-		description: "Flexible regime-adaptive allocator, blends trend & range strategies",
+		description:
+			"Flexible regime-adaptive allocator, blends trend & range strategies",
 		color: "#eab308", // yellow-500
 		bgClass: "bg-yellow-500/20",
 		textClass: "text-yellow-600",
@@ -179,7 +180,9 @@ export function toVariantId(value: unknown): VariantId | undefined {
  *   Guardian
  * </span>
  */
-export function getVariantBadgeClasses(variant: VariantId | string | undefined): string {
+export function getVariantBadgeClasses(
+	variant: VariantId | string | undefined,
+): string {
 	if (!variant || !isValidVariantId(variant)) {
 		return "bg-zinc-500/20 text-zinc-600";
 	}
@@ -190,7 +193,9 @@ export function getVariantBadgeClasses(variant: VariantId | string | undefined):
 /**
  * Get hex color for a variant (for charts, legends, etc.)
  */
-export function getVariantColor(variant: VariantId | string | undefined): string {
+export function getVariantColor(
+	variant: VariantId | string | undefined,
+): string {
 	if (!variant || !isValidVariantId(variant)) {
 		return "#71717a"; // zinc-500 fallback
 	}
@@ -200,7 +205,9 @@ export function getVariantColor(variant: VariantId | string | undefined): string
 /**
  * Get variant label for display
  */
-export function getVariantLabel(variant: VariantId | string | undefined): string {
+export function getVariantLabel(
+	variant: VariantId | string | undefined,
+): string {
 	if (!variant || !isValidVariantId(variant)) {
 		return variant ?? "Unknown";
 	}
@@ -228,7 +235,12 @@ export const VARIANT_TABS: Array<{
 	color: string;
 	background: string;
 }> = [
-	{ id: AGGREGATE_CONFIG.id, label: AGGREGATE_CONFIG.label, color: AGGREGATE_CONFIG.color, background: AGGREGATE_CONFIG.lightBg },
+	{
+		id: AGGREGATE_CONFIG.id,
+		label: AGGREGATE_CONFIG.label,
+		color: AGGREGATE_CONFIG.color,
+		background: AGGREGATE_CONFIG.lightBg,
+	},
 	...VARIANT_IDS.map((id) => ({
 		id,
 		label: VARIANT_CONFIG[id].label,

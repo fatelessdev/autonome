@@ -29,7 +29,9 @@ export const variantEnum = pgEnum("Variant", VARIANT_IDS);
 export const models = pgTable(
 	"Models",
 	{
-		id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+		id: text("id")
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
 		name: text("name").notNull(),
 		openRouterModelName: text("openRouterModelName").notNull(),
 		variant: variantEnum("variant").notNull().default(DEFAULT_VARIANT),
@@ -43,7 +45,10 @@ export const models = pgTable(
 	(table) => ({
 		nameIdx: index("Models_name_idx").on(table.name),
 		// Unique on name + variant so each model can have 5 variants
-		nameVariantUnique: uniqueIndex("Models_name_variant_key").on(table.name, table.variant),
+		nameVariantUnique: uniqueIndex("Models_name_variant_key").on(
+			table.name,
+			table.variant,
+		),
 	}),
 );
 
@@ -97,14 +102,20 @@ export const portfolioSize = pgTable(
 				onDelete: "restrict",
 				onUpdate: "cascade",
 			}),
-		netPortfolio: numeric("netPortfolio", { precision: 18, scale: 2 }).notNull(),
+		netPortfolio: numeric("netPortfolio", {
+			precision: 18,
+			scale: 2,
+		}).notNull(),
 		createdAt: timestamp("createdAt").defaultNow().notNull(),
 		updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 	},
 	(table) => ({
 		modelIdx: index("PortfolioSize_modelId_idx").on(table.modelId),
 		// Composite index for efficient time-range queries per model
-		modelCreatedAtIdx: index("PortfolioSize_modelId_createdAt_idx").on(table.modelId, table.createdAt),
+		modelCreatedAtIdx: index("PortfolioSize_modelId_createdAt_idx").on(
+			table.modelId,
+			table.createdAt,
+		),
 		// Standalone index for time-based pruning/aggregation
 		createdAtIdx: index("PortfolioSize_createdAt_idx").on(table.createdAt),
 	}),
@@ -118,14 +129,16 @@ export const portfolioSize = pgTable(
  *
  * Unrealized P&L is calculated live from current prices, not stored.
  * When an order is closed, exitPrice and realizedPnl are populated.
- * 
+ *
  * Note: entryNotional and exitNotional are derived (qty * price) - not stored.
  * Note: confidence is stored inside exitPlan JSONB (confidence in the plan).
  */
 export const orders = pgTable(
 	"Orders",
 	{
-		id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+		id: text("id")
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
 		modelId: text("modelId")
 			.notNull()
 			.references(() => models.id, {

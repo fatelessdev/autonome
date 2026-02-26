@@ -4,13 +4,13 @@
  */
 
 export {
-	runConsensusVoting,
-	runConsensusWorkflow,
-	DEFAULT_CONSENSUS_CONFIG,
 	CONSENSUS_MODEL_NAME,
 	type ConsensusConfig,
 	type ConsensusResult,
 	type ConsensusVoter,
+	DEFAULT_CONSENSUS_CONFIG,
+	runConsensusVoting,
+	runConsensusWorkflow,
 	type VoterDecision,
 	type VoterResult,
 } from "./consensusOrchestrator";

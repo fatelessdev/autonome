@@ -87,7 +87,9 @@ function TradeItem({ trade, isLast }: { trade: Trade; isLast: boolean }) {
 						</div>
 						<span className="text-sm font-semibold">{modelLabel}</span>
 					</div>
-					<span className="text-xs text-muted-foreground">{timestampLabel}</span>
+					<span className="text-xs text-muted-foreground">
+						{timestampLabel}
+					</span>
 				</div>
 
 				<div className="mb-3 flex flex-wrap items-center gap-1.5 text-xs">
@@ -191,10 +193,7 @@ export function TradesTab({ trades, loading, filterMenu }: TradesTabProps) {
 						</p>
 					</div>
 				) : (
-					<div
-						ref={parentRef}
-						className="h-full overflow-auto"
-					>
+					<div ref={parentRef} className="h-full overflow-auto">
 						<div
 							style={{
 								height: `${virtualizer.getTotalSize()}px`,
@@ -203,7 +202,10 @@ export function TradesTab({ trades, loading, filterMenu }: TradesTabProps) {
 							}}
 						>
 							{virtualizer.getVirtualItems().map((virtualRow) => {
-								const trade = trades[virtualRow.index]!;
+								const trade = trades[virtualRow.index];
+								if (!trade) {
+									return null;
+								}
 								return (
 									<div
 										key={trade.id}

@@ -4,8 +4,11 @@
  */
 
 import * as XLSX from "xlsx";
-import type { OverallStats, AdvancedStats } from "@/server/features/analytics/types";
 import { VARIANT_IDS } from "@/core/shared/variants";
+import type {
+	AdvancedStats,
+	OverallStats,
+} from "@/server/features/analytics/types";
 
 /**
  * Leaderboard entry for export
@@ -32,7 +35,7 @@ export interface LeaderboardVariantData {
  * Format hold time in minutes to human-readable string
  */
 function formatHoldTime(minutes: number): string {
-	if (!isFinite(minutes) || minutes < 0) return "0m";
+	if (!Number.isFinite(minutes) || minutes < 0) return "0m";
 	if (minutes < 60) return `${Math.round(minutes)}m`;
 	if (minutes < 1440) return `${(minutes / 60).toFixed(1)}h`;
 	return `${(minutes / 1440).toFixed(1)}d`;
@@ -170,8 +173,23 @@ function createLeaderboardSheet(
 	includeVariant: boolean,
 ): XLSX.WorkSheet {
 	const headers = includeVariant
-		? ["Model", "Variant", "PnL %", "PnL $", "Max Drawdown %", "Start Value $", "End Value $"]
-		: ["Model", "PnL %", "PnL $", "Max Drawdown %", "Start Value $", "End Value $"];
+		? [
+				"Model",
+				"Variant",
+				"PnL %",
+				"PnL $",
+				"Max Drawdown %",
+				"Start Value $",
+				"End Value $",
+			]
+		: [
+				"Model",
+				"PnL %",
+				"PnL $",
+				"Max Drawdown %",
+				"Start Value $",
+				"End Value $",
+			];
 
 	const data = [
 		headers,
@@ -203,32 +221,46 @@ function createLeaderboardSheet(
 /**
  * Calculate averaged entries across variants for each model
  */
-function calculateAverageEntries(entries: LeaderboardEntry[]): LeaderboardEntry[] {
+function calculateAverageEntries(
+	entries: LeaderboardEntry[],
+): LeaderboardEntry[] {
 	const byModelName = new Map<string, LeaderboardEntry[]>();
-	
+
 	for (const entry of entries) {
 		const existing = byModelName.get(entry.modelName) ?? [];
 		existing.push(entry);
 		byModelName.set(entry.modelName, existing);
 	}
 
-	return Array.from(byModelName.entries()).map(([modelName, modelEntries]) => {
-		const avgPnlPercent = modelEntries.reduce((sum, e) => sum + e.pnlPercent, 0) / modelEntries.length;
-		const avgPnlAbsolute = modelEntries.reduce((sum, e) => sum + e.pnlAbsolute, 0) / modelEntries.length;
-		const avgMaxDrawdown = modelEntries.reduce((sum, e) => sum + e.maxDrawdown, 0) / modelEntries.length;
-		const avgStartValue = modelEntries.reduce((sum, e) => sum + e.startValue, 0) / modelEntries.length;
-		const avgEndValue = modelEntries.reduce((sum, e) => sum + e.endValue, 0) / modelEntries.length;
+	return Array.from(byModelName.entries())
+		.map(([modelName, modelEntries]) => {
+			const avgPnlPercent =
+				modelEntries.reduce((sum, e) => sum + e.pnlPercent, 0) /
+				modelEntries.length;
+			const avgPnlAbsolute =
+				modelEntries.reduce((sum, e) => sum + e.pnlAbsolute, 0) /
+				modelEntries.length;
+			const avgMaxDrawdown =
+				modelEntries.reduce((sum, e) => sum + e.maxDrawdown, 0) /
+				modelEntries.length;
+			const avgStartValue =
+				modelEntries.reduce((sum, e) => sum + e.startValue, 0) /
+				modelEntries.length;
+			const avgEndValue =
+				modelEntries.reduce((sum, e) => sum + e.endValue, 0) /
+				modelEntries.length;
 
-		return {
-			modelName,
-			variant: "AVG",
-			pnlPercent: avgPnlPercent,
-			pnlAbsolute: avgPnlAbsolute,
-			maxDrawdown: avgMaxDrawdown,
-			startValue: avgStartValue,
-			endValue: avgEndValue,
-		};
-	}).sort((a, b) => b.pnlPercent - a.pnlPercent);
+			return {
+				modelName,
+				variant: "AVG",
+				pnlPercent: avgPnlPercent,
+				pnlAbsolute: avgPnlAbsolute,
+				maxDrawdown: avgMaxDrawdown,
+				startValue: avgStartValue,
+				endValue: avgEndValue,
+			};
+		})
+		.sort((a, b) => b.pnlPercent - a.pnlPercent);
 }
 
 /**
@@ -240,7 +272,7 @@ function calculateAverageEntries(entries: LeaderboardEntry[]): LeaderboardEntry[
  * 5. Sovereign
  * 6. All Models - All models across all variants
  * 7. Average - Averaged stats per model across variants
- * 
+ *
  * Filename format: YYYY-MM-DD_Leaderboard_{window}.xlsx
  */
 export function exportLeaderboardToExcel(

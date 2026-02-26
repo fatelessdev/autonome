@@ -81,7 +81,9 @@ export const parseSymbols = (raw: string | null): string[] => {
 		.split(",")
 		.map((symbol) => symbol.trim().toUpperCase())
 		.filter(Boolean)
-		.forEach((symbol) => deduped.add(symbol));
+		.forEach((symbol) => {
+			deduped.add(symbol);
+		});
 
 	return deduped.size > 0 ? Array.from(deduped) : [...DEFAULT_SYMBOLS];
 };

@@ -7,14 +7,14 @@
 import { TAAPI_API_KEY } from "@/env";
 import { taapiCache } from "./cache";
 import type {
+	ADXResult,
+	BBandsResult,
+	IchimokuResult,
+	SupertrendResult,
 	TaapiBulkPayload,
 	TaapiBulkResponse,
 	TaapiIndicatorConfig,
 	TaapiPreFetchResult,
-	BBandsResult,
-	ADXResult,
-	SupertrendResult,
-	IchimokuResult,
 	VWAPResult,
 } from "./types";
 import { TAAPI_FREE_PLAN_SYMBOLS } from "./types";
@@ -45,7 +45,10 @@ export class TaapiClient {
 			try {
 				// Create abort controller for timeout
 				const controller = new AbortController();
-				const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+				const timeoutId = setTimeout(
+					() => controller.abort(),
+					FETCH_TIMEOUT_MS,
+				);
 
 				const response = await fetch(BULK_URL, {
 					method: "POST",
@@ -77,10 +80,10 @@ export class TaapiClient {
 
 				return (await response.json()) as TaapiBulkResponse;
 			} catch (error) {
-				const isAborted =
-					error instanceof Error && error.name === "AbortError";
+				const isAborted = error instanceof Error && error.name === "AbortError";
 				const isTimeout =
-					error instanceof Error && (error.message.includes("timeout") || isAborted);
+					error instanceof Error &&
+					(error.message.includes("timeout") || isAborted);
 				const isNetworkError =
 					error instanceof Error &&
 					(error.message.includes("fetch") ||
@@ -88,7 +91,9 @@ export class TaapiClient {
 
 				if ((isTimeout || isNetworkError) && attempt < retries - 1) {
 					const wait = backoffMs * (attempt + 1);
-					console.warn(`[TAAPI] ${isAborted ? "Timeout" : "Network error"}, retrying in ${Math.round(wait / 1000)}s`);
+					console.warn(
+						`[TAAPI] ${isAborted ? "Timeout" : "Network error"}, retrying in ${Math.round(wait / 1000)}s`,
+					);
 					await new Promise((r) => setTimeout(r, wait));
 					continue;
 				}
@@ -244,15 +249,22 @@ export class TaapiClient {
 		// Filter to only free plan symbols
 		const validAssets = assets
 			.map((a) => a.toUpperCase())
-			.filter((a) => TAAPI_FREE_PLAN_SYMBOLS.includes(a as typeof TAAPI_FREE_PLAN_SYMBOLS[number]));
+			.filter((a) =>
+				TAAPI_FREE_PLAN_SYMBOLS.includes(
+					a as (typeof TAAPI_FREE_PLAN_SYMBOLS)[number],
+				),
+			);
 
 		const skippedAssets = assets.filter(
-			(a) => !TAAPI_FREE_PLAN_SYMBOLS.includes(a.toUpperCase() as typeof TAAPI_FREE_PLAN_SYMBOLS[number])
+			(a) =>
+				!TAAPI_FREE_PLAN_SYMBOLS.includes(
+					a.toUpperCase() as (typeof TAAPI_FREE_PLAN_SYMBOLS)[number],
+				),
 		);
 
 		if (skippedAssets.length > 0) {
 			console.log(
-				`[TAAPI] Skipping ${skippedAssets.join(", ")} (free plan only supports BTC, ETH)`
+				`[TAAPI] Skipping ${skippedAssets.join(", ")} (free plan only supports BTC, ETH)`,
 			);
 		}
 
@@ -264,7 +276,11 @@ export class TaapiClient {
 		// Check cache for all assets first
 		const uncachedAssets: string[] = [];
 		for (const asset of validAssets) {
-			const cached = taapiCache.get<TaapiPreFetchResult>(asset, interval, "prefetch");
+			const cached = taapiCache.get<TaapiPreFetchResult>(
+				asset,
+				interval,
+				"prefetch",
+			);
 			if (cached) {
 				console.log(`[TAAPI] Cache hit for ${asset}:${interval}`);
 				results.set(asset, cached);
@@ -280,11 +296,16 @@ export class TaapiClient {
 		}
 
 		// Free plan only allows 1 construct per request, so fetch sequentially
-		console.log(`[TAAPI] Fetching indicators for ${uncachedAssets.join(", ")} (sequential, free plan)`);
+		console.log(
+			`[TAAPI] Fetching indicators for ${uncachedAssets.join(", ")} (sequential, free plan)`,
+		);
 
 		for (const asset of uncachedAssets) {
 			try {
-				const prefetchResult = await this.preFetchSupplementaryIndicators(asset, interval);
+				const prefetchResult = await this.preFetchSupplementaryIndicators(
+					asset,
+					interval,
+				);
 				results.set(asset, prefetchResult);
 			} catch (error) {
 				console.error(`[TAAPI] Failed to fetch ${asset}:`, error);

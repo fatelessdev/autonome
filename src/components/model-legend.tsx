@@ -1,5 +1,5 @@
 import NumberFlow from "@number-flow/react";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ChartConfig } from "@/components/ui/chart";
 import { cn } from "@/core/lib/utils";
 import { formatCurrencyValue } from "@/shared/formatting/numberFormat";
@@ -42,7 +42,7 @@ export default function ModelLegend({
 		for (let i = chartData.length - 1; i >= 0; i--) {
 			const row = chartData[i];
 			if (!row) continue;
-			
+
 			for (const key of modelKeys) {
 				if (key in latest) continue; // Already found latest for this model
 				const value = row[key];
@@ -50,11 +50,11 @@ export default function ModelLegend({
 					latest[key] = value;
 				}
 			}
-			
+
 			// Early exit if all models have latest values
 			if (Object.keys(latest).length === modelKeys.length) break;
 		}
-		
+
 		return latest;
 	}, [chartData, chartConfig, seriesMeta]);
 
@@ -147,9 +147,7 @@ export default function ModelLegend({
 	});
 
 	return (
-		<div
-			className={cn("border-t py-1 sm:py-2.5")}
-		>
+		<div className={cn("border-t py-1 sm:py-2.5")}>
 			<div
 				className={cn(
 					"flex gap-3 overflow-x-auto overflow-y-visible pb-2 pt-1 px-4 sm:px-4 scrollbar-hide",
@@ -174,7 +172,11 @@ export default function ModelLegend({
 						if (typeof value !== "number") return undefined;
 						if (!isPercent) return value;
 						const base = baseBySeriesKey[key];
-						if (typeof base === "number" && Number.isFinite(base) && base !== 0) {
+						if (
+							typeof base === "number" &&
+							Number.isFinite(base) &&
+							base !== 0
+						) {
 							return ((value - base) / Math.abs(base)) as number;
 						}
 						return undefined;
@@ -183,7 +185,8 @@ export default function ModelLegend({
 					const isDimmed = hoveredLine && hoveredLine !== key;
 
 					return (
-						<div
+						<button
+							type="button"
 							className={cn(
 								"flex flex-col items-center justify-center rounded-md border-2 px-3 py-2 text-sm cursor-pointer",
 								"transition-[border-color,transform,box-shadow] duration-150 ease-out",
@@ -239,7 +242,9 @@ export default function ModelLegend({
 										style={{ backgroundColor: color }}
 									/>
 								)}
-								<span className="font-medium text-center text-xs sm:text-sm">{label}</span>
+								<span className="font-medium text-center text-xs sm:text-sm">
+									{label}
+								</span>
 							</div>
 							<div
 								className="mt-1 text-[10px] sm:text-xs tabular-nums text-muted-foreground"
@@ -269,7 +274,7 @@ export default function ModelLegend({
 									<span>{formatValue(displayValue)}</span>
 								)}
 							</div>
-						</div>
+						</button>
 					);
 				})}
 			</div>

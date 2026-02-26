@@ -103,7 +103,10 @@ export function ModelChatTab({
 									activeConversationPanels[conv.id] ?? "response";
 
 								return (
-									<div key={conv.id} className="min-w-0 max-w-full overflow-hidden">
+									<div
+										key={conv.id}
+										className="min-w-0 max-w-full overflow-hidden"
+									>
 										<div
 											className="rounded px-4 py-4 transition-colors hover:bg-accent/30 min-w-0 max-w-full overflow-hidden"
 											style={{ backgroundColor: `${modelColor}10` }}
@@ -155,9 +158,12 @@ export function ModelChatTab({
 														borderColor: `${modelColor}33`,
 													}}
 												>
-													<p 
+													<p
 														className="text-sm leading-relaxed text-muted-foreground cursor-pointer overflow-hidden"
-														style={{ wordBreak: "break-all", overflowWrap: "anywhere" }}
+														style={{
+															wordBreak: "break-all",
+															overflowWrap: "anywhere",
+														}}
 													>
 														{previewText || "No response yet."}
 													</p>
@@ -173,31 +179,31 @@ export function ModelChatTab({
 														className="flex items-center gap-2 rounded-lg border bg-background/70 p-1"
 														style={{ borderColor: `${modelColor}22` }}
 													>
-														{(["response", "decisions", "prompt"] as Panel[]).map(
-															(panel) => {
-																const isActive = activePanel === panel;
-																return (
-																	<button
-																		key={panel}
-																		type="button"
-																		onClick={() =>
-																			setConversationPanel(conv.id, panel)
-																		}
-																		className={`flex-1 cursor-pointer rounded-md px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors ${
-																			isActive
-																				? "bg-accent text-foreground"
-																				: "text-muted-foreground hover:bg-accent/40"
-																		}`}
-																	>
-																		{panel === "response"
-																			? "Response"
-																			: panel === "decisions"
-																				? "Trading Decisions"
-																				: "Prompt"}
-																	</button>
-																);
-															},
-														)}
+														{(
+															["response", "decisions", "prompt"] as Panel[]
+														).map((panel) => {
+															const isActive = activePanel === panel;
+															return (
+																<button
+																	key={panel}
+																	type="button"
+																	onClick={() =>
+																		setConversationPanel(conv.id, panel)
+																	}
+																	className={`flex-1 cursor-pointer rounded-md px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors ${
+																		isActive
+																			? "bg-accent text-foreground"
+																			: "text-muted-foreground hover:bg-accent/40"
+																	}`}
+																>
+																	{panel === "response"
+																		? "Response"
+																		: panel === "decisions"
+																			? "Trading Decisions"
+																			: "Prompt"}
+																</button>
+															);
+														})}
 													</div>
 
 													{activePanel === "response" ? (
@@ -206,9 +212,12 @@ export function ModelChatTab({
 																className="rounded-lg border bg-background/60 p-3 min-w-0 max-w-full overflow-hidden"
 																style={{ borderColor: `${modelColor}33` }}
 															>
-																<div 
+																<div
 																	className="prose prose-invert prose-sm max-w-none min-w-0 overflow-hidden"
-																	style={{ wordBreak: "break-word", overflowWrap: "anywhere" }}
+																	style={{
+																		wordBreak: "break-word",
+																		overflowWrap: "anywhere",
+																	}}
 																>
 																	<ReactMarkdown
 																		remarkPlugins={[remarkGfm]}
@@ -237,77 +246,77 @@ export function ModelChatTab({
 																			stopLabel,
 																		} = formatDecisionDetails(decision);
 
-								const action = (
-													decision.action ||
-													decision.toolCallType ||
-													"OTHER"
-												).toUpperCase();
-												const isUpdateCall =
-													action === "UPDATE_EXIT_PLAN";
-												const isCloseCall =
-													action === "CLOSE_POSITION";
-												const isHoldingCall =
-													action === "HOLDING";
-												const isHoldSignal =
-													decision.signal === "HOLD";
-												const signalLabel = isHoldingCall
-													? "Holding"
-													: isUpdateCall
-														? "Exit Plan Update"
-														: isCloseCall
-															? `Close ${decision.signal}`
-															: decision.signal;
-												const badgeVariant =
-													(isHoldSignal || isHoldingCall) &&
-													!isUpdateCall &&
-													!isCloseCall
-														? "secondary"
-														: "outline";
-												const badgeClass = (() => {
-													if (isHoldingCall) {
-														return "border-slate-500/30 bg-slate-500/12 text-slate-400";
-													}
-													if (isUpdateCall) {
-														return "border-sky-500/30 bg-sky-500/12 text-sky-400";
-													}
-													if (isCloseCall) {
-														return "border-amber-500/30 bg-amber-500/12 text-amber-600";
-													}
-													if (decision.signal === "SHORT") {
-														return "border-red-500/20 bg-red-500/10 text-red-500";
-													}
-													if (decision.signal === "LONG") {
-														return "border-green-500/20 bg-green-500/10 text-green-500";
-													}
-													return "border-muted text-foreground";
-												})();
+																		const action = (
+																			decision.action ||
+																			decision.toolCallType ||
+																			"OTHER"
+																		).toUpperCase();
+																		const isUpdateCall =
+																			action === "UPDATE_EXIT_PLAN";
+																		const isCloseCall =
+																			action === "CLOSE_POSITION";
+																		const isHoldingCall = action === "HOLDING";
+																		const isHoldSignal =
+																			decision.signal === "HOLD";
+																		const signalLabel = isHoldingCall
+																			? "Holding"
+																			: isUpdateCall
+																				? "Exit Plan Update"
+																				: isCloseCall
+																					? `Close ${decision.signal}`
+																					: decision.signal;
+																		const badgeVariant =
+																			(isHoldSignal || isHoldingCall) &&
+																			!isUpdateCall &&
+																			!isCloseCall
+																				? "secondary"
+																				: "outline";
+																		const badgeClass = (() => {
+																			if (isHoldingCall) {
+																				return "border-slate-500/30 bg-slate-500/12 text-slate-400";
+																			}
+																			if (isUpdateCall) {
+																				return "border-sky-500/30 bg-sky-500/12 text-sky-400";
+																			}
+																			if (isCloseCall) {
+																				return "border-amber-500/30 bg-amber-500/12 text-amber-600";
+																			}
+																			if (decision.signal === "SHORT") {
+																				return "border-red-500/20 bg-red-500/10 text-red-500";
+																			}
+																			if (decision.signal === "LONG") {
+																				return "border-green-500/20 bg-green-500/10 text-green-500";
+																			}
+																			return "border-muted text-foreground";
+																		})();
 
-												const statusLabel = (() => {
-													if (decision.status)
-														return decision.status;
-													if (isHoldingCall) return "HOLDING";
-													if (isUpdateCall) return "UPDATED";
-													if (isCloseCall) {
-														return decision.result?.success ===
-															false && decision.result?.error
-															? "FAILED"
-															: "CLOSED";
-													}
-													if (decision.result?.success === true)
-														return "EXECUTED";
-													if (decision.result?.success === false)
-														return "REJECTED";
-													if (isHoldSignal) return "HOLD";
-													return null;
-												})();
+																		const statusLabel = (() => {
+																			if (decision.status)
+																				return decision.status;
+																			if (isHoldingCall) return "HOLDING";
+																			if (isUpdateCall) return "UPDATED";
+																			if (isCloseCall) {
+																				return decision.result?.success ===
+																					false && decision.result?.error
+																					? "FAILED"
+																					: "CLOSED";
+																			}
+																			if (decision.result?.success === true)
+																				return "EXECUTED";
+																			if (decision.result?.success === false)
+																				return "REJECTED";
+																			if (isHoldSignal) return "HOLD";
+																			return null;
+																		})();
 
-												const showInvalidationRow = !isUpdateCall && !isHoldingCall;
-												const reasonContent = isUpdateCall
-													? (decision.reason ??
-														decision.invalidationCondition)
-													: isHoldingCall
-														? decision.reason
-														: null;
+																		const showInvalidationRow =
+																			!isUpdateCall && !isHoldingCall;
+																		const reasonContent = isUpdateCall
+																			? (decision.reason ??
+																				decision.invalidationCondition)
+																			: isHoldingCall
+																				? decision.reason
+																				: null;
 
 																		return (
 																			<div
@@ -368,18 +377,21 @@ export function ModelChatTab({
 																							</div>
 																						</div>
 																					) : null}
-											</div>
-											{(isUpdateCall || isHoldingCall) && reasonContent ? (
-												<div className={`mt-3 rounded-md border p-2 text-xs ${
-													isHoldingCall 
-														? "border-slate-500/20 bg-slate-500/10 text-slate-300"
-														: "border-sky-500/20 bg-sky-500/10 text-sky-300"
-												}`}>
-													{reasonContent}
-												</div>
-											) : null}
-											{decision.result?.success === false &&
-											decision.result?.error ? (
+																				</div>
+																				{(isUpdateCall || isHoldingCall) &&
+																				reasonContent ? (
+																					<div
+																						className={`mt-3 rounded-md border p-2 text-xs ${
+																							isHoldingCall
+																								? "border-slate-500/20 bg-slate-500/10 text-slate-300"
+																								: "border-sky-500/20 bg-sky-500/10 text-sky-300"
+																						}`}
+																					>
+																						{reasonContent}
+																					</div>
+																				) : null}
+																				{decision.result?.success === false &&
+																				decision.result?.error ? (
 																					<div className="mt-3 rounded-md border border-red-500/20 bg-red-500/10 p-2 text-xs text-red-400">
 																						{decision.result.error}
 																					</div>
@@ -396,7 +408,8 @@ export function ModelChatTab({
 																className="rounded-lg border bg-background/60 p-3"
 																style={{ borderColor: `${modelColor}33` }}
 															>
-																{conv.prompt && conv.prompt.trim().length > 0 ? (
+																{conv.prompt &&
+																conv.prompt.trim().length > 0 ? (
 																	<pre className="whitespace-pre-wrap wrap-break-word text-xs leading-relaxed font-sans text-muted-foreground">
 																		{conv.prompt}
 																	</pre>

@@ -59,10 +59,14 @@ export function closePositionTool(ctx: ToolContext) {
 			if (symbolsToClose.length === 0) {
 				const messages: string[] = [];
 				if (skippedDuplicates.length > 0) {
-					messages.push(`Already acted on ${skippedDuplicates.join(", ")} this invocation`);
+					messages.push(
+						`Already acted on ${skippedDuplicates.join(", ")} this invocation`,
+					);
 				}
 				if (skippedLimitReached.length > 0) {
-					messages.push(`Session limit (${MAX_ACTIONS_PER_SYMBOL}) reached for ${skippedLimitReached.join(", ")}`);
+					messages.push(
+						`Session limit (${MAX_ACTIONS_PER_SYMBOL}) reached for ${skippedLimitReached.join(", ")}`,
+					);
 				}
 				return messages.length > 0
 					? `${messages.join(". ")}. Call 'holding' if done.`
@@ -117,4 +121,3 @@ export function closePositionTool(ctx: ToolContext) {
 		},
 	});
 }
-

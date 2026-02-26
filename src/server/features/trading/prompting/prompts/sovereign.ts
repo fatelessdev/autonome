@@ -1,6 +1,6 @@
 // === CONFIGURATION ===
-const RISK_PER_TRADE_PCT = 0.02;  // 2% Standard Risk
-const ZOMBIE_HOURS = 24;          // Dead Capital Rule
+const RISK_PER_TRADE_PCT = 0.02; // 2% Standard Risk
+const ZOMBIE_HOURS = 24; // Dead Capital Rule
 
 export const SYSTEM_PROMPT = `You are **Autonome Sovereign**, an autonomous capital allocator.
 

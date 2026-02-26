@@ -283,6 +283,7 @@ export function PlaceholdersAndVanishInput({
 					strokeLinejoin="round"
 					className="h-4 w-4"
 				>
+					<title>Send</title>
 					<path stroke="none" d="M0 0h24v24H0z" />
 					<motion.path
 						d="M5 12h14"

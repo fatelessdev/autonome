@@ -31,7 +31,7 @@ export const extractTradingDecisions = (
 
 	toolCalls.forEach((tc) => {
 		const metadata = tc.metadata;
-		
+
 		// Handle HOLDING type - extract holding decisions with reason
 		if (tc.type === "HOLDING") {
 			const rawMetadata = metadata?.raw as Record<string, unknown> | undefined;
@@ -76,7 +76,9 @@ export const extractTradingDecisions = (
 		}>;
 
 		const decisionList: DecisionItem[] = [
-			...(Array.isArray(metadata?.decisions) ? (metadata.decisions as DecisionItem[]) : []),
+			...(Array.isArray(metadata?.decisions)
+				? (metadata.decisions as DecisionItem[])
+				: []),
 		];
 		const results = metadata?.results ?? [];
 		const resultLookup = new Map<
@@ -221,7 +223,10 @@ export const resolveModelIdentity = (source: ModelIdentitySource) => {
 		source.modelRouterName,
 		source.modelName,
 	]
-		.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+		.filter(
+			(value): value is string =>
+				typeof value === "string" && value.trim().length > 0,
+		)
 		.map((value) => value.trim());
 
 	for (const candidate of candidates) {

@@ -1,6 +1,6 @@
-import { ThemeProvider } from "./theme-provider";
+﻿import { ThemeProvider } from "./theme-provider";
 import { Toaster } from "./ui/sonner";
-import { VariantProvider } from "./variant-context";
+import { VariantProvider } from "./variant-provider";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
 	return (
@@ -10,9 +10,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 			enableSystem
 			disableTransitionOnChange
 		>
-			<VariantProvider>
-				{children}
-			</VariantProvider>
+			<VariantProvider>{children}</VariantProvider>
 			<Toaster richColors />
 		</ThemeProvider>
 	);

@@ -1,5 +1,5 @@
-import { cn } from "@/core/lib/utils";
-import { useVariant, VARIANT_TABS } from "./variant-context";
+﻿import { cn } from "@/core/lib/utils";
+import { useVariant, VARIANT_TABS } from "./variant-provider";
 
 export function VariantTabs() {
 	const { selectedVariant, setSelectedVariant } = useVariant();

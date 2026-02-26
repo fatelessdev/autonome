@@ -12,10 +12,17 @@
  * - Integrates TAAPI supplementary indicators for BTC/ETH
  */
 
-import { getMarketSnapshots, formatMarketSnapshots, type MarketSnapshot } from "./marketData";
-import { MARKETS } from "@/shared/markets/marketMetadata";
-import { taapiClient, type TaapiPreFetchResult } from "@/server/integrations/taapi";
+import {
+	type TaapiPreFetchResult,
+	taapiClient,
+} from "@/server/integrations/taapi";
 import { TAAPI_FREE_PLAN_SYMBOLS } from "@/server/integrations/taapi/types";
+import { MARKETS } from "@/shared/markets/marketMetadata";
+import {
+	formatMarketSnapshots,
+	getMarketSnapshots,
+	type MarketSnapshot,
+} from "./marketData";
 
 const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
 const FETCH_TIMEOUT_MS = 60_000; // 1 minute timeout for entire fetch operation
@@ -59,21 +66,24 @@ function formatTaapiIndicators(
 	if (data.bbands) {
 		lines.push(
 			`BBands(20): Upper=${data.bbands.valueUpperBand.toFixed(2)}, ` +
-			`Mid=${data.bbands.valueMiddleBand.toFixed(2)}, ` +
-			`Lower=${data.bbands.valueLowerBand.toFixed(2)}`
+				`Mid=${data.bbands.valueMiddleBand.toFixed(2)}, ` +
+				`Lower=${data.bbands.valueLowerBand.toFixed(2)}`,
 		);
 	}
 
 	if (data.adx) {
 		const strength =
-			data.adx.value >= 25 ? "strong trend" :
-			data.adx.value >= 20 ? "moderate trend" : "weak/no trend";
+			data.adx.value >= 25
+				? "strong trend"
+				: data.adx.value >= 20
+					? "moderate trend"
+					: "weak/no trend";
 		lines.push(`ADX(14): ${data.adx.value.toFixed(1)} (${strength})`);
 	}
 
 	if (data.supertrend) {
 		lines.push(
-			`Supertrend(10): ${data.supertrend.value.toFixed(2)} → ${data.supertrend.valueAdvice.toUpperCase()}`
+			`Supertrend(10): ${data.supertrend.value.toFixed(2)} → ${data.supertrend.valueAdvice.toUpperCase()}`,
 		);
 	}
 
@@ -81,17 +91,17 @@ function formatTaapiIndicators(
 	if (data.ichimoku) {
 		const ich = data.ichimoku;
 		lines.push(
-			`Ichimoku: Tenkan=${ich.conversion.toFixed(2)}, Kijun=${ich.base.toFixed(2)}`
+			`Ichimoku: Tenkan=${ich.conversion.toFixed(2)}, Kijun=${ich.base.toFixed(2)}`,
 		);
 		lines.push(
-			`  Cloud: SpanA=${ich.spanA.toFixed(2)}, SpanB=${ich.spanB.toFixed(2)}`
+			`  Cloud: SpanA=${ich.spanA.toFixed(2)}, SpanB=${ich.spanB.toFixed(2)}`,
 		);
-		
+
 		// Determine cloud status if we have current price
 		if (currentPrice !== undefined && currentPrice !== null) {
 			const cloudTop = Math.max(ich.spanA, ich.spanB);
 			const cloudBottom = Math.min(ich.spanA, ich.spanB);
-			
+
 			let cloudStatus: string;
 			if (currentPrice > cloudTop) {
 				cloudStatus = "ABOVE CLOUD (Bullish)";
@@ -185,7 +195,11 @@ export async function getSharedMarketIntelligence(credentials: {
 			const taapiIndicators = taapiData.get(symbol);
 			if (taapiIndicators) {
 				const currentPrice = priceMap.get(symbol);
-				const taapiSection = formatTaapiIndicators(symbol, taapiIndicators, currentPrice);
+				const taapiSection = formatTaapiIndicators(
+					symbol,
+					taapiIndicators,
+					currentPrice,
+				);
 				if (taapiSection) {
 					// Insert TAAPI section after the symbol's market data header
 					const marker = `### ${symbol} MARKET DATA`;
@@ -196,7 +210,10 @@ export async function getSharedMarketIntelligence(credentials: {
 						if (lineEnd !== -1) {
 							// Insert TAAPI section before the series data
 							const higherTfMarker = "**Higher timeframe (4h";
-							const higherTfIndex = formatted.indexOf(higherTfMarker, markerIndex);
+							const higherTfIndex = formatted.indexOf(
+								higherTfMarker,
+								markerIndex,
+							);
 							if (higherTfIndex !== -1) {
 								formatted =
 									formatted.slice(0, higherTfIndex) +
@@ -224,8 +241,11 @@ export async function getSharedMarketIntelligence(credentials: {
 	// Wrap with timeout to ensure fetch always settles
 	const timeoutPromise = new Promise<never>((_, reject) => {
 		setTimeout(
-			() => reject(new Error("Market intelligence fetch timed out after 60 seconds")),
-			FETCH_TIMEOUT_MS
+			() =>
+				reject(
+					new Error("Market intelligence fetch timed out after 60 seconds"),
+				),
+			FETCH_TIMEOUT_MS,
 		);
 	});
 
