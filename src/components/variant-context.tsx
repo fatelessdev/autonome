@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 
 import {
-	type VariantId as SharedVariantId,
 	type VariantIdWithAll,
 	VARIANT_TABS,
 } from "@/core/shared/variants";

@@ -1,3 +1,5 @@
+import { INITIAL_CAPITAL } from "@/core/shared/trading/calculations";
+
 const DATABASE_SCHEMA = `
 === DATABASE SCHEMA ===
 
@@ -9,7 +11,7 @@ TABLES:
 
 1. "Models" (AI trading model configs)
    id TEXT PK, name TEXT UNIQUE NOT NULL, "openRoutermodelName" TEXT,
-   "invocationCount" INT, "totalMinutes" INT, "accountIndex" TEXT
+   "invocationCount" INT, "totalMinutes" INT, "alpacaApiKey" TEXT, "alpacaApiSecret" TEXT
 
 2. "Orders" (positions & trades - single source of truth)
    id TEXT PK, "modelId" TEXT FK→Models, symbol TEXT, side "OrderSide",
@@ -80,8 +82,8 @@ WITH latest AS (
 )
 SELECT m.name,
    value AS current_value,
-   value - 10000 AS profit_vs_initial,
-   (value - 10000) / 10000.0 AS return_ratio
+   value - ${INITIAL_CAPITAL} AS profit_vs_initial,
+   (value - ${INITIAL_CAPITAL}) / ${INITIAL_CAPITAL}.0 AS return_ratio
 FROM latest JOIN "Models" m ON latest."modelId" = m.id;
 
 -- Avg leverage & confidence per model

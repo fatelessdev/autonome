@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, ChevronRight, Loader2, AlertTriangle, Clock, Zap, DollarSign } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2, AlertTriangle } from "lucide-react";
 
 import { VariantSelector } from "@/components/variant-selector";
 import { useVariant, type VariantId } from "@/components/variant-context";
@@ -50,29 +50,6 @@ const formatDate = (date: Date) =>
 
 const formatPercent = (value: number) => `${value.toFixed(2)}%`;
 
-const formatTokens = (tokens: number) => {
-	if (tokens >= 1000000) return `${(tokens / 1000000).toFixed(1)}M`;
-	if (tokens >= 1000) return `${(tokens / 1000).toFixed(1)}K`;
-	return tokens.toString();
-};
-
-/**
- * Estimate cost based on token usage.
- * Using approximate OpenRouter pricing for Claude Sonnet 4.
- * Input: ~$3/1M tokens, Output: ~$15/1M tokens
- */
-const estimateCost = (inputTokens: number, outputTokens: number): number => {
-	const inputCost = (inputTokens / 1000000) * 3;
-	const outputCost = (outputTokens / 1000000) * 15;
-	return inputCost + outputCost;
-};
-
-const formatCost = (cost: number): string => {
-	if (cost < 0.001) return "<$0.001";
-	if (cost < 0.01) return `$${cost.toFixed(4)}`;
-	return `$${cost.toFixed(3)}`;
-};
-
 function FailureCard({ failure }: { failure: FailureEntry }) {
 	const [isOpen, setIsOpen] = useState(false);
 	const modelInfo = getModelInfo(failure.modelName);
@@ -87,14 +64,6 @@ function FailureCard({ failure }: { failure: FailureEntry }) {
 	const failedExecutions = executionResults.filter(
 		(r: unknown) => (r as { success?: boolean })?.success === false,
 	);
-
-	// Extract step telemetry
-	const stepTelemetry = failure.stepTelemetry ?? [];
-	const totalSteps = failure.totalSteps ?? stepTelemetry.length;
-	const totalInputTokens = failure.totalInputTokens ?? 0;
-	const totalOutputTokens = failure.totalOutputTokens ?? 0;
-	const estimatedCost = estimateCost(totalInputTokens, totalOutputTokens);
-	const hitMaxSteps = totalSteps >= 10; // Our stopWhen limit
 
 	return (
 		<Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -131,31 +100,11 @@ function FailureCard({ failure }: { failure: FailureEntry }) {
 												Classified
 											</Badge>
 										)}
-										{hitMaxSteps && (
-											<Badge variant="outline" className="text-xs text-orange-500 border-orange-500/50">
-												<Clock className="h-3 w-3 mr-1" />
-												Max Steps
-											</Badge>
-										)}
 									</CardTitle>
 									<CardDescription className="flex items-center gap-3">
 										<span>{formatDate(failure.createdAt)}</span>
 										<span>•</span>
-										<span className="flex items-center gap-1">
-											<Zap className="h-3 w-3" />
-											{totalSteps} steps
-										</span>
-										<span>•</span>
 										<span>{failure.toolCalls.length} tool calls</span>
-										{(totalInputTokens > 0 || totalOutputTokens > 0) && (
-											<>
-												<span>•</span>
-												<span className="flex items-center gap-1">
-													<DollarSign className="h-3 w-3" />
-													{formatCost(estimatedCost)}
-												</span>
-											</>
-										)}
 										{failedExecutions.length > 0 && (
 											<span className="text-red-500">
 												• {failedExecutions.length} failed
@@ -176,69 +125,6 @@ function FailureCard({ failure }: { failure: FailureEntry }) {
 				</CollapsibleTrigger>
 				<CollapsibleContent>
 					<CardContent className="pt-0">
-						{/* Step Telemetry Summary */}
-						{stepTelemetry.length > 0 && (
-							<div className="mb-4 p-3 rounded-lg bg-muted/50 border">
-								<h4 className="font-semibold mb-2 flex items-center gap-2">
-									<Zap className="h-4 w-4" />
-									Execution Telemetry
-								</h4>
-								<div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-									<div>
-										<span className="text-muted-foreground">Steps:</span>
-										<span className={cn("ml-1 font-medium", hitMaxSteps && "text-orange-500")}>
-											{totalSteps}{hitMaxSteps && " (limit)"}
-										</span>
-									</div>
-									<div>
-										<span className="text-muted-foreground">Input:</span>
-										<span className="ml-1 font-medium">{formatTokens(totalInputTokens)}</span>
-									</div>
-									<div>
-										<span className="text-muted-foreground">Output:</span>
-										<span className="ml-1 font-medium">{formatTokens(totalOutputTokens)}</span>
-									</div>
-									<div>
-										<span className="text-muted-foreground">Est. Cost:</span>
-										<span className="ml-1 font-medium">{formatCost(estimatedCost)}</span>
-									</div>
-								</div>
-								{/* Step breakdown */}
-								<Collapsible className="mt-3">
-									<CollapsibleTrigger asChild>
-										<Button variant="outline" size="sm" className="w-full justify-start">
-											<ChevronRight className="h-4 w-4 mr-2" />
-											View Step Breakdown
-										</Button>
-									</CollapsibleTrigger>
-									<CollapsibleContent className="mt-2">
-										<div className="space-y-1 text-xs">
-											{stepTelemetry.map((step) => (
-												<div
-													key={step.stepNumber}
-													className="flex items-center justify-between p-2 rounded bg-background"
-												>
-													<div className="flex items-center gap-2">
-														<Badge variant="outline" className="text-xs">
-															Step {step.stepNumber}
-														</Badge>
-														{step.toolNames.length > 0 && (
-															<span className="text-muted-foreground">
-																{step.toolNames.join(", ")}
-															</span>
-														)}
-													</div>
-													<span className="text-muted-foreground">
-														{formatTokens(step.inputTokens)} in / {formatTokens(step.outputTokens)} out
-													</span>
-												</div>
-											))}
-										</div>
-									</CollapsibleContent>
-								</Collapsible>
-							</div>
-						)}
-
 						{/* Failure Reason */}
 						{failure.failureReason && (
 							<div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">

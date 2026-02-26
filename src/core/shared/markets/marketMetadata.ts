@@ -1,43 +1,35 @@
+/**
+ * Market Metadata for Alpaca Trading
+ *
+ * Crypto symbols use "X/USD" format on Alpaca (e.g. "BTC/USD").
+ * The `symbol` key is the Alpaca-formatted symbol.
+ * `canonical` is the short form used in our DB and UI (e.g. "BTC").
+ */
 export const MARKETS = {
 	BTC: {
-		marketId: 1,
-		priceDecimals: 10,
-		qtyDecimals: 100000,
-		clientOrderIndex: 0,
-		slClientOrderIndex: 100,  // SL orders use offset +100
-		tpClientOrderIndex: 200,  // TP orders use offset +200
+		symbol: "BTC/USD",
+		canonical: "BTC",
+		assetClass: "crypto" as const,
 	},
 	ETH: {
-		marketId: 0,
-		priceDecimals: 100,
-		qtyDecimals: 10000,
-		clientOrderIndex: 1,
-		slClientOrderIndex: 101,
-		tpClientOrderIndex: 201,
+		symbol: "ETH/USD",
+		canonical: "ETH",
+		assetClass: "crypto" as const,
 	},
 	SOL: {
-		marketId: 2,
-		priceDecimals: 1000,
-		qtyDecimals: 1000,
-		clientOrderIndex: 2,
-		slClientOrderIndex: 102,
-		tpClientOrderIndex: 202,
+		symbol: "SOL/USD",
+		canonical: "SOL",
+		assetClass: "crypto" as const,
 	},
-	ZEC: {
-		marketId: 90,
-		priceDecimals: 1000,
-		qtyDecimals: 1000,
-		clientOrderIndex: 3,
-		slClientOrderIndex: 103,
-		tpClientOrderIndex: 203,
+	XRP: {
+		symbol: "XRP/USD",
+		canonical: "XRP",
+		assetClass: "crypto" as const,
 	},
 	HYPE: {
-		marketId: 24,
-		priceDecimals: 10000,
-		qtyDecimals: 100,
-		clientOrderIndex: 4,
-		slClientOrderIndex: 104,
-		tpClientOrderIndex: 204,
+		symbol: "HYPE/USD",
+		canonical: "HYPE",
+		assetClass: "crypto" as const,
 	},
 } as const;
 
@@ -46,3 +38,44 @@ type MarketSymbol = keyof typeof MARKETS;
 export const SUPPORTED_MARKETS: MarketSymbol[] = Object.keys(
 	MARKETS,
 ) as MarketSymbol[];
+
+const normalizeRawSymbol = (value: string) =>
+	value.toUpperCase().trim().replace(/\s+/g, "");
+
+/**
+ * Resolve an Alpaca symbol (e.g. "BTC/USD") back to canonical form ("BTC").
+ */
+export function toCanonical(alpacaSymbol: string): string {
+	const normalized = normalizeRawSymbol(alpacaSymbol);
+
+	if (MARKETS[normalized as MarketSymbol]) {
+		return normalized;
+	}
+
+	for (const market of Object.values(MARKETS)) {
+		if (market.symbol === normalized) return market.canonical;
+	}
+
+	return normalized;
+}
+
+/**
+ * Resolve a canonical symbol ("BTC") to the Alpaca API symbol ("BTC/USD").
+ */
+export function toAlpacaSymbol(canonical: string): string {
+	const normalized = normalizeRawSymbol(canonical);
+
+	for (const market of Object.values(MARKETS)) {
+		if (market.symbol === normalized) {
+			return market.symbol;
+		}
+	}
+
+	const base = toCanonical(normalized).toUpperCase();
+	const market = MARKETS[base as MarketSymbol];
+	if (!market) {
+		throw new Error(`Unsupported Alpaca market symbol: ${canonical}`);
+	}
+
+	return market.symbol;
+}

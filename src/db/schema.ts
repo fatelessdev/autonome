@@ -11,7 +11,7 @@ import {
 	uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-import { VARIANT_IDS } from "@/core/shared/variants";
+import { DEFAULT_VARIANT, VARIANT_IDS } from "@/core/shared/variants";
 
 export const toolCallTypeEnum = pgEnum("ToolCallType", [
 	"CREATE_POSITION",
@@ -32,11 +32,11 @@ export const models = pgTable(
 		id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
 		name: text("name").notNull(),
 		openRouterModelName: text("openRouterModelName").notNull(),
-		variant: variantEnum("variant").notNull().default("Apex"),
-		lighterApiKey: text("lighterApiKey").notNull().default("0"),
+		variant: variantEnum("variant").notNull().default(DEFAULT_VARIANT),
+		alpacaApiKey: text("alpacaApiKey").notNull(),
+		alpacaApiSecret: text("alpacaApiSecret").notNull(),
 		invocationCount: integer("invocationCount").notNull().default(0),
 		totalMinutes: integer("totalMinutes").notNull().default(0),
-		accountIndex: text("accountIndex").notNull().default("0"),
 		failedWorkflowCount: integer("failedWorkflowCount").notNull().default(0),
 		failedToolCallCount: integer("failedToolCallCount").notNull().default(0),
 	},
@@ -156,12 +156,8 @@ export const orders = pgTable(
 		realizedPnl: numeric("realizedPnl", { precision: 18, scale: 2 }),
 		// Auto-close trigger (null = manual close, "STOP" or "TARGET" = auto)
 		closeTrigger: text("closeTrigger"),
-		// Lighter exchange order indices for real SL/TP orders
-		slOrderIndex: text("slOrderIndex"),
-		tpOrderIndex: text("tpOrderIndex"),
-		// Trigger prices for SL/TP orders (stored for reference)
-		slTriggerPrice: numeric("slTriggerPrice", { precision: 18, scale: 8 }),
-		tpTriggerPrice: numeric("tpTriggerPrice", { precision: 18, scale: 8 }),
+		// Alpaca broker order ID for tracking fills and status
+		alpacaOrderId: text("alpacaOrderId"),
 		// Timestamps
 		openedAt: timestamp("openedAt").defaultNow().notNull(),
 		closedAt: timestamp("closedAt"),

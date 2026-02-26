@@ -12,7 +12,7 @@ import {
 	VARIANT_CONFIG,
 	variantIdSchema,
 } from "@/core/shared/variants";
-import { VARIANT_PROMPTS } from "@/server/features/trading/prompts/variants";
+import { VARIANT_PROMPTS } from "@/server/features/trading/prompting/prompts/variants";
 
 // ==================== Schema Definitions ====================
 
@@ -252,3 +252,4 @@ export const getVariantHistory = os
 			return { variants, aggregate };
 		});
 	});
+

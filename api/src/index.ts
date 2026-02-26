@@ -6,49 +6,68 @@
  */
 
 import { RPCHandler } from "@orpc/server/fetch";
-import { type Context, Hono } from "hono";
+import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
-import { streamSSE } from "hono/streaming";
 
 import "@/polyfill";
 
 import { env } from "@/env";
+import { getWorld } from "workflow/runtime";
+import { start } from "workflow/api";
 import { subscribeToWorkflowEvents } from "@/server/events/workflowEvents";
 import {
-	emitPortfolioEvent,
-	getCurrentPortfolioSummary,
 	subscribeToPortfolioEvents,
 } from "@/server/features/portfolio/events/portfolioEvents";
-import { refreshConversationEvents } from "@/server/features/trading/conversationsSnapshot.server";
 import {
-	type ConversationEventData,
-	emitConversationEvent,
-	getCurrentConversations,
 	subscribeToConversationEvents,
 } from "@/server/features/trading/events/conversationEvents";
 import {
-	emitPositionEvent,
-	getCurrentPositions,
-	type PositionEventData,
 	subscribeToPositionEvents,
 } from "@/server/features/trading/events/positionEvents";
 import {
-	emitTradeEvent,
-	getCurrentTrades,
 	subscribeToTradeEvents,
-	type TradeEventData,
 } from "@/server/features/trading/events/tradeEvents";
-import {
-	fetchPositions,
-	fetchTrades,
-} from "@/server/features/trading/queries.server";
 import router from "@/server/orpc/router";
-import { bootstrapSchedulers } from "@/server/schedulers/bootstrap";
-import {
-	getSchedulerHealth,
-	getSchedulerDetailedHealth,
-} from "@/server/schedulers/schedulerState";
+import { createSseHandler } from "./sse";
+
+type DashboardEventType =
+	| "positions:changed"
+	| "trades:changed"
+	| "conversations:changed"
+	| "portfolio:changed"
+	| "connected";
+
+type DashboardEvent = {
+	type: DashboardEventType;
+	timestamp: string;
+};
+
+function subscribeToDashboardEvents(
+	listener: (event: DashboardEvent) => void,
+): () => void {
+	const now = () => new Date().toISOString();
+	const unsubscribes = [
+		subscribeToPositionEvents(() => {
+			listener({ type: "positions:changed", timestamp: now() });
+		}),
+		subscribeToTradeEvents(() => {
+			listener({ type: "trades:changed", timestamp: now() });
+		}),
+		subscribeToConversationEvents(() => {
+			listener({ type: "conversations:changed", timestamp: now() });
+		}),
+		subscribeToPortfolioEvents(() => {
+			listener({ type: "portfolio:changed", timestamp: now() });
+		}),
+	];
+
+	return () => {
+		for (const unsubscribe of unsubscribes) {
+			unsubscribe();
+		}
+	};
+}
 
 // ==================== Global Error Handlers ====================
 // Prevent unhandled errors from silently crashing schedulers
@@ -103,228 +122,136 @@ app.all("/api/rpc/*", async (c) => {
 	return response ?? c.json({ error: "Not Found" }, 404);
 });
 
+// ==================== Workflow DevKit Routes ====================
+// The Vite workflow() plugin compiles "use workflow"/"use step" directives into
+// node_modules/.nitro/workflow/. The local world POSTs execution requests to
+// these /.well-known/ routes. We mount the compiled handlers here so the API
+// server can process workflow and step executions.
+
+// Dynamic imports for compiled workflow handlers.
+// These MUST be lazy (not top-level) to avoid a race condition:
+// the API starts before Vite finishes recompiling the .mjs bundles,
+// so static imports would load the stale version from the previous run.
+const loadWorkflowFlowHandler = () =>
+	// @ts-ignore — generated .mjs files have no type declarations
+	import("../../node_modules/.nitro/workflow/workflows.mjs").then((m) => m.POST);
+const loadWorkflowStepHandler = () =>
+	// @ts-ignore — generated .mjs files have no type declarations
+	import("../../node_modules/.nitro/workflow/steps.mjs").then((m) => m.POST);
+const loadWebhookHandlers = () =>
+	// @ts-ignore — generated .mjs files have no type declarations
+	import("../../node_modules/.nitro/workflow/webhook.mjs").then((m) => ({
+		POST: m.POST,
+		GET: m.GET,
+	}));
+
+// GET handler for health checks — Hono auto-handles HEAD for GET routes,
+// so the local world's HEAD ?__health probes will return 200.
+app.get("/.well-known/workflow/v1/flow", (c) => c.body(null, 200));
+
+app.post("/.well-known/workflow/v1/flow", async (c) => {
+	const handler = await loadWorkflowFlowHandler();
+	return handler(c.req.raw);
+});
+
+app.post("/.well-known/workflow/v1/step", async (c) => {
+	const handler = await loadWorkflowStepHandler();
+	return handler(c.req.raw);
+});
+
+app.all("/.well-known/workflow/v1/webhook/:token", async (c) => {
+	const { POST, GET } = await loadWebhookHandlers();
+	const handler = c.req.method === "GET" ? GET : POST;
+	return handler(c.req.raw);
+});
+
 // ==================== SSE Endpoints ====================
 
-const HEARTBEAT_MS = 15_000;
-
-app.get("/api/events/positions", async (c) => {
-	return streamSSE(c, async (stream) => {
-		// Hydrate cache
-		const positions = await fetchPositions();
-		emitPositionEvent({
-			type: "positions:updated",
-			timestamp: new Date().toISOString(),
-			data: positions as PositionEventData[],
-		});
-
-		// Send initial data
-		await stream.writeSSE({ data: JSON.stringify(getCurrentPositions()) });
-
-		// Subscribe to updates
-		const unsubscribe = subscribeToPositionEvents((event) => {
-			stream.writeSSE({ data: JSON.stringify(event.data) });
-		});
-
-		// Heartbeat
-		const heartbeat = setInterval(() => {
-			stream.writeSSE({ event: "ping", data: "" });
-		}, HEARTBEAT_MS);
-
-		// Wait for abort
-		stream.onAbort(() => {
-			clearInterval(heartbeat);
-			unsubscribe();
-		});
-
-		// Keep stream alive
-		await new Promise(() => {});
-	});
-});
-
-app.get("/api/events/trades", async (c) => {
-	return streamSSE(c, async (stream) => {
-		// Hydrate cache
-		const trades = await fetchTrades();
-		emitTradeEvent({
-			type: "trades:updated",
-			timestamp: new Date().toISOString(),
-			data: trades as unknown as TradeEventData[],
-		});
-
-		// Send initial data
-		await stream.writeSSE({ data: JSON.stringify(getCurrentTrades()) });
-
-		// Subscribe to updates
-		const unsubscribe = subscribeToTradeEvents((event) => {
-			stream.writeSSE({ data: JSON.stringify(event.data) });
-		});
-
-		// Heartbeat
-		const heartbeat = setInterval(() => {
-			stream.writeSSE({ event: "ping", data: "" });
-		}, HEARTBEAT_MS);
-
-		// Wait for abort
-		stream.onAbort(() => {
-			clearInterval(heartbeat);
-			unsubscribe();
-		});
-
-		// Keep stream alive
-		await new Promise(() => {});
-	});
-});
-
-app.get("/api/events/conversations", async (c) => {
-	return streamSSE(c, async (stream) => {
-		// Hydrate cache
-		const conversations = await refreshConversationEvents();
-		emitConversationEvent({
-			type: "conversations:updated",
-			timestamp: new Date().toISOString(),
-			data: conversations as ConversationEventData[],
-		});
-
-		// Send initial data
-		await stream.writeSSE({ data: JSON.stringify(getCurrentConversations()) });
-
-		// Subscribe to updates
-		const unsubscribe = subscribeToConversationEvents((event) => {
-			stream.writeSSE({ data: JSON.stringify(event.data) });
-		});
-
-		// Heartbeat
-		const heartbeat = setInterval(() => {
-			stream.writeSSE({ event: "ping", data: "" });
-		}, HEARTBEAT_MS);
-
-		// Wait for abort
-		stream.onAbort(() => {
-			clearInterval(heartbeat);
-			unsubscribe();
-		});
-
-		// Keep stream alive
-		await new Promise(() => {});
-	});
-});
-
-app.get("/api/events/portfolio", async (c) => {
-	return streamSSE(c, async (stream) => {
-		// Emit initial event
-		emitPortfolioEvent({
-			type: "portfolio:updated",
-			timestamp: new Date().toISOString(),
-			data: { modelsUpdated: 0, snapshotsCreated: 0 },
-		});
-
-		// Send initial data
-		await stream.writeSSE({
-			data: JSON.stringify(getCurrentPortfolioSummary()),
-		});
-
-		// Subscribe to updates
-		const unsubscribe = subscribeToPortfolioEvents((event) => {
-			stream.writeSSE({ data: JSON.stringify(event.data) });
-		});
-
-		// Heartbeat
-		const heartbeat = setInterval(() => {
-			stream.writeSSE({ event: "ping", data: "" });
-		}, HEARTBEAT_MS);
-
-		// Wait for abort
-		stream.onAbort(() => {
-			clearInterval(heartbeat);
-			unsubscribe();
-		});
-
-		// Keep stream alive
-		await new Promise(() => {});
-	});
-});
-
-app.get("/api/events/workflow", async (c) => {
-	return streamSSE(c, async (stream) => {
-		// Send connected event
-		await stream.writeSSE({
+app.get(
+	"/api/events/workflow",
+	createSseHandler({
+		getInitialMessage: () => ({
 			event: "connected",
 			data: JSON.stringify({
 				type: "connected",
 				timestamp: new Date().toISOString(),
 			}),
-		});
+		}),
+		subscribe: subscribeToWorkflowEvents,
+		toSseMessage: (event) => ({
+			event: event.type,
+			data: JSON.stringify(event),
+		}),
+		heartbeatMs: 30_000,
+		heartbeatMessage: { data: "" },
+	}),
+);
 
-		// Subscribe to workflow events
-		const unsubscribe = subscribeToWorkflowEvents((event) => {
-			stream.writeSSE({
-				event: event.type,
-				data: JSON.stringify(event),
-			});
-		});
-
-		// Heartbeat
-		const heartbeat = setInterval(() => {
-			stream.writeSSE({ data: "" });
-		}, 30_000);
-
-		// Wait for abort
-		stream.onAbort(() => {
-			clearInterval(heartbeat);
-			unsubscribe();
-		});
-
-		// Keep stream alive
-		await new Promise(() => {});
-	});
-});
+app.get(
+	"/api/events/dashboard",
+	createSseHandler({
+		getInitialMessage: () => ({
+			data: JSON.stringify({
+				type: "connected",
+				timestamp: new Date().toISOString(),
+			}),
+		}),
+		subscribe: subscribeToDashboardEvents,
+		toSseMessage: (event) => ({ data: JSON.stringify(event) }),
+	}),
+);
 
 // ==================== Health Check ====================
 
-// Health handler function (reused for both paths)
-const healthHandler = (c: Context) => {
-	const health = getSchedulerHealth();
-	return c.json(health);
-};
-
-app.get("/health", healthHandler);
-app.get("/api/health", healthHandler);
+app.get("/health", (c) => c.json({ status: "ok", timestamp: new Date().toISOString() }));
+app.get("/api/health", (c) => c.json({ status: "ok", timestamp: new Date().toISOString() }));
 
 app.get("/", (c) => {
 	return c.json({
 		name: "Autonome API",
-		version: "1.0.0",
+		version: "2.0.0",
+		broker: "alpaca",
 		endpoints: [
 			"/api/rpc/*",
-			"/api/events/positions",
-			"/api/events/trades",
-			"/api/events/conversations",
-			"/api/events/portfolio",
+			"/api/events/dashboard",
 			"/api/events/workflow",
 			"/health",
-			"/health/schedulers",
 		],
 	});
 });
 
-// Detailed scheduler health endpoint
-const schedulersHealthHandler = (c: Context) => {
-	const detailedHealth = getSchedulerDetailedHealth();
-	return c.json(detailedHealth);
-};
-
-app.get("/health/schedulers", schedulersHealthHandler);
-app.get("/api/health/schedulers", schedulersHealthHandler);
-
 // ==================== Start Server ====================
 
-const port = env.PORT;
+const port = env.API_PORT;
+
+/**
+ * Workflow metadata for the trade cycle.
+ * The API server runs via `bun --hot` (no Vite), so `"use workflow"` directives
+ * aren't compiled here. We pass the pre-compiled workflowId directly instead.
+ * This ID is generated by the Workflow DevKit Vite plugin (see manifest.json).
+ */
+const TRADE_CYCLE_WORKFLOW = {
+	workflowId: "workflow//./src/server/workflows/tradeCycle//tradeCycleWorkflow",
+};
 
 async function main() {
 	console.log("🚀 Starting Autonome API server...");
 
-	// Bootstrap schedulers (simulator, price tracker, trade executor)
-	await bootstrapSchedulers();
+	// Start the Workflow DevKit world (connects to queue backend, begins processing)
+	const world = getWorld();
+	if (world.start) {
+		await world.start();
+		console.log("✅ Workflow world started");
+	}
+
+	// Start the trade cycle workflow (idempotent — if already running, this is a no-op)
+	try {
+		await start(TRADE_CYCLE_WORKFLOW);
+		console.log("✅ Trade cycle workflow started");
+	} catch (error) {
+		// If the workflow is already running, this is expected
+		console.log("ℹ️ Trade cycle workflow:", error instanceof Error ? error.message : String(error));
+	}
 
 	console.log(`✅ API server running on http://localhost:${port}`);
 }
@@ -333,5 +260,6 @@ main().catch(console.error);
 
 export default {
 	port,
+	idleTimeout: 120, // seconds — Bun default is 10s, SSE needs much longer
 	fetch: app.fetch,
 };

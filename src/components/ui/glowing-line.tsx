@@ -23,6 +23,16 @@ type ChartDatum = {
 };
 type SeriesMeta = Record<string, { originalKey: string }>;
 
+export type TimeFilter = "1d" | "1w" | "1m" | "72h" | "all";
+
+const TIME_FILTER_OPTIONS: { value: TimeFilter; label: string }[] = [
+	{ value: "1d", label: "1D" },
+	{ value: "72h", label: "3D" },
+	{ value: "1w", label: "1W" },
+	{ value: "1m", label: "1M" },
+	{ value: "all", label: "ALL" },
+];
+
 const FLOW_FORMAT_CURRENCY = {
 	style: "currency" as const,
 	currency: "USD",
@@ -53,8 +63,8 @@ type GlowingLineChartProps = {
 	seriesMeta: SeriesMeta;
 	valueMode?: "usd" | "percent";
 	onValueModeChange?: (mode: "usd" | "percent") => void;
-	timeFilter?: "all" | "72h";
-	onTimeFilterChange?: (filter: "all" | "72h") => void;
+	timeFilter?: TimeFilter;
+	onTimeFilterChange?: (filter: TimeFilter) => void;
 	hoveredLine?: string | null;
 	onHoverLine?: (key: string | null) => void;
 	compact?: boolean;
@@ -357,8 +367,22 @@ export function GlowingLineChart({
 		}
 
 		// For USD mode, find min/max values across all series
-		let minVal = Number.POSITIVE_INFINITY;
-		let maxVal = 10000; // Default minimum
+		let minVal = 0;
+		let maxVal = 100000; // Default to INITIAL_CAPITAL
+		let startingValue: number | null = null;
+
+		for (const row of chartData) {
+			for (const key of modelKeys) {
+				const val = row[key];
+				if (typeof val === "number" && Number.isFinite(val)) {
+					startingValue = val;
+					break;
+				}
+			}
+			if (startingValue != null) {
+				break;
+			}
+		}
 		for (const row of chartData) {
 			for (const key of modelKeys) {
 				const val = row[key];
@@ -369,12 +393,19 @@ export function GlowingLineChart({
 			}
 		}
 		// Handle edge case where no data exists
-		if (!Number.isFinite(minVal)) minVal = 10000;
+		if (!Number.isFinite(minVal)) minVal = 100000;
 
-		// Fixed step size for ±2k unlocking
-		const STEP = 2000;
-		const DEFAULT_MIN = 8000;
-		const DEFAULT_MAX = 12000;
+		// Dynamic step size based on data range (targets ~5-7 ticks)
+		const dataRange = maxVal - Math.max(minVal, 0);
+		const rawStep = dataRange / 5;
+		// Round step to nearest "nice" number (10k, 20k, 5k, etc.)
+		const magnitude = 10 ** Math.floor(Math.log10(rawStep || 1));
+		const STEP = Math.max(
+			magnitude,
+			Math.ceil(rawStep / magnitude) * magnitude,
+		);
+		const DEFAULT_MIN = Math.floor(90000 / STEP) * STEP; // ~90k floor
+		const DEFAULT_MAX = Math.ceil(110000 / STEP) * STEP; // ~110k ceiling
 
 		// Start with default bounds (8k-12k)
 		// Unlock lower bound in 2k increments when data goes below
@@ -389,14 +420,27 @@ export function GlowingLineChart({
 			maxBound += STEP;
 		}
 
-		// Generate ticks at 2k intervals
+		const anchorValue = startingValue ?? 100000;
+
+		while (anchorValue < minBound && minBound > 0) {
+			minBound -= STEP;
+		}
+
+		while (anchorValue > maxBound) {
+			maxBound += STEP;
+		}
+
+		// Generate ticks at dynamic intervals and force anchor tick label
 		const ticks: number[] = [];
 		for (let t = minBound; t <= maxBound; t += STEP) {
 			ticks.push(t);
 		}
+		ticks.push(anchorValue);
+		ticks.sort((a, b) => a - b);
+		const uniqueTicks = Array.from(new Set(ticks));
 		return {
-			domain: [minBound, maxBound] as [number, number],
-			ticks,
+			domain: [uniqueTicks[0] ?? minBound, uniqueTicks[uniqueTicks.length - 1] ?? maxBound] as [number, number],
+			ticks: uniqueTicks,
 		};
 	}, [chartData, modelKeys, isPercent]);
 
@@ -491,37 +535,26 @@ export function GlowingLineChart({
 							{variantLabel} / TOTAL ACCOUNT VALUE
 						</h2>
 					</div>
-					{/* ALL and 72H buttons - desktop only */}
+					{/* Time filter buttons - desktop only */}
 					{!compact ? (
-						<div className="flex gap-2">
-							<Button
-								aria-pressed={timeFilter === "all"}
-								className="h-8 w-16 text-xs font-medium sm:w-auto sm:px-3"
-								onClick={() => onTimeFilterChange?.("all")}
-								onKeyDown={(e) => {
-									if (e.key === "Enter" || e.key === " ") {
-										onTimeFilterChange?.("all");
-									}
-								}}
-								type="button"
-								variant={timeFilter === "all" ? "default" : "outline"}
-							>
-								ALL
-							</Button>
-							<Button
-								aria-pressed={timeFilter === "72h"}
-								className="h-8 w-16 text-xs font-medium sm:w-auto sm:px-3"
-								onClick={() => onTimeFilterChange?.("72h")}
-								onKeyDown={(e) => {
-									if (e.key === "Enter" || e.key === " ") {
-										onTimeFilterChange?.("72h");
-									}
-								}}
-								type="button"
-								variant={timeFilter === "72h" ? "default" : "outline"}
-							>
-								72H
-							</Button>
+						<div className="flex gap-1">
+							{TIME_FILTER_OPTIONS.map((option) => (
+								<Button
+									key={option.value}
+									aria-pressed={timeFilter === option.value}
+									className="h-7 min-w-10 px-2 text-[11px] font-medium"
+									onClick={() => onTimeFilterChange?.(option.value)}
+									onKeyDown={(e) => {
+										if (e.key === "Enter" || e.key === " ") {
+											onTimeFilterChange?.(option.value);
+										}
+									}}
+									type="button"
+									variant={timeFilter === option.value ? "default" : "outline"}
+								>
+									{option.label}
+								</Button>
+							))}
 						</div>
 					) : null}
 				</div>

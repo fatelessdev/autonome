@@ -9,7 +9,7 @@ import { normalizeNumber } from "@/core/shared/formatting/numberFormat";
 
 // ==================== Constants ====================
 
-export const INITIAL_CAPITAL = 10_000;
+export const INITIAL_CAPITAL = 100_000;
 export const RISK_FREE_RATE = 0;
 
 // ==================== P&L Calculations ====================

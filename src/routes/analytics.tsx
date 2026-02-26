@@ -24,6 +24,7 @@ import {
 import { VariantSelector } from "@/components/variant-selector";
 import { useVariant, type VariantId } from "@/components/variant-context";
 import { cn } from "@/core/lib/utils";
+import { normalizeIdentifier } from "@/core/shared/strings/normalizeIdentifier";
 import { getModelInfo } from "@/core/shared/models/modelConfig";
 import { getVariantBadgeClasses } from "@/core/shared/variants";
 import { formatHoldTime } from "@/core/shared/trading/calculations";
@@ -53,11 +54,7 @@ const formatPercent = (value: number, decimals = 2) =>
 	`${value >= 0 ? "+" : ""}${value.toFixed(decimals)}%`;
 
 const normalizeModelKey = (value: string) =>
-	value
-		.trim()
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-+|-+$/g, "") || "model";
+	normalizeIdentifier(value, "model");
 
 const averageNumber = (values: number[]) =>
 	values.length === 0

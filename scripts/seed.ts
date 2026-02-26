@@ -15,6 +15,7 @@ import { sql } from "drizzle-orm";
 import { Pool } from "pg";
 import { env } from "@/env";
 import { VARIANT_IDS } from "@/core/shared/variants";
+import { ALPACA_KEYS } from "./alpacaKeys";
 
 // Load environment variables
 config({ path: ".env.local" });
@@ -34,18 +35,18 @@ const db = drizzle(pool);
 // Model definitions - openRouterModelName
 const MODEL_DEFINITIONS = [
 	//working models
-	"stepfun-ai/step-3.5-flash",
-	"minimaxai/minimax-m2.1",
-	"z-ai/glm4.7",
+	// "stepfun-ai/step-3.5-flash",
+	// "minimaxai/minimax-m2.1",
+	// "z-ai/glm4.7",
 	"deepseek-ai/deepseek-v3.1-terminus",
 	// not working models
 	// "xiaomi/mimo-v2-flash:free",
 	// "kwaipilot/kat-coder-pro:free",
 	// "deepseek-ai/deepseek-v3.2",
 	// "mistralai/mistral-large-3-675b-instruct-2512"
-	"kimi-for-coding-free",
-	"coding-minimax-m2.1-free",
-	"coding-glm-4.7-free",
+	// "kimi-for-coding-free",
+	// "coding-minimax-m2.1-free",
+	// "coding-glm-4.7-free",
 
 ];
 
@@ -85,25 +86,30 @@ async function seed() {
 			const name = extractModelName(openRouterModelName);
 
 			for (const variant of VARIANT_IDS) {
+				const keys = ALPACA_KEYS[variant];
+				if (!keys) {
+					console.warn(`  ⚠ No Alpaca keys found for variant "${variant}", using placeholders`);
+				}
+
 				await db.execute(sql`
 					INSERT INTO "Models" (
 						"id",
 						"name",
 						"openRouterModelName",
 						"variant",
-						"lighterApiKey",
+						"alpacaApiKey",
+						"alpacaApiSecret",
 						"invocationCount",
-						"totalMinutes",
-						"accountIndex"
+						"totalMinutes"
 					) VALUES (
 						${crypto.randomUUID()},
 						${name},
 						${openRouterModelName},
 						${variant},
-						'0',
+						${keys?.alpacaApiKey ?? "placeholder-key"},
+						${keys?.alpacaApiSecret ?? "placeholder-secret"},
 						0,
-						0,
-						'0'
+						0
 					)
 				`);
 

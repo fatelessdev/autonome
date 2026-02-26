@@ -8,7 +8,7 @@ import { z } from "zod";
 
 import { ToolCallType } from "@/server/db/tradingRepository";
 import { createToolCallMutation } from "@/server/db/tradingRepository.server";
-import { closePosition } from "@/server/features/trading/closePosition";
+import { closePosition } from "@/server/features/trading/execution/closePosition";
 
 import { marketSymbols } from "../schemas";
 import { MAX_ACTIONS_PER_SYMBOL, type ToolContext } from "./types";
@@ -97,6 +97,7 @@ export function closePositionTool(ctx: ToolContext) {
 					realizedPnl: position.realizedPnl,
 					unrealizedPnl: position.unrealizedPnl,
 					closedAt: position.closedAt ?? null,
+					orderId: position.orderId,
 				});
 			}
 
@@ -116,3 +117,4 @@ export function closePositionTool(ctx: ToolContext) {
 		},
 	});
 }
+

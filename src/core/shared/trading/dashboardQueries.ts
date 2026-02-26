@@ -1,8 +1,8 @@
-import { type QueryClient, queryOptions } from "@tanstack/react-query";
+import { queryOptions } from "@tanstack/react-query";
 
 import { orpc } from "@/server/orpc/client";
 import { normalizeNumber } from "@/shared/formatting/numberFormat";
-import { VARIANT_IDS, isValidVariantId, type VariantId } from "@/core/shared/variants";
+import { isValidVariantId } from "@/core/shared/variants";
 
 import type {
 	Conversation,
@@ -42,20 +42,8 @@ function normalizeTrades(payload: TradesResponse): Trade[] {
 		.map((entry) => {
 			if (!entry || typeof entry !== "object") return null;
 			const record = entry as Record<string, unknown>;
-			const id =
-				typeof record.id === "string"
-					? record.id
-					: typeof record.tradeId === "string"
-						? record.tradeId
-						: null;
-			const modelId =
-				typeof record.modelId === "string"
-					? record.modelId
-					: typeof record.modelKey === "string"
-						? record.modelKey
-						: typeof id === "string"
-							? id
-							: null;
+			const id = typeof record.id === "string" ? record.id : null;
+			const modelId = typeof record.modelId === "string" ? record.modelId : null;
 
 			if (!id || !modelId) return null;
 
@@ -103,7 +91,11 @@ function normalizeExitPlan(plan: unknown): PositionExitPlan | null {
 	const target = normalizeNumber(record.target);
 	const stop = normalizeNumber(record.stop);
 	const invalidation =
-		typeof record.invalidation === "string" ? record.invalidation : null;
+		typeof record.invalidation === "string"
+			? record.invalidation
+			: typeof record.invalidation === "object" && record.invalidation !== null
+				? (record.invalidation as { message?: string }).message ?? null
+				: null;
 	const confidence = normalizeNumber(record.confidence);
 
 	if (target == null && stop == null && invalidation == null && confidence == null) {
@@ -116,37 +108,30 @@ function normalizeExitPlan(plan: unknown): PositionExitPlan | null {
 function normalizePosition(entry: unknown): Position | null {
 	if (!entry || typeof entry !== "object") return null;
 	const record = entry as Record<string, unknown>;
-	const symbol =
-		typeof record.symbol === "string"
-			? record.symbol
-			: typeof record.position === "string"
-				? record.position
-				: null;
+	const symbol = typeof record.symbol === "string" ? record.symbol : null;
 
 	if (!symbol) return null;
 
 	const rawSign =
 		typeof record.side === "string" ? record.side.toUpperCase() : "LONG";
 	const sign = rawSign === "SHORT" ? "SHORT" : "LONG";
+	const normalizedNotional = normalizeNumber(record.notional);
 
 	return {
 		symbol,
-		position: typeof record.position === "string" ? record.position : symbol,
+		position: symbol,
 		sign,
 		quantity: normalizeNumber(record.quantity),
-		unrealizedPnl:
-			typeof record.unrealizedPnl === "string" ? record.unrealizedPnl : "0",
-		realizedPnl:
-			typeof record.realizedPnl === "string" ? record.realizedPnl : "0",
-		liquidationPrice:
-			typeof record.liquidationPrice === "string"
-				? record.liquidationPrice
-				: "0",
+		entryPrice: normalizeNumber(record.entryPrice),
+		currentPrice: normalizeNumber(record.currentPrice),
+		unrealizedPnl: String(normalizeNumber(record.unrealizedPnl) ?? 0),
+		realizedPnl: String(normalizeNumber(record.realizedPnl) ?? 0),
+		liquidationPrice: String(normalizeNumber(record.liquidationPrice) ?? 0),
 		leverage:
 			typeof record.leverage === "number" && Number.isFinite(record.leverage)
 				? record.leverage
 				: undefined,
-		notional: typeof record.notional === "string" ? record.notional : undefined,
+		notional: normalizedNotional != null ? String(normalizedNotional) : undefined,
 		exitPlan: normalizeExitPlan(record.exitPlan),
 		confidence: normalizeNumber(record.confidence),
 		signal:
@@ -167,18 +152,8 @@ function normalizePositions(payload: PositionsResponse): ModelPositions[] {
 		.map((entry) => {
 			if (!entry || typeof entry !== "object") return null;
 			const record = entry as Record<string, unknown>;
-			const modelId =
-				typeof record.modelId === "string"
-					? record.modelId
-					: typeof record.modelKey === "string"
-						? record.modelKey
-						: null;
-			const modelName =
-				typeof record.modelName === "string"
-					? record.modelName
-					: typeof record.name === "string"
-						? record.name
-						: modelId;
+			const modelId = typeof record.modelId === "string" ? record.modelId : null;
+			const modelName = typeof record.modelName === "string" ? record.modelName : modelId;
 
 			if (!modelId || !modelName) return null;
 
@@ -202,10 +177,6 @@ function normalizePositions(payload: PositionsResponse): ModelPositions[] {
 				totalUnrealizedPnl:
 					typeof record.totalUnrealizedPnl === "number"
 						? record.totalUnrealizedPnl
-						: undefined,
-				availableCash:
-					typeof record.availableCash === "number"
-						? record.availableCash
 						: undefined,
 			} as ModelPositions;
 		})
@@ -302,40 +273,6 @@ function normalizeConversations(
 		);
 }
 
-function coerceTradesResponse(payload: unknown): TradesResponse {
-	if (payload && typeof payload === "object" && "trades" in payload) {
-		return payload as TradesResponse;
-	}
-
-	return Array.isArray(payload) ? { trades: payload } : { trades: [] };
-}
-
-function coercePositionsResponse(payload: unknown): PositionsResponse {
-	if (payload && typeof payload === "object" && "positions" in payload) {
-		return payload as PositionsResponse;
-	}
-
-	return Array.isArray(payload) ? { positions: payload } : { positions: [] };
-}
-
-function coerceConversationsResponse(payload: unknown): ConversationsResponse {
-	if (payload && typeof payload === "object" && "conversations" in payload) {
-		return payload as ConversationsResponse;
-	}
-
-	return Array.isArray(payload)
-		? { conversations: payload }
-		: { conversations: [] };
-}
-
-export const DASHBOARD_NORMALIZERS = {
-	trades: (payload: unknown) => normalizeTrades(coerceTradesResponse(payload)),
-	positions: (payload: unknown) =>
-		normalizePositions(coercePositionsResponse(payload)),
-	conversations: (payload: unknown) =>
-		normalizeConversations(coerceConversationsResponse(payload)),
-} as const;
-
 async function fetchTrades(variant?: VariantFilter): Promise<Trade[]> {
 	const data = await orpc.trading.getTrades.call({
 		limit: 100,
@@ -354,12 +291,13 @@ async function fetchConversations(): Promise<Conversation[]> {
 	const transformed = data.conversations.map((conv) => ({
 		id: conv.id,
 		modelId: conv.modelId,
-		modelName: conv.modelName || "Unknown Model",
-		modelVariant: conv.modelVariant || undefined,
-		modelLogo: conv.modelLogo || "unknown-model",
-		response: conv.response || "",
+		modelName: conv.modelName,
+		modelVariant: conv.modelVariant,
+		modelLogo: conv.modelLogo,
+		response: conv.response ?? "",
+		responsePayload: conv.responsePayload,
 		timestamp: conv.timestamp,
-		toolCalls: conv.toolCalls || [],
+		toolCalls: conv.toolCalls,
 	}));
 	return normalizeConversations({ conversations: transformed });
 }
@@ -396,44 +334,3 @@ export const DASHBOARD_QUERIES = {
 	positions: positionsQueryOptions,
 	conversations: conversationsQueryOptions,
 } as const;
-
-export type DashboardSseUpdaters = ReturnType<
-	typeof createDashboardSseUpdaters
->;
-
-export function createDashboardSseUpdaters(queryClient: QueryClient) {
-	const isTradesKey = (
-		queryKey: unknown,
-	): queryKey is ReturnType<(typeof DASHBOARD_QUERY_KEYS)["trades"]> =>
-		Array.isArray(queryKey) &&
-		queryKey[0] === "dashboard" &&
-		queryKey[1] === "trades";
-
-	return {
-		trades: (payload: unknown) => {
-			const normalized = DASHBOARD_NORMALIZERS.trades(payload);
-			queryClient.setQueryData(
-				DASHBOARD_QUERY_KEYS.trades("all"),
-				normalized,
-			);
-			queryClient.invalidateQueries({
-				predicate: ({ queryKey }) =>
-					isTradesKey(queryKey) && (queryKey[2] as VariantFilter) !== "all",
-			});
-			return normalized;
-		},
-		positions: (payload: unknown) => {
-			const normalized = DASHBOARD_NORMALIZERS.positions(payload);
-			queryClient.setQueryData(DASHBOARD_QUERY_KEYS.positions(), normalized);
-			return normalized;
-		},
-		conversations: (payload: unknown) => {
-			const normalized = DASHBOARD_NORMALIZERS.conversations(payload);
-			queryClient.setQueryData(
-				DASHBOARD_QUERY_KEYS.conversations(),
-				normalized,
-			);
-			return normalized;
-		},
-	};
-}

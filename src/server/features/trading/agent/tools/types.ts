@@ -3,14 +3,16 @@
  * Shared interfaces and types for trading agent tools
  */
 
-import type { Account } from "@/server/features/trading/accounts";
+import type { Account } from "@/server/features/trading/contracts/accounts";
 import type {
 	InvocationClosedPositionSummary,
 	InvocationDecisionSummary,
 	InvocationExecutionResultSummary,
-} from "@/server/features/trading/invocationResponse";
-import type { EnrichedOpenPosition } from "@/server/features/trading/openPositionEnrichment";
-import type { TradingDecisionWithContext } from "@/server/features/trading/tradingDecisions";
+} from "@/server/features/trading/contracts/invocationResponse";
+import type { EnrichedOpenPosition } from "@/server/features/trading/data/openPositionEnrichment";
+import type { TradingDecisionWithContext } from "@/server/features/trading/contracts/tradingDecisions";
+
+export type { PositionResult } from "@/server/features/trading/execution/createPosition";
 
 /** Maximum actions (create/close) per symbol per session */
 export const MAX_ACTIONS_PER_SYMBOL = 3;
@@ -59,18 +61,6 @@ export interface ToolContext {
 }
 
 /**
- * Result from a position creation/update operation
- */
-export interface PositionResult {
-	symbol: string;
-	side: "LONG" | "SHORT" | "HOLD";
-	quantity: number | null;
-	leverage: number | null;
-	success: boolean;
-	error?: string | null;
-}
-
-/**
  * Result from a position close operation
  */
 export interface ClosePositionResult {
@@ -84,3 +74,4 @@ export interface ClosePositionResult {
 	unrealizedPnl: number | null;
 	closedAt: string | null;
 }
+

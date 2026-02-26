@@ -20,3 +20,6 @@ drizzle/*.json
 drizzle
 .netlify# Lighter SDK reference folder (npm package is used instead)
 lighter-ts/
+
+# Alpaca credentials (per-variant API keys)
+scripts/alpacaKeys.ts

@@ -24,7 +24,7 @@ import { z } from "zod";
  * This is the SSOT - all other variant lists derive from this.
  */
 export const VARIANT_IDS = [
-	"Apex",
+	// "Apex",
 	"Trendsurfer",
 	"Contrarian",
 	"Sovereign",
@@ -82,15 +82,15 @@ export interface VariantConfig {
  * Colors match Tailwind's palette for consistency.
  */
 export const VARIANT_CONFIG: Record<VariantId, VariantConfig> = {
-	Apex: {
-		id: "Apex",
-		label: "Apex (Kelly Engine)",
-		description: "Aggressive 10x leverage, VWAP momentum validation, squeeze trading",
-		color: "#a855f7", // purple-500
-		bgClass: "bg-purple-500/20",
-		textClass: "text-purple-600",
-		lightBg: "#faf5ff",
-	},
+	// Apex: {
+	// 	id: "Apex",
+	// 	label: "Apex (Kelly Engine)",
+	// 	description: "Aggressive squeeze trading, VWAP momentum validation",
+	// 	color: "#a855f7", // purple-500
+	// 	bgClass: "bg-purple-500/20",
+	// 	textClass: "text-purple-600",
+	// 	lightBg: "#faf5ff",
+	// },
 	Trendsurfer: {
 		id: "Trendsurfer",
 		label: "Trendsurfer (Momentum)",
@@ -119,6 +119,19 @@ export const VARIANT_CONFIG: Record<VariantId, VariantConfig> = {
 		lightBg: "#fefce8",
 	},
 };
+
+// ==================== Tradeable Variants ====================
+
+/**
+ * Variants available for active trading.
+ * Apex is kept in VARIANT_IDS for DB enum compatibility but excluded here.
+ */
+export const TRADEABLE_VARIANT_IDS: readonly VariantId[] = [
+	// "Apex", // retired — aggressive squeeze strategy, not suited for spot
+	"Trendsurfer",
+	"Contrarian",
+	"Sovereign",
+];
 
 // ==================== Helper Functions ====================
 
@@ -229,4 +242,4 @@ export const VARIANT_TABS: Array<{
 /**
  * Default variant for backward compatibility
  */
-export const DEFAULT_VARIANT: VariantId = "Apex";
+export const DEFAULT_VARIANT: VariantId = "Sovereign";

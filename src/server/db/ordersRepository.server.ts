@@ -1,10 +1,11 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne, or } from "drizzle-orm";
 import { db } from "@/db";
 import {
 	orders,
 	OrderStatus,
 	type Order,
 } from "@/db/schema";
+import { toCanonical } from "@/shared/markets/marketMetadata";
 
 // ==========================================
 // Types
@@ -16,7 +17,6 @@ export type CreateOrderParams = {
 	side: "LONG" | "SHORT";
 	quantity: string;
 	entryPrice: string;
-	leverage?: string | null;
 	exitPlan?: {
 		stop: number | null;
 		target: number | null;
@@ -32,20 +32,7 @@ export type CloseOrderParams = {
 	orderId: string;
 	exitPrice: string;
 	realizedPnl: string;
-	closeTrigger?: "STOP" | "TARGET" | null;
-};
-
-export type UpdateExitPlanParams = {
-	orderId: string;
-	exitPlan: {
-		stop: number | null;
-		target: number | null;
-		invalidation: string | null;
-		invalidationPrice: number | null;
-		confidence: number | null;
-		timeExit: string | null;
-		cooldownUntil: string | null;
-	};
+	closeTrigger?: string | null;
 };
 
 export type ScaleOrderParams = {
@@ -66,10 +53,7 @@ export type ScaleOrderParams = {
 
 export type UpdateSlTpOrdersParams = {
 	orderId: string;
-	slOrderIndex?: string | null;
-	tpOrderIndex?: string | null;
-	slTriggerPrice?: string | null;
-	tpTriggerPrice?: string | null;
+	alpacaOrderId?: string | null;
 };
 
 export type OrderWithModel = Order & {
@@ -98,7 +82,6 @@ export async function createOrder(params: CreateOrderParams): Promise<Order> {
 			side: params.side,
 			quantity: params.quantity,
 			entryPrice: params.entryPrice,
-			leverage: params.leverage ?? null,
 			exitPlan: params.exitPlan ?? null,
 			status: OrderStatus.OPEN,
 		})
@@ -127,24 +110,6 @@ export async function closeOrder(params: CloseOrderParams): Promise<Order> {
 			realizedPnl: params.realizedPnl,
 			closeTrigger: params.closeTrigger ?? null,
 			closedAt: new Date(),
-			updatedAt: new Date(),
-		})
-		.where(eq(orders.id, params.orderId))
-		.returning();
-
-	return updated;
-}
-
-/**
- * Update exit plan for an existing order
- */
-export async function updateOrderExitPlan(
-	params: UpdateExitPlanParams,
-): Promise<Order> {
-	const [updated] = await db
-		.update(orders)
-		.set({
-			exitPlan: params.exitPlan,
 			updatedAt: new Date(),
 		})
 		.where(eq(orders.id, params.orderId))
@@ -238,12 +203,24 @@ export async function getOpenOrderBySymbol(
 	modelId: string,
 	symbol: string,
 ): Promise<Order | undefined> {
+	const canonical = toCanonical(symbol).toUpperCase();
+	const symbolCandidates = [
+		canonical,
+		`${canonical}USD`,
+		`${canonical}/USD`,
+		`${canonical}-USD`,
+		`${canonical}USDT`,
+		`${canonical}/USDT`,
+		`${canonical}-USDT`,
+	].filter((value, index, array) => array.indexOf(value) === index);
+
 	return db.query.orders.findFirst({
 		where: and(
 			eq(orders.modelId, modelId),
-			eq(orders.symbol, symbol.toUpperCase()),
+			inArray(orders.symbol, symbolCandidates),
 			eq(orders.status, OrderStatus.OPEN),
 		),
+		orderBy: desc(orders.openedAt),
 	});
 }
 
@@ -258,6 +235,7 @@ export async function getClosedOrdersByModel(
 		where: and(
 			eq(orders.modelId, modelId),
 			eq(orders.status, OrderStatus.CLOSED),
+			or(isNull(orders.closeTrigger), ne(orders.closeTrigger, "adjustment")),
 		),
 		orderBy: desc(orders.closedAt),
 		limit,
@@ -314,19 +292,6 @@ export async function getTotalRealizedPnl(modelId: string): Promise<number> {
 }
 
 /**
- * Get all open orders that need auto-close checking
- * Returns orders with exit plans that have stop or target set
- */
-export async function getOrdersWithExitPlans(): Promise<OrderWithModel[]> {
-	const allOpen = await getAllOpenOrders();
-	return allOpen.filter(
-		(order) =>
-			order.exitPlan &&
-			(order.exitPlan.stop != null || order.exitPlan.target != null),
-	);
-}
-
-/**
  * Bulk close orders by IDs
  */
 export async function closeOrdersByIds(
@@ -352,31 +317,22 @@ export async function closeOrdersByIds(
 }
 
 // ==========================================
-// SL/TP Order Management Functions
+// Alpaca Order ID Management
 // ==========================================
 
 /**
- * Update SL/TP order indices and trigger prices for an order
- * Used when placing real SL/TP orders on the exchange
+ * Update the Alpaca order ID for a position.
+ * Used when placing orders via Alpaca API.
  */
-export async function updateSlTpOrders(
+export async function updateAlpacaOrderId(
 	params: UpdateSlTpOrdersParams,
 ): Promise<Order> {
 	const updateData: Record<string, unknown> = {
 		updatedAt: new Date(),
 	};
 
-	if (params.slOrderIndex !== undefined) {
-		updateData.slOrderIndex = params.slOrderIndex;
-	}
-	if (params.tpOrderIndex !== undefined) {
-		updateData.tpOrderIndex = params.tpOrderIndex;
-	}
-	if (params.slTriggerPrice !== undefined) {
-		updateData.slTriggerPrice = params.slTriggerPrice;
-	}
-	if (params.tpTriggerPrice !== undefined) {
-		updateData.tpTriggerPrice = params.tpTriggerPrice;
+	if (params.alpacaOrderId !== undefined) {
+		updateData.alpacaOrderId = params.alpacaOrderId;
 	}
 
 	const [updated] = await db
@@ -389,56 +345,14 @@ export async function updateSlTpOrders(
 }
 
 /**
- * Get SL/TP order indices for an order
+ * Update the close trigger on a closed order (e.g., marking as "adjustment")
  */
-export async function getSlTpOrders(
+export async function updateOrderCloseTrigger(
 	orderId: string,
-): Promise<{ slOrderIndex: string | null; tpOrderIndex: string | null } | null> {
-	const order = await db.query.orders.findFirst({
-		where: eq(orders.id, orderId),
-		columns: {
-			slOrderIndex: true,
-			tpOrderIndex: true,
-		},
-	});
-
-	if (!order) return null;
-
-	return {
-		slOrderIndex: order.slOrderIndex,
-		tpOrderIndex: order.tpOrderIndex,
-	};
-}
-
-/**
- * Clear SL/TP order indices (after canceling orders on exchange)
- */
-export async function clearSlTpOrders(orderId: string): Promise<Order> {
-	const [updated] = await db
+	closeTrigger: string,
+): Promise<void> {
+	await db
 		.update(orders)
-		.set({
-			slOrderIndex: null,
-			tpOrderIndex: null,
-			slTriggerPrice: null,
-			tpTriggerPrice: null,
-			updatedAt: new Date(),
-		})
-		.where(eq(orders.id, orderId))
-		.returning();
-
-	return updated;
-}
-
-/**
- * Get all open orders with SL/TP orders placed on exchange
- * Used for monitoring and cleanup
- */
-export async function getOrdersWithExchangeSlTp(): Promise<Order[]> {
-	const allOpen = await db.query.orders.findMany({
-		where: eq(orders.status, OrderStatus.OPEN),
-	});
-
-	return allOpen.filter(
-		(order) => order.slOrderIndex != null || order.tpOrderIndex != null,
-	);
+		.set({ closeTrigger, updatedAt: new Date() })
+		.where(eq(orders.id, orderId));
 }

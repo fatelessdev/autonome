@@ -10,7 +10,7 @@ services:
       - .env
     environment:
       - DATABASE_URL=postgresql://autonome:autonome_secret@db:5432/autonome
-      - PORT=8081
+      - API_PORT=8081
       
     depends_on:
       db:

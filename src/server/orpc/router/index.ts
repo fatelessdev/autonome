@@ -1,12 +1,6 @@
 import { getFailures, getLeaderboard, getModelStats, getRunInfo } from "./analytics";
 import { getInvocations, getModels } from "./models";
 import {
-	getAccount,
-	getCompletedTradesFromDB,
-	placeOrder,
-	resetAccount,
-} from "./simulator";
-import {
 	getCryptoPrices,
 	getPortfolioHistory,
 	getPositions,
@@ -31,14 +25,6 @@ export default {
 	models: {
 		getModels,
 		getInvocations,
-	},
-
-	// Simulator
-	simulator: {
-		placeOrder,
-		getAccount,
-		resetAccount,
-		getCompletedTradesFromDB,
 	},
 
 	// Analytics

@@ -10,8 +10,8 @@ import {
 	recentToolCallsWithModelQuery,
 	searchModelsQuery,
 } from "@/server/db/tradingRepository.server";
-import { portfolioQuery } from "@/server/features/trading/getPortfolio.server";
-import { openPositionsQuery } from "@/server/features/trading/openPositions.server";
+import { portfolioQuery } from "@/server/features/trading/data/portfolio.server";
+import { openPositionsQuery } from "@/server/features/trading/data/positions.server";
 import { normalizeNumber } from "@/shared/formatting/numberFormat";
 import { getArray, safeJsonParse } from "@/utils/json";
 
@@ -309,7 +309,7 @@ export const getModelsOverview = createTool({
 					routerModel: model.openRouterModelName,
 					invocationCount: model.invocationCount,
 					totalMinutes: model.totalMinutes,
-					accountIndex: model.accountIndex,
+					hasAlpacaKeys: !!model.alpacaApiKey && !!model.alpacaApiSecret,
 				})),
 				count: models.length,
 				searchTerm: search,
@@ -441,30 +441,19 @@ export const getOpenPositionsTool = createTool({
 			const results = await Promise.all(
 				models.map(async (model) => {
 					try {
-						const [positions, portfolio] = await Promise.all([
-							queryClient.fetchQuery(
-								openPositionsQuery({
-									apiKey: model.lighterApiKey,
-									accountIndex: model.accountIndex,
-									id: model.id,
-									modelName: model.openRouterModelName,
-									name: model.name,
-									invocationCount: model.invocationCount,
-									totalMinutes: model.totalMinutes,
-								}),
-							),
-							queryClient.fetchQuery(
-								portfolioQuery({
-									apiKey: model.lighterApiKey,
-									accountIndex: model.accountIndex,
-									id: model.id,
-									invocationCount: model.invocationCount,
-									modelName: model.openRouterModelName,
-									name: model.name,
-									totalMinutes: model.totalMinutes,
-								}),
-							),
-						]);
+						const account = {
+								alpacaApiKey: model.alpacaApiKey,
+								alpacaApiSecret: model.alpacaApiSecret,
+								id: model.id,
+								modelName: model.openRouterModelName,
+								name: model.name,
+								invocationCount: model.invocationCount,
+								totalMinutes: model.totalMinutes,
+							};
+							const [positions, portfolio] = await Promise.all([
+								queryClient.fetchQuery(openPositionsQuery(account)),
+								queryClient.fetchQuery(portfolioQuery(account)),
+							]);
 
 						return {
 							modelId: model.id,
@@ -742,7 +731,7 @@ export const compareModelsPerformance = createTool({
 							routerModel: model.openRouterModelName,
 							invocationCount: model.invocationCount,
 							totalMinutes: model.totalMinutes,
-							accountIndex: model.accountIndex,
+							hasAlpacaKeys: !!model.alpacaApiKey && !!model.alpacaApiSecret,
 							latestPortfolioValue: latestPortfolio
 								? normalizeNumber(latestPortfolio.snapshot.netPortfolio)
 								: null,
@@ -795,3 +784,5 @@ export const tools = {
 	getRecentTradesTool,
 	compareModelsPerformance,
 };
+
+

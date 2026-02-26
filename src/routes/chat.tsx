@@ -264,8 +264,7 @@ function EmptyState() {
 					invocations."
 				</div>
 				<div className="rounded-xl  p-3 transition-colors">
-					"What is the cumulative realized PnL across BTC trades in the
-					simulator?"
+					"What is the cumulative realized PnL across BTC trades?"
 				</div>
 			</div>
 		</div>

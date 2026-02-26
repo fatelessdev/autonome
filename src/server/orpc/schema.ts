@@ -52,6 +52,7 @@ export const PositionSchema = z.object({
 	side: z.enum(["long", "short"]),
 	quantity: z.number(),
 	entryPrice: z.number(),
+	notional: z.number().optional(),
 	currentPrice: z.number().optional(),
 	unrealizedPnl: z.number().optional(),
 	exitPlan: ExitPlanSchema.optional(),
@@ -69,7 +70,6 @@ export const AccountPositionsSchema = z.object({
 	modelLogo: z.string().optional(),
 	positions: z.array(PositionSchema),
 	totalUnrealizedPnl: z.number().optional(),
-	availableCash: z.number().optional(),
 });
 
 export const PositionsResponseSchema = z.object({
@@ -157,13 +157,4 @@ export const InvocationsResponseSchema = z.object({
 	conversations: z.array(InvocationSchema),
 });
 
-// ==================== Simulator Schemas ====================
-
-export const SimulatorResetInputSchema = z.object({
-	accountId: z.string(),
-});
-
-export const SimulatorResetResponseSchema = z.object({
-	success: z.boolean(),
-	message: z.string().optional(),
-});
+// Alpaca paper trading is the only supported execution path.

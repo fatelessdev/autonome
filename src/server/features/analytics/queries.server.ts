@@ -12,6 +12,7 @@ import {
 	portfolioSize,
 	toolCalls,
 } from "@/db/schema";
+import type { VariantId } from "@/core/shared/variants";
 import { INITIAL_CAPITAL } from "./calculations";
 import type {
 	ClosedTradeData,
@@ -29,7 +30,7 @@ const WINDOW_MS: Record<LeaderboardWindow, number> = {
 	"30d": 30 * 24 * 60 * 60 * 1000,
 };
 
-type VariantFilter = "Apex" | "Trendsurfer" | "Contrarian" | "Sovereign";
+type VariantFilter = VariantId;
 
 function toFiniteNumber(value: unknown): number | undefined {
 	if (typeof value === "number" && Number.isFinite(value)) {
@@ -195,7 +196,7 @@ export async function getAllModels(): Promise<
 
 /**
  * Get current account value from latest portfolio snapshot
- * Falls back to INITIAL_CAPITAL (10,000) if no snapshots exist
+ * Falls back to INITIAL_CAPITAL (100,000) if no snapshots exist
  */
 export async function getModelAccountValues(
 	modelIds: string[],
@@ -249,7 +250,7 @@ export async function getAllModelsWithFailureCounts(
 	Array<{
 		id: string;
 		name: string;
-		variant: "Apex" | "Trendsurfer" | "Contrarian" | "Sovereign";
+		variant: VariantId;
 		failedWorkflowCount: number;
 		failedToolCallCount: number;
 		invocationCount: number;

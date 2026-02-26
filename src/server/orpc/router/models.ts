@@ -6,11 +6,10 @@ import { z } from "zod";
 
 import {
 	refreshConversationEvents,
-} from "@/server/features/trading/conversationsSnapshot.server";
+} from "@/server/features/trading/data/conversationsSnapshot.server";
 import {
 	fetchModelsList,
-} from "@/server/features/trading/queries.server";
-import { MODEL_INFO } from "@/shared/models/modelConfig";
+} from "@/server/features/trading/data/queries.server";
 import { InvocationsResponseSchema, ModelsResponseSchema } from "../schema";
 
 // ==================== Models ====================
@@ -24,18 +23,8 @@ export const getModels = os
 				const models = await fetchModelsList();
 				return { models };
 			} catch (error) {
-				console.error("Failed to fetch models", error);
 				Sentry.captureException(error);
-
-				const fallback = Object.entries(MODEL_INFO).map(([id, info]) => ({
-					id,
-					name: info.label || id,
-				}));
-
-				return {
-					models: fallback,
-					warning: "Database unavailable, using static model metadata.",
-				};
+				throw new Error("Failed to fetch models");
 			}
 		});
 	});
@@ -57,3 +46,4 @@ export const getInvocations = os
 			}
 		});
 	});
+

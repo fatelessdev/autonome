@@ -1,4 +1,4 @@
-import { EventEmitter } from "node:events";
+import { createTypedEventBus } from "@/server/events/typedEventBus";
 
 export type PositionEventData = {
 	modelId: string;
@@ -6,7 +6,6 @@ export type PositionEventData = {
 	modelLogo: string;
 	positions: unknown[];
 	totalUnrealizedPnl: number;
-	availableCash: number;
 };
 
 export type PositionEvent = {
@@ -15,36 +14,23 @@ export type PositionEvent = {
 	data: PositionEventData[];
 };
 
-const emitter = new EventEmitter();
-emitter.setMaxListeners(50);
-const EVENT_KEY = "position-update";
+const bus = createTypedEventBus<PositionEvent>("position-update");
 
-// Cache for current positions
 let currentPositionsCache: PositionEventData[] = [];
 let lastPositionUpdateAt: number | null = null;
 
-export const emitPositionEvent = (event: PositionEvent) => {
+export const emitPositionEvent = (event: PositionEvent): void => {
 	currentPositionsCache = event.data;
 	lastPositionUpdateAt = Date.now();
-	emitter.emit(EVENT_KEY, event);
+	bus.emit(event);
 };
 
-export const subscribeToPositionEvents = (
-	listener: (event: PositionEvent) => void,
-) => {
-	emitter.on(EVENT_KEY, listener);
-	return () => {
-		emitter.off(EVENT_KEY, listener);
-	};
-};
+export const subscribeToPositionEvents = bus.subscribe;
 
-export const getCurrentPositions = () => {
-	return currentPositionsCache;
-};
+export const getCurrentPositions = (): PositionEventData[] =>
+	currentPositionsCache;
 
-export const getPositionCacheMetadata = () => {
-	return {
-		count: currentPositionsCache.length,
-		lastUpdatedAt: lastPositionUpdateAt,
-	};
-};
+export const getPositionCacheMetadata = () => ({
+	count: currentPositionsCache.length,
+	lastUpdatedAt: lastPositionUpdateAt,
+});

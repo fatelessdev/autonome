@@ -15,6 +15,7 @@ import type {
 } from "@/components/trades-sidebar/types";
 import { useTradingDashboardData } from "@/components/trades-sidebar/use-trading-dashboard-data";
 import { useVariant } from "@/components/variant-context";
+import { normalizeIdentifier } from "@/core/shared/strings/normalizeIdentifier";
 import { getModelInfo } from "@/shared/models/modelConfig";
 
 let customEasePromise: Promise<void> | null = null;
@@ -53,13 +54,7 @@ type TradesSidebarProps = {
 type FilterValue = "all" | string;
 
 const normalizeModelKey = (value: string | null | undefined) =>
-	typeof value === "string" && value.trim().length > 0
-		? value
-				.trim()
-				.toLowerCase()
-				.replace(/[^a-z0-9]+/g, "-")
-				.replace(/^-+|-+$/g, "")
-		: "";
+	normalizeIdentifier(value);
 
 const matchesFilter = (
 	filterMatchers: string[] | null,

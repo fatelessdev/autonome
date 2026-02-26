@@ -20,16 +20,18 @@
 import { EventEmitter } from "node:events";
 import {
 	emitPositionEvent,
-	type PositionEventData,
 } from "@/server/features/trading/events/positionEvents";
 import {
 	emitTradeEvent,
-	type TradeEventData,
 } from "@/server/features/trading/events/tradeEvents";
 import {
 	emitConversationEvent,
-	type ConversationEventData,
 } from "@/server/features/trading/events/conversationEvents";
+import {
+	mapConversationToEventData,
+	mapPositionToEventData,
+	mapTradeToEventData,
+} from "@/server/features/trading/events/eventPayloadMappers";
 
 // ============================================================================
 // Event Types
@@ -163,13 +165,11 @@ export async function emitAllDataChanged(modelId: string): Promise<void> {
 	// Also trigger data SSE streams so clients get immediate updates
 	// Import dynamically to avoid circular dependencies
 	const [
-		{ fetchPositions },
-		{ fetchTrades },
+		{ fetchPositions, fetchTrades },
 		{ refreshConversationEvents },
 	] = await Promise.all([
-		import("@/server/features/trading/queries.server"),
-		import("@/server/features/trading/queries.server"),
-		import("@/server/features/trading/conversationsSnapshot.server"),
+		import("@/server/features/trading/data/queries.server"),
+		import("@/server/features/trading/data/conversationsSnapshot.server"),
 	]);
 
 	const [positions, trades, conversations] = await Promise.all([
@@ -181,23 +181,19 @@ export async function emitAllDataChanged(modelId: string): Promise<void> {
 	emitPositionEvent({
 		type: "positions:updated",
 		timestamp: new Date().toISOString(),
-		data: positions as PositionEventData[],
+		data: positions.map(mapPositionToEventData),
 	});
 
 	emitTradeEvent({
 		type: "trades:updated",
 		timestamp: new Date().toISOString(),
-		data: (trades as any[]).map((t) => ({
-			...t,
-			entryNotional: (t.quantity || 0) * (t.entryPrice || 0),
-			exitNotional: (t.quantity || 0) * (t.exitPrice || 0),
-		})) as TradeEventData[],
+		data: trades.map(mapTradeToEventData),
 	});
 
 	emitConversationEvent({
 		type: "conversations:updated",
 		timestamp: new Date().toISOString(),
-		data: conversations as ConversationEventData[],
+		data: conversations.map(mapConversationToEventData),
 	});
 }
 
@@ -226,3 +222,4 @@ export function subscribeToWorkflowEvents(
 export function getListenerCount(): number {
 	return emitter.listenerCount(EVENT_KEY);
 }
+

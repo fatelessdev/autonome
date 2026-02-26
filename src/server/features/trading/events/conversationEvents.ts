@@ -1,4 +1,4 @@
-import { EventEmitter } from "node:events";
+import { createTypedEventBus } from "@/server/events/typedEventBus";
 
 export type ConversationEventData = {
 	id: string;
@@ -26,36 +26,23 @@ export type ConversationEvent = {
 	data: ConversationEventData[];
 };
 
-const emitter = new EventEmitter();
-emitter.setMaxListeners(50);
-const EVENT_KEY = "conversation-update";
+const bus = createTypedEventBus<ConversationEvent>("conversation-update");
 
-// Cache for current conversations
 let currentConversationsCache: ConversationEventData[] = [];
 let lastConversationUpdateAt: number | null = null;
 
-export const emitConversationEvent = (event: ConversationEvent) => {
+export const emitConversationEvent = (event: ConversationEvent): void => {
 	currentConversationsCache = event.data;
 	lastConversationUpdateAt = Date.now();
-	emitter.emit(EVENT_KEY, event);
+	bus.emit(event);
 };
 
-export const subscribeToConversationEvents = (
-	listener: (event: ConversationEvent) => void,
-) => {
-	emitter.on(EVENT_KEY, listener);
-	return () => {
-		emitter.off(EVENT_KEY, listener);
-	};
-};
+export const subscribeToConversationEvents = bus.subscribe;
 
-export const getCurrentConversations = () => {
-	return currentConversationsCache;
-};
+export const getCurrentConversations = (): ConversationEventData[] =>
+	currentConversationsCache;
 
-export const getConversationCacheMetadata = () => {
-	return {
-		count: currentConversationsCache.length,
-		lastUpdatedAt: lastConversationUpdateAt,
-	};
-};
+export const getConversationCacheMetadata = () => ({
+	count: currentConversationsCache.length,
+	lastUpdatedAt: lastConversationUpdateAt,
+});

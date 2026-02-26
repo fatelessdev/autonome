@@ -77,9 +77,6 @@ export const extractTradingDecisions = (
 
 		const decisionList: DecisionItem[] = [
 			...(Array.isArray(metadata?.decisions) ? (metadata.decisions as DecisionItem[]) : []),
-			...(Array.isArray((metadata as any)?.updates)
-				? ((metadata as any).updates as DecisionItem[])
-				: []),
 		];
 		const results = metadata?.results ?? [];
 		const resultLookup = new Map<
@@ -93,7 +90,7 @@ export const extractTradingDecisions = (
 			if (rawActionValue === "updateExitPlan") return "UPDATE_EXIT_PLAN";
 			if (tc.type === "CLOSE_POSITION") return "CLOSE_POSITION";
 			if (tc.type === "CREATE_POSITION") return "CREATE_POSITION";
-			if (typeof tc.type === "string" && tc.type.length > 0) return tc.type;
+			if (tc.type.length > 0) return tc.type;
 			return "OTHER";
 		})();
 		const isCloseCall = normalizedAction === "CLOSE_POSITION";

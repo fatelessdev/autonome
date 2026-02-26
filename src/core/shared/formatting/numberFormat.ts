@@ -1,3 +1,5 @@
+import { SUPPORTED_MARKETS } from "@/core/shared/markets/marketMetadata";
+
 const currencyFormatter = new Intl.NumberFormat("en-US", {
 	style: "currency",
 	currency: "USD",
@@ -5,7 +7,7 @@ const currencyFormatter = new Intl.NumberFormat("en-US", {
 	maximumFractionDigits: 2,
 });
 
-const DEFAULT_SYMBOLS = ["BTC", "ETH", "SOL"] as const;
+const DEFAULT_SYMBOLS = SUPPORTED_MARKETS;
 
 export const normalizeNumber = (value: unknown): number | null => {
 	if (value == null) return null;

@@ -8,7 +8,8 @@ import { z } from "zod";
 
 import { ToolCallType } from "@/server/db/tradingRepository";
 import { createToolCallMutation } from "@/server/db/tradingRepository.server";
-import { createPosition } from "@/server/features/trading/createPosition";
+import { updateOrderCloseTrigger } from "@/server/db/ordersRepository.server";
+import { createPosition } from "@/server/features/trading/execution/createPosition";
 import { MARKETS } from "@/shared/markets/marketMetadata";
 
 import { decisionSchema, type NormalizedDecision } from "../schemas";
@@ -88,25 +89,19 @@ export function createPositionTool(ctx: ToolContext) {
 			decisions: z.array(decisionSchema),
 		}),
 		execute: async ({ decisions }) => {
-			const modern =
-				decisions?.map((item) => ({
-					symbol: item.symbol.toUpperCase(),
-					side:
-						item.side === "SHORT" || item.side === "LONG"
-							? item.side
-							: item.side === "HOLD"
-								? "HOLD"
-								: (item.side as string),
-					quantity: item.quantity,
-					leverage: item.leverage ?? null,
-					profitTarget: item.profit_target ?? null,
-					stopLoss: item.stop_loss ?? null,
-					invalidationCondition: item.invalidation_condition ?? null,
-					invalidationPrice: item.invalidation_price ?? null,
-					timeExit: item.time_exit ?? null,
-					cooldownUntil: calculateCooldownUntil(item.cooldown_minutes), // Convert minutes to timestamp
-					confidence: item.confidence ?? null,
-				})) ?? [];
+			// decisions is Zod-validated: symbol is enum key, side is "LONG"|"SHORT"|"HOLD", quantity is positive number
+			const modern = decisions.map((item) => ({
+				symbol: item.symbol.toUpperCase(),
+				side: item.side,
+				quantity: item.quantity,
+				profitTarget: item.profit_target ?? null,
+				stopLoss: item.stop_loss ?? null,
+				invalidationCondition: item.invalidation_condition ?? null,
+				invalidationPrice: item.invalidation_price ?? null,
+				timeExit: item.time_exit ?? null,
+				cooldownUntil: calculateCooldownUntil(item.cooldown_minutes),
+				confidence: item.confidence ?? null,
+			}));
 
 			const normalized: NormalizedDecision[] = [];
 			const seenSymbols = new Set<string>();
@@ -135,13 +130,9 @@ export function createPositionTool(ctx: ToolContext) {
 					continue;
 				}
 
-				const sideRaw =
-					typeof entry.side === "string" ? entry.side.toUpperCase() : "HOLD";
-				const validSide =
-					sideRaw === "LONG" || sideRaw === "SHORT"
-						? sideRaw
-						: (entry.side as string);
-				const quantity = Number.isFinite(entry.quantity) ? entry.quantity : 0;
+				// side and quantity are Zod-validated: side is enum("LONG"|"SHORT"|"HOLD"), quantity is number().positive()
+				const validSide = entry.side;
+				const quantity = entry.quantity;
 
 				if (!(symbol in MARKETS)) continue;
 				if (seenSymbols.has(symbol)) continue;
@@ -149,9 +140,8 @@ export function createPositionTool(ctx: ToolContext) {
 
 				normalized.push({
 					symbol,
-					side: validSide as "LONG" | "SHORT" | "HOLD",
+					side: validSide,
 					quantity,
-					leverage: entry.leverage ?? null,
 					profitTarget: entry.profitTarget ?? null,
 					stopLoss: entry.stopLoss ?? null,
 					invalidationCondition: entry.invalidationCondition ?? null,
@@ -191,13 +181,28 @@ export function createPositionTool(ctx: ToolContext) {
 				ctx.symbolActionCounts.set(result.symbol, current + 1);
 			}
 
+			// Detect close+reopen adjustments: if we just opened a symbol
+			// that was closed earlier in this invocation, mark the close as
+			// an "adjustment" so it doesn't count as a completed trade.
+			for (const result of successful) {
+				const closedSameSymbol = ctx.capturedClosedPositions.find(
+					(p) => p.symbol.toUpperCase() === result.symbol.toUpperCase() && p.orderId,
+				);
+				if (closedSameSymbol?.orderId) {
+					try {
+						await updateOrderCloseTrigger(closedSameSymbol.orderId, "adjustment");
+					} catch (err) {
+						console.warn(`[createPositionTool] Failed to mark close as adjustment for ${result.symbol}:`, err);
+					}
+				}
+			}
+
 			// Capture decisions for telemetry
 			for (const decision of normalized) {
 				ctx.capturedDecisions.push({
 					symbol: decision.symbol,
 					side: decision.side,
 					quantity: decision.quantity,
-					leverage: decision.leverage,
 					profitTarget: decision.profitTarget,
 					stopLoss: decision.stopLoss,
 					invalidationCondition: decision.invalidationCondition,
@@ -214,7 +219,6 @@ export function createPositionTool(ctx: ToolContext) {
 					symbol: outcome.symbol,
 					side: outcome.side,
 					quantity: outcome.quantity,
-					leverage: outcome.leverage ?? null,
 					success: outcome.success,
 					error: outcome.error ?? null,
 				});
@@ -238,12 +242,7 @@ export function createPositionTool(ctx: ToolContext) {
 				} else {
 					pieces.push(r.side);
 				}
-				if (Number.isFinite(r.quantity)) {
-					pieces.push(`qty ${Math.abs(r.quantity ?? 0).toPrecision(3)}`);
-				}
-				if (Number.isFinite(r.leverage ?? undefined)) {
-					pieces.push(`${r.leverage}x`);
-				}
+				pieces.push(`qty ${Math.abs(r.quantity).toPrecision(3)}`);
 				return pieces.join(" ");
 			};
 
@@ -267,3 +266,4 @@ export function createPositionTool(ctx: ToolContext) {
 		},
 	});
 }
+

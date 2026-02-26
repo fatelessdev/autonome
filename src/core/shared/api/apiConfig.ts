@@ -33,7 +33,7 @@ export function getApiBaseUrl(): string {
 /**
  * Get a full SSE endpoint URL.
  *
- * @param path - The SSE endpoint path (e.g., "/api/events/trades")
+ * @param path - The SSE endpoint path (e.g., "/api/events/dashboard")
  * @returns Full URL to the SSE endpoint
  */
 export function getSseUrl(path: string): string {

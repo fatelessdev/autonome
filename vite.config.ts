@@ -5,21 +5,13 @@ import { nitro } from "nitro/vite";
 import react from "@vitejs/plugin-react";
 import viteTsConfigPaths from "vite-tsconfig-paths";
 import tailwindcss from "@tailwindcss/vite";
+import { workflow } from "workflow/vite";
 
 // Port configuration - read from env with defaults
-const API_PORT = Number(process.env.PORT) || 8081;
+// NOTE: We use API_PORT (not PORT) to avoid collision with Vite/Nitro's built-in PORT handling.
+const API_PORT = Number(process.env.API_PORT) || 8081;
 const FRONTEND_PORT = Number(process.env.FRONTEND_PORT) || 5173;
 const API_URL = process.env.VITE_API_URL || `http://localhost:${API_PORT}`;
-
-// Prevent Vite from picking up the backend PORT env var (8081) which overrides `server.port`
-if (process.env.PORT && normalizePort(process.env.PORT) === API_PORT) {
-  delete process.env.PORT;
-}
-
-function normalizePort(val: string | number) {
-  const port = parseInt(String(val), 10);
-  return isNaN(port) ? val : port;
-}
 
 export default defineConfig({
   plugins: [
@@ -39,6 +31,7 @@ export default defineConfig({
       },
     }),
     nitro(),
+    workflow(),
     react({
       babel: {
         plugins: ["babel-plugin-react-compiler"],

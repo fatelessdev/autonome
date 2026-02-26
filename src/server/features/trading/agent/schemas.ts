@@ -25,11 +25,6 @@ export const decisionSchema = z.object({
 		.positive()
 		.max(100_000)
 		.describe("Position size in base asset units (e.g., 0.5 BTC). Must be positive and ≤100,000."),
-	leverage: z
-		.number()
-		.min(1)
-		.max(20)
-		.describe("Leverage multiplier (1-20x)"),
 	profit_target: z.number().positive().describe("Take profit price level"),
 	stop_loss: z.number().positive().describe("Stop loss price level"),
 	invalidation_condition: z
@@ -95,7 +90,6 @@ export interface NormalizedDecision {
 	symbol: string;
 	side: "LONG" | "SHORT" | "HOLD";
 	quantity: number;
-	leverage: number | null;
 	profitTarget: number | null;
 	stopLoss: number | null;
 	invalidationCondition: string | null;

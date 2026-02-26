@@ -14,8 +14,8 @@ import {
 	getNextNimApiKey,
 	getNextOpenRouterApiKey,
 } from "@/env";
-import type { Account } from "@/server/features/trading/accounts";
-import type { StepTelemetry } from "@/server/features/trading/invocationResponse";
+import type { Account } from "@/server/features/trading/contracts/accounts";
+import type { StepTelemetry } from "@/server/features/trading/contracts/invocationResponse";
 import { getModelProvider } from "@/shared/models/modelConfig";
 
 import { callOptionsSchema } from "./schemas";
@@ -231,3 +231,4 @@ export function createTradeAgent(config: TradeAgentConfig) {
 }
 
 export type TradeAgent = ReturnType<typeof createTradeAgent>;
+

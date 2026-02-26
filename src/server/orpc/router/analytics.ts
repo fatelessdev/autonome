@@ -4,6 +4,8 @@ import { os } from "@orpc/server";
 import * as Sentry from "@sentry/react";
 import { z } from "zod";
 
+import { variantIdWithAllSchema } from "@/core/shared/variants";
+
 import {
 	INITIAL_CAPITAL,
 	calculateAdvancedStats,
@@ -58,9 +60,7 @@ const AdvancedStatsSchema = z.object({
 	failureRate: z.number(),
 });
 
-const VariantFilterSchema = z
-	.enum(["all", "Apex", "Trendsurfer", "Contrarian", "Sovereign"])
-	.default("all");
+const VariantFilterSchema = variantIdWithAllSchema.default("all");
 
 const GetAllModelsStatsInputSchema = z.object({
 	mode: z.enum(["overall", "advanced"]).default("overall"),

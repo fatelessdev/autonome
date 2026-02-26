@@ -1,3 +1,5 @@
+import { SUPPORTED_MARKETS } from "@/core/shared/markets/marketMetadata";
+
 /**
  * TAAPI Integration Types
  * TypeScript types for TAAPI technical analysis API
@@ -25,9 +27,9 @@ export interface TaapiBulkPayload {
 	construct: TaapiConstruct | TaapiConstruct[];
 }
 
-// Free plan symbols (TAAPI limitation)
-export const TAAPI_FREE_PLAN_SYMBOLS = ["BTC", "ETH", "SOL", "ZEC", "HYPE"] as const;
-export type TaapiFreeSymbol = (typeof TAAPI_FREE_PLAN_SYMBOLS)[number];
+// Free plan symbols — derived from market metadata SSOT
+export const TAAPI_FREE_PLAN_SYMBOLS = SUPPORTED_MARKETS;
+export type TaapiFreeSymbol = (typeof SUPPORTED_MARKETS)[number];
 
 export interface TaapiBulkResponseItem {
 	id: string;

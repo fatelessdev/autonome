@@ -1,4 +1,4 @@
-import { EventEmitter } from "node:events";
+import { createTypedEventBus } from "@/server/events/typedEventBus";
 
 export type TradeEventData = {
 	id: string;
@@ -25,36 +25,22 @@ export type TradeEvent = {
 	data: TradeEventData[];
 };
 
-const emitter = new EventEmitter();
-emitter.setMaxListeners(50);
-const EVENT_KEY = "trade-update";
+const bus = createTypedEventBus<TradeEvent>("trade-update");
 
-// Cache for current trades
 let currentTradesCache: TradeEventData[] = [];
 let lastTradesUpdateAt: number | null = null;
 
-export const emitTradeEvent = (event: TradeEvent) => {
+export const emitTradeEvent = (event: TradeEvent): void => {
 	currentTradesCache = event.data;
 	lastTradesUpdateAt = Date.now();
-	emitter.emit(EVENT_KEY, event);
+	bus.emit(event);
 };
 
-export const subscribeToTradeEvents = (
-	listener: (event: TradeEvent) => void,
-) => {
-	emitter.on(EVENT_KEY, listener);
-	return () => {
-		emitter.off(EVENT_KEY, listener);
-	};
-};
+export const subscribeToTradeEvents = bus.subscribe;
 
-export const getCurrentTrades = () => {
-	return currentTradesCache;
-};
+export const getCurrentTrades = (): TradeEventData[] => currentTradesCache;
 
-export const getTradeCacheMetadata = () => {
-	return {
-		count: currentTradesCache.length,
-		lastUpdatedAt: lastTradesUpdateAt,
-	};
-};
+export const getTradeCacheMetadata = () => ({
+	count: currentTradesCache.length,
+	lastUpdatedAt: lastTradesUpdateAt,
+});

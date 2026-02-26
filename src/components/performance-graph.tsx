@@ -2,17 +2,19 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import ModelLegend from "@/components/model-legend";
 import type { ChartConfig } from "@/components/ui/chart";
-import { GlowingLineChart } from "@/components/ui/glowing-line";
+import { GlowingLineChart, type TimeFilter } from "@/components/ui/glowing-line";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useVariant } from "@/components/variant-context";
 import { getSseUrl } from "@/core/shared/api/apiConfig";
 import { sampleForViewport } from "@/core/shared/charts/chartSampler";
+import type { DashboardSseEvent } from "@/core/shared/trading/dashboardEvents";
 import {
 	PORTFOLIO_QUERIES,
 	type PortfolioHistoryEntry,
 	type DownsampleResolution,
 } from "@/core/shared/markets/marketQueries";
 import type { VariantId } from "@/core/shared/variants";
+import { createSseConnection } from "@/core/lib/sseConnection";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { getModelInfo } from "@/shared/models/modelConfig";
 
@@ -26,7 +28,7 @@ type SeriesMeta = Record<string, { originalKey: string }>;
 
 export default function PerformanceGraph() {
 	const [valueMode, setValueMode] = useState<"usd" | "percent">("usd");
-	const [timeFilter, setTimeFilter] = useState<"all" | "72h">("all");
+	const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
 	const [hoveredLine, setHoveredLine] = useState<string | null>(null);
 	const isCompact = useMediaQuery("(max-width: 768px)", {
 		defaultValue: false,
@@ -55,62 +57,22 @@ export default function PerformanceGraph() {
 	// Only show skeleton on initial load, not during variant transitions
 	const isPending = isHistoryPending && !portfolioData;
 
-	// Subscribe to portfolio SSE events for real-time updates with auto-reconnect
+	// Subscribe to dashboard SSE events for real-time portfolio updates
 	// Triggers refetch to get properly downsampled data from server
 	useEffect(() => {
-		let source: EventSource | null = null;
-		let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
-		let reconnectAttempts = 0;
-		const MAX_RECONNECT_DELAY = 30_000; // Max 30 seconds between reconnects
-		let mounted = true;
-
-		const connect = () => {
-			if (!mounted) return;
-			
-			source = new EventSource(getSseUrl("/api/events/portfolio"));
-
-			source.onopen = () => {
-				reconnectAttempts = 0; // Reset on successful connection
-			};
-
-			source.onmessage = (event) => {
+		return createSseConnection({
+			url: getSseUrl("/api/events/dashboard"),
+			onMessage: (event) => {
 				try {
-					const payload = JSON.parse(event.data);
-					// SSE stream sends the data payload directly (not wrapped in event object)
-					// Invalidate query when snapshots were created (or on any valid payload)
-					if (payload && (payload.snapshotsCreated > 0 || payload.lastUpdatedAt)) {
+					const payload = JSON.parse(event.data) as DashboardSseEvent;
+					if (payload.type === "portfolio:changed") {
 						void queryClient.invalidateQueries({ queryKey: ["portfolio", "history"] });
 					}
 				} catch (error) {
-					console.error("[Portfolio SSE] Failed to parse payload", error);
+					console.error("[SSE][dashboard] Failed to parse payload", error);
 				}
-			};
-
-			source.onerror = () => {
-				// Don't log on every error to avoid spam during expected disconnections
-				if (source?.readyState === EventSource.CLOSED) {
-					source?.close();
-					source = null;
-					
-					if (mounted) {
-						// Exponential backoff: 1s, 2s, 4s, 8s, ... up to MAX_RECONNECT_DELAY
-						const delay = Math.min(1000 * 2 ** reconnectAttempts, MAX_RECONNECT_DELAY);
-						reconnectAttempts++;
-						reconnectTimeout = setTimeout(connect, delay);
-					}
-				}
-			};
-		};
-
-		connect();
-
-		return () => {
-			mounted = false;
-			if (reconnectTimeout) {
-				clearTimeout(reconnectTimeout);
-			}
-			source?.close();
-		};
+			},
+		});
 	}, [queryClient]);
 
 	const { chartData, chartConfig, seriesMeta } = useMemo(() => {
@@ -350,9 +312,17 @@ function buildChartArtifacts(
 	return { chartData: rows, chartConfig, seriesMeta };
 }
 
-function filterByTime(data: DataPoint[], filter: "all" | "72h"): DataPoint[] {
-	if (filter !== "72h") return data;
-	const cutoffTime = Date.now() - 72 * 60 * 60 * 1000;
+function filterByTime(data: DataPoint[], filter: TimeFilter): DataPoint[] {
+	if (filter === "all") return data;
+
+	const cutoffMs: Record<Exclude<TimeFilter, "all">, number> = {
+		"1d": 24 * 60 * 60 * 1000,
+		"72h": 72 * 60 * 60 * 1000,
+		"1w": 7 * 24 * 60 * 60 * 1000,
+		"1m": 30 * 24 * 60 * 60 * 1000,
+	};
+
+	const cutoffTime = Date.now() - cutoffMs[filter];
 	return data.filter((point) => {
 		if (typeof point.timestamp === "number") {
 			return point.timestamp >= cutoffTime;

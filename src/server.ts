@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 // Port configuration for TanStack Start SSR server
 // FRONTEND_PORT: server-side only, read from process.env
 // VITE_API_URL: client-exposed, read from import.meta.env
-const API_PORT = Number(process.env.PORT) || 8081;
+const API_PORT = Number(process.env.API_PORT) || 8081;
 const FRONTEND_PORT = Number(process.env.FRONTEND_PORT) || 5173;
 const API_URL = import.meta.env.VITE_API_URL || `http://localhost:${API_PORT}`;
 

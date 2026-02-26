@@ -18,7 +18,7 @@ interface MyRouterContext {
 const SITE_URL = "https://autonome.fateless.dev";
 const SITE_NAME = "Autonome";
 const SITE_DESCRIPTION =
-	"AI-powered autonomous cryptocurrency trading platform with real-time portfolio analytics, multi-model AI strategies, and sophisticated trading simulation for both live and sandbox execution.";
+	"AI-powered autonomous cryptocurrency trading platform with real-time portfolio analytics, multi-model AI strategies, and Alpaca paper-trading execution.";
 const OG_IMAGE = `${SITE_URL}/logo.png`;
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
@@ -44,7 +44,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 					"AI Trading Bot",
 					"Crypto Portfolio",
 					"Real-time Trading",
-					"Trading Simulator",
+					"Paper Trading",
 					"Multi-model AI",
 					"Portfolio Analytics",
 					"Decentralized Trading",
@@ -191,7 +191,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 								"AI-powered trading decisions",
 								"Real-time portfolio analytics",
 								"Multi-model AI strategies",
-								"Trading simulation",
+								"Alpaca paper trading",
 								"Live market execution",
 							],
 						},

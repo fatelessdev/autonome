@@ -10,15 +10,9 @@ export type MarketPrice = {
 	symbol: MarketSymbol;
 	price: number;
 	change24h: number | null;
-	source: "lighter" | "simulator" | "cache";
+	source: "alpaca" | "cache";
 	timestamp: string;
 };
-
-export type MarketPricesResponse =
-	| { prices?: Array<Record<string, unknown>> }
-	| Array<Record<string, unknown>>
-	| null
-	| undefined;
 
 export type PortfolioHistoryEntry = {
 	id: string;
@@ -40,16 +34,6 @@ export type PortfolioHistoryResult = {
 	resolution: DownsampleResolution;
 };
 
-export type PortfolioHistoryResponse =
-	| PortfolioHistoryResult
-	| PortfolioHistoryEntry[]
-	| {
-			history?: PortfolioHistoryEntry[];
-			resolution?: DownsampleResolution;
-	  }
-	| null
-	| undefined;
-
 const MARKET_QUERY_KEYS = {
 	prices: (symbols: readonly MarketSymbol[]) =>
 		["markets", "prices", [...symbols].sort().join(",")] as const,
@@ -60,73 +44,31 @@ const PORTFOLIO_QUERY_KEYS = {
 	latest: (variant?: string) => ["portfolio", "latest", variant ?? "all"] as const,
 } as const;
 
-function normalizeMarketPrice(
-	entry: Record<string, unknown>,
-): MarketPrice | null {
-	const { symbol, price, change24h, source, timestamp } = entry;
-	const upperSymbol =
-		typeof symbol === "string" ? (symbol.toUpperCase() as MarketSymbol) : null;
-	if (!upperSymbol || !SUPPORTED_MARKETS.includes(upperSymbol)) {
-		return null;
-	}
-
-	const numericPrice =
-		typeof price === "number" && Number.isFinite(price) ? price : null;
-	if (numericPrice == null) {
-		return null;
-	}
-
-	return {
-		symbol: upperSymbol,
-		price: numericPrice,
-		change24h:
-			typeof change24h === "number" && Number.isFinite(change24h)
-				? change24h
-				: null,
-		source:
-			source === "lighter" || source === "simulator" || source === "cache"
-				? source
-				: "cache",
-		timestamp:
-			typeof timestamp === "string" ? timestamp : new Date().toISOString(),
-	};
-}
-
-function normalizeMarketPrices(
-	payload: MarketPricesResponse,
-	symbols: readonly MarketSymbol[] = SUPPORTED_MARKETS,
+function toMarketPrices(
+	prices: Array<{ symbol: string; price: number }>,
+	symbols: readonly MarketSymbol[],
 ): MarketPrice[] {
-	const raw =
-		payload && typeof payload === "object" && "prices" in payload
-			? (payload.prices as Array<Record<string, unknown>>)
-			: Array.isArray(payload)
-				? payload
-				: [];
-
-	const normalized = raw
-		.map((entry) => normalizeMarketPrice(entry ?? {}))
-		.filter((item): item is MarketPrice => Boolean(item));
-
 	const requestedSymbols = symbols.length > 0 ? symbols : SUPPORTED_MARKETS;
+	const priceMap = new Map(
+		prices
+			.filter((p) => SUPPORTED_MARKETS.includes(p.symbol.toUpperCase() as MarketSymbol))
+			.map((p) => [p.symbol.toUpperCase(), p.price]),
+	);
 
-	return requestedSymbols.map((symbol) => {
-		const fallbackPrice: MarketPrice = {
-			symbol,
-			price: Number.NaN,
-			change24h: null,
-			source: "cache",
-			timestamp: new Date(0).toISOString(),
-		};
-
-		return normalized.find((price) => price.symbol === symbol) ?? fallbackPrice;
-	});
+	return requestedSymbols.map((symbol) => ({
+		symbol,
+		price: priceMap.get(symbol) ?? Number.NaN,
+		change24h: null,
+		source: "cache" as const,
+		timestamp: new Date().toISOString(),
+	}));
 }
 
 async function requestMarketPrices(symbols: readonly MarketSymbol[]) {
 	const data = await orpc.trading.getCryptoPrices.call({
 		symbols: [...symbols],
 	});
-	return normalizeMarketPrices({ prices: data.prices }, symbols);
+	return toMarketPrices(data.prices, symbols);
 }
 
 export function marketPricesQueryOptions(
@@ -148,91 +90,27 @@ export async function prefetchMarketPrices(
 	return queryClient.ensureQueryData(marketPricesQueryOptions(symbols));
 }
 
-export function createMarketPriceUpdater(queryClient: QueryClient) {
-	return (
-		payload: MarketPricesResponse,
-		symbols: readonly MarketSymbol[] = SUPPORTED_MARKETS,
-	) => {
-		const normalized = normalizeMarketPrices(payload, symbols);
-		queryClient.setQueryData(MARKET_QUERY_KEYS.prices(symbols), normalized);
-		return normalized;
-	};
-}
-
 function normalizePortfolioHistory(
-	payload: PortfolioHistoryResponse,
+	payload: PortfolioHistoryResult,
 ): PortfolioHistoryResult {
-	// Handle new response format with { history, resolution }
-	const isNewFormat = payload && typeof payload === "object" && !Array.isArray(payload) && "resolution" in payload;
-	
-	const raw: unknown = isNewFormat
-		? (payload as PortfolioHistoryResult).history
-		: payload && typeof payload === "object" && !Array.isArray(payload)
-			? payload.history
-			: payload;
-	
-	const resolution: DownsampleResolution = isNewFormat
-		? (payload as PortfolioHistoryResult).resolution
-		: "1m"; // Default fallback
-
-	if (!Array.isArray(raw)) {
-		return { history: [], resolution };
-	}
-
-	const entries: PortfolioHistoryEntry[] = [];
-
-	for (const entry of raw) {
-		if (!entry || typeof entry !== "object") continue;
-		const record = entry as Record<string, unknown>;
-		const id = typeof record.id === "string" ? record.id : null;
-		const modelId =
-			typeof record.modelId === "string" ? record.modelId : null;
-		const netPortfolio =
-			typeof record.netPortfolio === "string" ? record.netPortfolio : null;
-		const createdAt =
-			typeof record.createdAt === "string" ? record.createdAt : null;
-		const updatedAt =
-			typeof record.updatedAt === "string" ? record.updatedAt : null;
-		const model =
-			record.model && typeof record.model === "object" ? record.model : null;
-
-		if (
-			!id ||
-			!modelId ||
-			!netPortfolio ||
-			!createdAt ||
-			!updatedAt ||
-			!model
-		) {
-			continue;
-		}
-
-		const modelRecord = model as Record<string, unknown>;
-		const variant = typeof modelRecord.variant === "string" && isValidVariantId(modelRecord.variant)
-				? modelRecord.variant
-				: undefined;
-
-		entries.push({
-			id,
-			modelId,
-			netPortfolio,
-			createdAt,
-			updatedAt,
-			model: {
-				name:
-					typeof modelRecord.name === "string"
-						? modelRecord.name
-						: "Unknown Model",
-				variant,
-				openRouterModelName:
-					typeof modelRecord.openRouterModelName === "string"
-						? modelRecord.openRouterModelName
-						: "unknown-model",
-			},
-		});
-	}
-
-	return { history: entries, resolution };
+	// oRPC validates shape via PortfolioHistoryResponseSchema — trust it
+	return {
+		history: payload.history.map((entry) => ({
+			id: entry.id,
+			modelId: entry.modelId,
+			netPortfolio: entry.netPortfolio,
+			createdAt: entry.createdAt,
+			updatedAt: entry.updatedAt,
+			model: entry.model
+				? {
+						name: entry.model.name,
+						variant: isValidVariantId(entry.model.variant) ? entry.model.variant : undefined,
+						openRouterModelName: entry.model.openRouterModelName,
+				  }
+				: undefined,
+		})),
+		resolution: payload.resolution,
+	};
 }
 
 async function requestPortfolioHistory(variant?: VariantId): Promise<PortfolioHistoryResult> {
@@ -261,14 +139,6 @@ export const portfolioHistoryQueryOptions = (variant?: VariantId) =>
 
 export async function prefetchPortfolioHistory(queryClient: QueryClient, variant?: VariantId) {
 	return queryClient.ensureQueryData(portfolioHistoryQueryOptions(variant));
-}
-
-export function createPortfolioHistoryUpdater(queryClient: QueryClient) {
-	return (payload: PortfolioHistoryResponse, variant?: string) => {
-		const normalized = normalizePortfolioHistory(payload);
-		queryClient.setQueryData(PORTFOLIO_QUERY_KEYS.history(variant), normalized);
-		return normalized;
-	};
 }
 
 export const MARKET_QUERIES = {
@@ -312,7 +182,7 @@ const VARIANT_QUERY_KEYS = {
 
 async function requestVariantHistory(window: "24h" | "7d" | "30d") {
 	const data = await orpc.variants.getVariantHistory.call({ window });
-	return data as VariantHistoryResponse;
+	return data;
 }
 
 export const variantHistoryQueryOptions = (

@@ -1,7 +1,7 @@
 import type {
 	TradingDecision,
 	TradingDecisionResult,
-} from "@/server/features/trading/tradingDecisions";
+} from "@/server/features/trading/contracts/tradingDecisions";
 import type { VariantId } from "@/core/shared/variants";
 
 export type TradeSide = "LONG" | "SHORT" | "UNKNOWN";
@@ -37,6 +37,8 @@ export type Position = {
 	position: string;
 	sign: "LONG" | "SHORT";
 	quantity?: number | null;
+	entryPrice?: number | null;
+	currentPrice?: number | null;
 	unrealizedPnl: string;
 	realizedPnl: string;
 	liquidationPrice: string;
@@ -56,7 +58,6 @@ export type ModelPositions = {
 	modelLogo: string;
 	positions: Position[];
 	totalUnrealizedPnl?: number;
-	availableCash?: number;
 };
 
 export type Conversation = {
@@ -121,3 +122,4 @@ export type ExitPlanSelection = {
 	modelColor: string;
 	position: Position;
 };
+

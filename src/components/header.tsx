@@ -1,4 +1,3 @@
-import { Link } from "@tanstack/react-router";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { ThemeToggleButton2 } from "@/components/ui/theme-toggle-button-2";
 
@@ -26,9 +25,18 @@ export default function Header({
 				<div className="text-base sm:text-lg font-mono tracking-wider text-foreground">
 					AutonoMe
 				</div>
+				{/* Market status indicator — crypto is 24/7 */}
+				<div className="hidden sm:flex items-center gap-1.5 ml-2 rounded-full border border-green-500/30 bg-green-500/10 px-2.5 py-0.5">
+					<div className="relative">
+						<div className="h-1.5 w-1.5 rounded-full bg-green-500" />
+						<div className="absolute inset-0 h-1.5 w-1.5 rounded-full bg-green-500 opacity-75 animate-ping" />
+					</div>
+					<span className="text-[10px] font-bold uppercase tracking-widest text-green-500">
+						LIVE
+					</span>
+				</div>
 			</div>
 			<div className="flex items-center gap-4 sm:gap-8">
-				{/*<div className="font-thin text-sm text-muted-foreground">{currentTime}</div>*/}
 				<button
 					type="button"
 					onClick={onToggleSidebar}

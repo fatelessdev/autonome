@@ -2,8 +2,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 
 import { getSseUrl } from "@/core/shared/api/apiConfig";
+import { createSseConnection } from "@/core/lib/sseConnection";
+import { normalizeIdentifier } from "@/core/shared/strings/normalizeIdentifier";
+import type { DashboardSseEvent } from "@/core/shared/trading/dashboardEvents";
 import {
-	createDashboardSseUpdaters,
+	DASHBOARD_QUERY_KEYS,
 	DASHBOARD_QUERIES,
 } from "@/core/shared/trading/dashboardQueries";
 import type {
@@ -21,25 +24,11 @@ type UseTradingDashboardDataOptions = {
 	variant?: VariantId;
 };
 
-const SSE_STREAMS = [
-	{ type: "trades", path: "/api/events/trades", updater: "trades" },
-	{ type: "positions", path: "/api/events/positions", updater: "positions" },
-	{
-		type: "conversations",
-		path: "/api/events/conversations",
-		updater: "conversations",
-	},
-] as const;
-
 export function useTradingDashboardData({
 	enabled = true,
 	variant = "all",
 }: UseTradingDashboardDataOptions = {}): TradingDashboardData {
 	const queryClient = useQueryClient();
-	const sseUpdaters = useMemo(
-		() => createDashboardSseUpdaters(queryClient),
-		[queryClient],
-	);
 
 	const tradesQuery = useQuery({
 		...DASHBOARD_QUERIES.trades(variant),
@@ -59,67 +48,37 @@ export function useTradingDashboardData({
 			return () => undefined;
 		}
 
-		let mounted = true;
-		const reconnectTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
-		const reconnectAttempts = new Map<string, number>();
-		const sources = new Map<string, EventSource>();
-		const MAX_RECONNECT_DELAY = 30_000; // Max 30 seconds between reconnects
-
-		const connectStream = (stream: typeof SSE_STREAMS[number]) => {
-			if (!mounted) return;
-
-			const source = new EventSource(getSseUrl(stream.path));
-			sources.set(stream.type, source);
-
-			source.onopen = () => {
-				reconnectAttempts.set(stream.type, 0); // Reset on successful connection
-			};
-
-			source.onmessage = (event) => {
+		return createSseConnection({
+			url: getSseUrl("/api/events/dashboard"),
+			onMessage: (event) => {
 				try {
-					const payload = JSON.parse(event.data);
-					sseUpdaters[stream.updater](payload);
-				} catch (error) {
-					console.error(`[SSE][${stream.type}] Failed to parse payload`, error);
-				}
-			};
+					const payload = JSON.parse(event.data) as DashboardSseEvent;
 
-			source.onerror = () => {
-				// Only reconnect if the connection is fully closed
-				if (source.readyState === EventSource.CLOSED) {
-					source.close();
-					sources.delete(stream.type);
-
-					if (mounted) {
-						const attempts = reconnectAttempts.get(stream.type) ?? 0;
-						// Exponential backoff: 1s, 2s, 4s, 8s, ... up to MAX_RECONNECT_DELAY
-						const delay = Math.min(1000 * 2 ** attempts, MAX_RECONNECT_DELAY);
-						reconnectAttempts.set(stream.type, attempts + 1);
-
-						const timeout = setTimeout(() => connectStream(stream), delay);
-						reconnectTimeouts.set(stream.type, timeout);
+					if (payload.type === "trades:changed") {
+						void queryClient.invalidateQueries({
+							queryKey: ["dashboard", "trades"],
+						});
+						return;
 					}
+
+					if (payload.type === "positions:changed") {
+						void queryClient.invalidateQueries({
+							queryKey: DASHBOARD_QUERY_KEYS.positions(),
+						});
+						return;
+					}
+
+					if (payload.type === "conversations:changed") {
+						void queryClient.invalidateQueries({
+							queryKey: DASHBOARD_QUERY_KEYS.conversations(),
+						});
+					}
+				} catch (error) {
+					console.error("[SSE][dashboard] Failed to parse payload", error);
 				}
-			};
-		};
-
-		// Connect all streams
-		for (const stream of SSE_STREAMS) {
-			connectStream(stream);
-		}
-
-		return () => {
-			mounted = false;
-			// Clear all reconnect timeouts
-			for (const timeout of reconnectTimeouts.values()) {
-				clearTimeout(timeout);
-			}
-			// Close all sources
-			for (const source of sources.values()) {
-				source.close();
-			}
-		};
-	}, [enabled, sseUpdaters]);
+			},
+		});
+	}, [enabled, queryClient]);
 
 	const trades = tradesQuery.data ?? [];
 	const positions = positionsQuery.data ?? [];
@@ -152,15 +111,6 @@ function buildModelOptions(
 ): ModelOption[] {
 	const map = new Map<string, ModelOption>();
 
-	const normalizeKey = (value: string | null | undefined) =>
-		typeof value === "string"
-			? value
-					.trim()
-					.toLowerCase()
-					.replace(/[^a-z0-9]+/g, "-")
-					.replace(/^-+|-+$/g, "")
-			: "";
-
 	const register = (
 		modelId: string,
 		identity: {
@@ -174,7 +124,7 @@ function buildModelOptions(
 		if (!modelId) return;
 		const info = resolveModelIdentity(identity);
 		const label = info.label || identity.modelName || modelId;
-		const normalizedLabel = normalizeKey(label);
+		const normalizedLabel = normalizeIdentifier(label);
 		if (!normalizedLabel) return;
 
 		const existing = map.get(normalizedLabel);
@@ -182,7 +132,7 @@ function buildModelOptions(
 		[modelId, label, identity.modelName, identity.modelKey, identity.modelRouterName]
 			.filter((candidate): candidate is string => Boolean(candidate))
 			.forEach((candidate) => {
-				const normalized = normalizeKey(candidate);
+				const normalized = normalizeIdentifier(candidate);
 				if (normalized) {
 					matchers.add(normalized);
 				}

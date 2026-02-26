@@ -2,18 +2,10 @@
  * Analytics Types - Trading statistics for model performance analysis
  */
 
-/**
- * Step-level telemetry captured during agent execution.
- * Imported from invocationResponse but re-exported for analytics use.
- */
-export interface StepTelemetry {
-	stepNumber: number;
-	toolNames: string[];
-	inputTokens: number;
-	outputTokens: number;
-	totalTokens: number;
-	timestamp: string;
-}
+// Re-export canonical StepTelemetry so analytics consumers get it from one place
+// without duplicating the interface definition.
+import type { StepTelemetry } from "@/server/features/trading/contracts/invocationResponse";
+export type { StepTelemetry };
 
 export interface OverallStats {
 	modelId: string;
@@ -125,3 +117,4 @@ export interface ModelFailureStats {
 	invocationCount: number;
 	failureRate: number;
 }
+
