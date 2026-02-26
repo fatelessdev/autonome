@@ -1,3 +1,4 @@
+import { queryOptions } from "@tanstack/react-query";
 import { eq, inArray } from "drizzle-orm";
 import { VARIANT_IDS, type VariantId } from "@/core/shared/variants";
 import { db } from "@/db";
@@ -139,3 +140,11 @@ export async function refreshConversationEvents() {
 	const conversations = await fetchConversationSnapshots();
 	return conversations;
 }
+
+export const conversationsQuery = () =>
+	queryOptions({
+		queryKey: ["conversations"],
+		queryFn: refreshConversationEvents,
+		staleTime: 20_000,
+		gcTime: 3 * 60_000,
+	});

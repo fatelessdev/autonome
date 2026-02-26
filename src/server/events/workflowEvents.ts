@@ -18,6 +18,11 @@
  */
 
 import { EventEmitter } from "node:events";
+import { refreshConversationEvents } from "@/server/features/trading/data/conversationsSnapshot.server";
+import {
+	fetchPositions,
+	fetchTrades,
+} from "@/server/features/trading/data/tradingQueries.server";
 import { emitConversationEvent } from "@/server/features/trading/events/conversationEvents";
 import { emitPositionEvent } from "@/server/features/trading/events/positionEvents";
 import { emitTradeEvent } from "@/server/features/trading/events/tradeEvents";
@@ -155,14 +160,6 @@ export async function emitAllDataChanged(modelId: string): Promise<void> {
 	emitTradesChanged(modelIds);
 	emitConversationsChanged(modelIds);
 	emitWorkflowComplete(modelId);
-
-	// Also trigger data SSE streams so clients get immediate updates
-	// Import dynamically to avoid circular dependencies
-	const [{ fetchPositions, fetchTrades }, { refreshConversationEvents }] =
-		await Promise.all([
-			import("@/server/features/trading/data/tradingQueries.server"),
-			import("@/server/features/trading/data/conversationsSnapshot.server"),
-		]);
 
 	const [positions, trades, conversations] = await Promise.all([
 		fetchPositions(),

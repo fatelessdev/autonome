@@ -8,6 +8,12 @@ import {
 	type VariantId,
 	variantIdSchema,
 } from "@/core/shared/variants";
+import {
+	fetchCryptoPrices,
+	fetchPortfolioHistory,
+	fetchPositions,
+	fetchTrades,
+} from "@/server/features/trading/data/tradingQueries.server";
 import { parseSymbols } from "@/shared/formatting/numberFormat";
 import {
 	CryptoPricesInputSchema,
@@ -35,11 +41,10 @@ export const getTrades = os
 	.handler(async ({ input }) => {
 		return Sentry.startSpan({ name: "getTrades" }, async () => {
 			try {
-				const result = await import(
-					"@/server/features/trading/data/tradingQueries.server"
-				).then((module) =>
-					module.fetchTrades({ variant: input.variant, limit: input.limit }),
-				);
+				const result = await fetchTrades({
+					variant: input.variant,
+					limit: input.limit,
+				});
 				const trades = result.map((trade) => ({
 					id: trade.id,
 					modelId: trade.modelId,
@@ -80,9 +85,7 @@ export const getPositions = os
 	.handler(async ({ input }) => {
 		return Sentry.startSpan({ name: "getPositions" }, async () => {
 			try {
-				const result = await import(
-					"@/server/features/trading/data/tradingQueries.server"
-				).then((module) => module.fetchPositions({ variant: input.variant }));
+				const result = await fetchPositions({ variant: input.variant });
 				const positions = result.map((modelPos) => ({
 					modelId: modelPos.modelId,
 					modelName: modelPos.modelName,
@@ -139,9 +142,7 @@ export const getCryptoPrices = os
 			const normalizedSymbols = parseSymbols(symbols.join(","));
 
 			try {
-				const result = await import(
-					"@/server/features/trading/data/tradingQueries.server"
-				).then((module) => module.fetchCryptoPrices(normalizedSymbols));
+				const result = await fetchCryptoPrices(normalizedSymbols);
 				const prices = result
 					.filter((price) => price.symbol)
 					.map((price) => ({
@@ -173,16 +174,12 @@ export const getPortfolioHistory = os
 	.handler(async ({ input }) => {
 		return Sentry.startSpan({ name: "getPortfolioHistory" }, async () => {
 			try {
-				const result = await import(
-					"@/server/features/trading/data/tradingQueries.server"
-				).then((module) =>
-					module.fetchPortfolioHistory({
-						variant: input.variant,
-						startDate: input.startDate ? new Date(input.startDate) : undefined,
-						endDate: input.endDate ? new Date(input.endDate) : undefined,
-						maxPoints: input.maxPoints,
-					}),
-				);
+				const result = await fetchPortfolioHistory({
+					variant: input.variant,
+					startDate: input.startDate ? new Date(input.startDate) : undefined,
+					endDate: input.endDate ? new Date(input.endDate) : undefined,
+					maxPoints: input.maxPoints,
+				});
 				const history = result.history.map((entry) => ({
 					id: entry.id,
 					modelId: entry.modelId,

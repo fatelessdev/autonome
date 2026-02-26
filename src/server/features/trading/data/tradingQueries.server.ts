@@ -140,6 +140,14 @@ export type FetchTradesOptions = {
 	limit?: number;
 };
 
+export const tradesQuery = (options?: FetchTradesOptions) =>
+	queryOptions({
+		queryKey: ["trades", options?.variant ?? "all", options?.limit ?? 100],
+		queryFn: () => fetchTrades(options),
+		staleTime: 30_000,
+		gcTime: 5 * 60_000,
+	});
+
 export async function fetchTrades(
 	options?: FetchTradesOptions,
 ): Promise<TradeRecord[]> {
@@ -234,6 +242,15 @@ export async function fetchTrades(
 export type FetchPositionsOptions = {
 	variant?: VariantId;
 };
+
+export const positionsQuery = (options?: FetchPositionsOptions) =>
+	queryOptions({
+		queryKey: ["positions", options?.variant ?? "all"],
+		queryFn: () => fetchPositions(options),
+		staleTime: 15_000,
+		gcTime: 2 * 60_000,
+		refetchInterval: 30_000,
+	});
 
 export async function fetchPositions(options?: FetchPositionsOptions) {
 	const { variant } = options ?? {};
@@ -407,6 +424,19 @@ export async function fetchPortfolioHistory(
 		resolution: result.resolution,
 	};
 }
+
+export const cryptoPricesQuery = (symbols: string[]) => {
+	const normalized = symbols
+		.map((symbol) => toCanonical(symbol).toUpperCase())
+		.sort();
+
+	return queryOptions({
+		queryKey: ["crypto-prices", ...normalized],
+		queryFn: () => fetchCryptoPrices(normalized),
+		staleTime: 10_000,
+		gcTime: 2 * 60_000,
+	});
+};
 
 /**
  * Fetch portfolio history for all models
