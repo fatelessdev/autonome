@@ -8,6 +8,7 @@ import { z } from "zod";
 import { updateOrderCloseTrigger } from "@/server/db/ordersRepository.server";
 import { ToolCallType } from "@/server/db/tradingRepository";
 import { createToolCallMutation } from "@/server/db/tradingRepository.server";
+import { calculateCooldownUntil } from "@/server/features/trading/execution/cooldown";
 import { createPosition } from "@/server/features/trading/execution/createPosition";
 import { MARKETS } from "@/shared/markets/marketMetadata";
 
@@ -17,12 +18,6 @@ import { MAX_ACTIONS_PER_SYMBOL, type ToolContext } from "./types";
 /**
  * Creates the createPosition tool with the given context
  */
-// Calculate cooldown timestamp from minutes (default 15 if not provided)
-function calculateCooldownUntil(minutes?: number | null): string {
-	const cooldownMinutes = Math.min(15, Math.max(1, minutes ?? 15));
-	return new Date(Date.now() + cooldownMinutes * 60 * 1000).toISOString();
-}
-
 /**
  * Check if a symbol is on cooldown for direction change.
  * Checks both open positions AND recently closed positions.
@@ -31,15 +26,14 @@ function calculateCooldownUntil(minutes?: number | null): string {
 function checkCooldown(
 	symbol: string,
 	requestedSide: string,
-	openPositions: ToolContext["openPositions"],
+	openPositionBySymbol: Map<string, ToolContext["openPositions"][number]>,
 	closedPositionCooldowns: ToolContext["closedPositionCooldowns"],
+	nowMs: number,
 ): string | null {
 	const upperSymbol = symbol.toUpperCase();
 
 	// Check open positions first
-	const existingPosition = openPositions.find(
-		(p) => p.symbol?.toUpperCase() === upperSymbol,
-	);
+	const existingPosition = openPositionBySymbol.get(upperSymbol);
 
 	if (existingPosition) {
 		// Same direction = adding to position, no cooldown check needed
@@ -50,10 +44,9 @@ function checkCooldown(
 		const cooldownUntil = existingPosition.exitPlan?.cooldownUntil;
 		if (cooldownUntil) {
 			const cooldownTime = new Date(cooldownUntil);
-			const now = new Date();
 
-			if (now < cooldownTime) {
-				const remainingMs = cooldownTime.getTime() - now.getTime();
+			if (nowMs < cooldownTime.getTime()) {
+				const remainingMs = cooldownTime.getTime() - nowMs;
 				const remainingMins = Math.ceil(remainingMs / 60000);
 				return `${symbol} direction change blocked: cooldown active for ${remainingMins} more minute(s) (until ${cooldownTime.toISOString()})`;
 			}
@@ -69,10 +62,9 @@ function checkCooldown(
 
 		// Opposite direction = check cooldown
 		const cooldownTime = new Date(closedCooldown.cooldownUntil);
-		const now = new Date();
 
-		if (now < cooldownTime) {
-			const remainingMs = cooldownTime.getTime() - now.getTime();
+		if (nowMs < cooldownTime.getTime()) {
+			const remainingMs = cooldownTime.getTime() - nowMs;
 			const remainingMins = Math.ceil(remainingMs / 60000);
 			return `${symbol} direction flip blocked: recently closed ${closedCooldown.side}, cooldown active for ${remainingMins} more minute(s) (until ${cooldownTime.toISOString()})`;
 		}
@@ -88,6 +80,18 @@ export function createPositionTool(ctx: ToolContext) {
 			decisions: z.array(decisionSchema),
 		}),
 		execute: async ({ decisions }) => {
+			const nowMs = Date.now();
+			const openPositionBySymbol = new Map<
+				string,
+				ToolContext["openPositions"][number]
+			>();
+			for (const position of ctx.openPositions) {
+				if (!position.symbol) {
+					throw new Error("Encountered open position with missing symbol");
+				}
+				openPositionBySymbol.set(position.symbol.toUpperCase(), position);
+			}
+
 			// decisions is Zod-validated: symbol is enum key, side is "LONG"|"SHORT"|"HOLD", quantity is positive number
 			const modern = decisions.map((item) => ({
 				symbol: item.symbol.toUpperCase(),
@@ -110,6 +114,11 @@ export function createPositionTool(ctx: ToolContext) {
 
 			for (const entry of [...modern]) {
 				const symbol = entry.symbol;
+				if (seenSymbols.has(symbol)) {
+					skippedDuplicates.push(symbol);
+					continue;
+				}
+				seenSymbols.add(symbol);
 
 				// Check if already acted on this symbol this session (duplicate in same invocation)
 				if (ctx.actedSymbols.has(symbol)) {
@@ -117,12 +126,19 @@ export function createPositionTool(ctx: ToolContext) {
 					continue;
 				}
 
+				const currentCount = ctx.symbolActionCounts.get(symbol) ?? 0;
+				if (currentCount >= MAX_ACTIONS_PER_SYMBOL) {
+					skippedLimitReached.push(symbol);
+					continue;
+				}
+
 				// Check cooldown for direction changes
 				const cooldownError = checkCooldown(
 					symbol,
 					entry.side,
-					ctx.openPositions,
+					openPositionBySymbol,
 					ctx.closedPositionCooldowns,
+					nowMs,
 				);
 				if (cooldownError) {
 					skippedCooldown.push(cooldownError);
@@ -133,9 +149,11 @@ export function createPositionTool(ctx: ToolContext) {
 				const validSide = entry.side;
 				const quantity = entry.quantity;
 
-				if (!(symbol in MARKETS)) continue;
-				if (seenSymbols.has(symbol)) continue;
-				seenSymbols.add(symbol);
+				if (!(symbol in MARKETS)) {
+					throw new Error(
+						`Unsupported market symbol in createPosition tool: ${symbol}`,
+					);
+				}
 
 				normalized.push({
 					symbol,
@@ -193,17 +211,7 @@ export function createPositionTool(ctx: ToolContext) {
 						p.symbol.toUpperCase() === result.symbol.toUpperCase() && p.orderId,
 				);
 				if (closedSameSymbol?.orderId) {
-					try {
-						await updateOrderCloseTrigger(
-							closedSameSymbol.orderId,
-							"adjustment",
-						);
-					} catch (err) {
-						console.warn(
-							`[createPositionTool] Failed to mark close as adjustment for ${result.symbol}:`,
-							err,
-						);
-					}
+					await updateOrderCloseTrigger(closedSameSymbol.orderId, "adjustment");
 				}
 			}
 
@@ -225,6 +233,12 @@ export function createPositionTool(ctx: ToolContext) {
 
 			// Capture execution results for telemetry
 			for (const outcome of results) {
+				if (!outcome.success && !outcome.error) {
+					throw new Error(
+						`createPosition returned failed outcome without error for ${outcome.symbol}`,
+					);
+				}
+
 				ctx.capturedExecutionResults.push({
 					symbol: outcome.symbol,
 					side: outcome.side,
@@ -262,7 +276,14 @@ export function createPositionTool(ctx: ToolContext) {
 			}
 			if (failed.length > 0) {
 				response += `Failed: ${failed
-					.map((r) => `${formatDecision(r)} (${r.error ?? "unknown error"})`)
+					.map((r) => {
+						if (!r.error) {
+							throw new Error(
+								`createPosition returned failed outcome without error for ${r.symbol}`,
+							);
+						}
+						return `${formatDecision(r)} (${r.error})`;
+					})
 					.join(", ")}. `;
 			}
 			if (skippedDuplicates.length > 0) {

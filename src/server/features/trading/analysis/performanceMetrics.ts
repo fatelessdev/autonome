@@ -1,10 +1,10 @@
 import {
 	calculateCurrentDrawdown,
 	calculateMaxDrawdown,
+	calculateRecoveryFactor,
 	calculateReturnPercent,
 	calculateSharpeRatioFromTrades,
 	calculateWinRate,
-	INITIAL_CAPITAL,
 } from "@/core/shared/trading/calculations";
 import {
 	getClosedOrdersByModel,
@@ -26,6 +26,24 @@ export type PerformanceMetrics = {
 	currentDrawdown: string;
 	/** Maximum historical drawdown as percentage string (e.g., "12.3%") */
 	maxDrawdown: string;
+	/** Recovery factor = net profit / max absolute drawdown */
+	recoveryFactor: string;
+};
+
+const parseRequiredRealizedPnl = (
+	value: string | null,
+	orderId: string,
+): number => {
+	if (value == null) {
+		throw new Error(`Closed order ${orderId} is missing realizedPnl`);
+	}
+	const parsed = Number.parseFloat(value);
+	if (!Number.isFinite(parsed)) {
+		throw new Error(
+			`Closed order ${orderId} has invalid realizedPnl: ${value}`,
+		);
+	}
+	return parsed;
 };
 
 /**
@@ -41,7 +59,7 @@ async function calculateTradeSharpe(modelId: string): Promise<string> {
 	}
 
 	const pnls = closedOrders
-		.map((order) => parseFloat(order.realizedPnl ?? "0"))
+		.map((order) => parseRequiredRealizedPnl(order.realizedPnl, order.id))
 		.filter((pnl) => Number.isFinite(pnl));
 
 	if (pnls.length < 2) {
@@ -80,9 +98,9 @@ export async function calculatePerformanceMetrics(
 
 	// Calculate trade stats
 	const tradeCount = closedOrders.length;
-	const pnls = closedOrders
-		.map((order) => parseFloat(order.realizedPnl ?? "0"))
-		.filter((pnl) => Number.isFinite(pnl));
+	const pnls = closedOrders.map((order) =>
+		parseRequiredRealizedPnl(order.realizedPnl, order.id),
+	);
 	const winRate =
 		tradeCount > 0 ? `${calculateWinRate(pnls).toFixed(1)}%` : "N/A";
 
@@ -91,17 +109,25 @@ export async function calculatePerformanceMetrics(
 	const currentDrawdown =
 		portfolioValues.length > 0
 			? `${calculateCurrentDrawdown(portfolioValues).toFixed(1)}%`
-			: "0.0%";
+			: "N/A";
 	const maxDrawdown =
 		portfolioValues.length > 1
 			? `${calculateMaxDrawdown(portfolioValues).toFixed(1)}%`
-			: "0.0%";
+			: "N/A";
+	const recoveryFactor =
+		portfolioValues.length > 1
+			? calculateRecoveryFactor(portfolioValues).toFixed(2)
+			: "N/A";
 
 	if (portfolioValues.length < 2) {
-		const fallbackInitial = alpacaHistory.base_value || INITIAL_CAPITAL;
+		if (alpacaHistory.base_value == null) {
+			throw new Error(
+				`Portfolio history missing base_value for model ${account.id}`,
+			);
+		}
 		const fallbackReturn = calculateReturnPercent(
 			currentPortfolioValue,
-			fallbackInitial,
+			alpacaHistory.base_value,
 		);
 
 		return {
@@ -112,6 +138,7 @@ export async function calculatePerformanceMetrics(
 			winRate,
 			currentDrawdown,
 			maxDrawdown,
+			recoveryFactor,
 		};
 	}
 
@@ -121,7 +148,13 @@ export async function calculatePerformanceMetrics(
 			? profitLossPct[profitLossPct.length - 1] * 100
 			: calculateReturnPercent(
 					currentPortfolioValue,
-					alpacaHistory.base_value || INITIAL_CAPITAL,
+					alpacaHistory.base_value == null
+						? (() => {
+								throw new Error(
+									`Portfolio history missing base_value for model ${account.id}`,
+								);
+							})()
+						: alpacaHistory.base_value,
 				);
 
 	// Use trade-based Sharpe ratio (same as analytics) for consistency
@@ -136,5 +169,6 @@ export async function calculatePerformanceMetrics(
 		winRate,
 		currentDrawdown,
 		maxDrawdown,
+		recoveryFactor,
 	};
 }

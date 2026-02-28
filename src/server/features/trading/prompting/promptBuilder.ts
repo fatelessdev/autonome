@@ -1,3 +1,4 @@
+import { toFiniteNumber } from "@/core/shared/trading/calculations";
 import type { CompetitionSnapshot } from "@/server/features/trading/analysis/competitionSnapshot";
 import type { PerformanceMetrics } from "@/server/features/trading/analysis/performanceMetrics";
 import type { Account } from "@/server/features/trading/contracts/accounts";
@@ -27,14 +28,28 @@ interface TradingPromptParams {
 	performanceMetrics: PerformanceMetrics;
 	marketIntelligence: string;
 	/** Formatted news digest from Alpaca News API */
-	newsDigest?: string;
+	newsDigest: string;
 	currentTime: string;
 	/** Strategy variant - determines which prompt set to use */
 	variant?: VariantId;
 	/** Per-symbol action counts for session limit tracking */
 	symbolActionCounts?: Map<string, number>;
 	/** Leaderboard context */
-	competition?: CompetitionSnapshot;
+	competition: CompetitionSnapshot;
+}
+
+function renderPromptTemplate(
+	template: string,
+	placeholders: Record<string, string>,
+): string {
+	return template.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_fullToken, tokenName) => {
+		const key = `{{${tokenName}}}`;
+		const replacement = placeholders[key];
+		if (replacement === undefined) {
+			throw new Error(`Missing prompt placeholder value for ${key}`);
+		}
+		return replacement;
+	});
 }
 
 /**
@@ -56,14 +71,18 @@ export function buildStateSummary(params: {
 	const exposurePct =
 		exposureRatio != null && Number.isFinite(exposureRatio)
 			? exposureRatio.toFixed(1)
-			: "0.0";
+			: "N/A";
 
-	// Build position summaries with safe number conversion
+	// Preserve unknowns explicitly rather than coercing missing values to zero.
 	const positionSummaries = openPositions.map((pos) => {
-		const pnlValue = Number(pos.unrealizedPnl ?? 0);
-		const pnlSign = pnlValue >= 0 ? "+" : "";
-		const pnl = Number.isFinite(pnlValue) ? pnlValue.toFixed(2) : "?";
-		return `${pos.symbol} ${pos.sign} @ ${pos.entryPrice} (${pnlSign}$${pnl})`;
+		const pnlValue = toFiniteNumber(pos.unrealizedPnl);
+		const entryValue = toFiniteNumber(pos.entryPrice);
+		const pnlLabel =
+			pnlValue === null
+				? "N/A"
+				: `${pnlValue >= 0 ? "+" : ""}$${pnlValue.toFixed(2)}`;
+		const entryLabel = entryValue === null ? "N/A" : entryValue.toFixed(2);
+		return `${pos.symbol} ${pos.sign} @ ${entryLabel} (${pnlLabel})`;
 	});
 
 	const positionsLine =
@@ -92,7 +111,7 @@ export function buildTradingPrompts(params: TradingPromptParams): {
 		exposureSummary,
 		performanceMetrics,
 		marketIntelligence,
-		newsDigest = "",
+		newsDigest,
 		currentTime,
 		variant = DEFAULT_VARIANT,
 		symbolActionCounts: _symbolActionCounts,
@@ -111,62 +130,40 @@ export function buildTradingPrompts(params: TradingPromptParams): {
 	const exposurePercentLabel =
 		exposureRatio != null && Number.isFinite(exposureRatio)
 			? exposureRatio.toFixed(1)
-			: "0.0";
+			: "N/A";
 	const availableCashLabel = formatUsd(portfolio.availableCash);
 
 	// Calculate risk to equity percentage for prompts that use it
 	const riskToEquityPct =
 		portfolio.totalValue > 0 && exposureSummary.totalRiskUsd > 0
 			? ((exposureSummary.totalRiskUsd / portfolio.totalValue) * 100).toFixed(2)
-			: "0.00";
+			: "N/A";
 
-	// TODO: Re-enable symbol action counts later
-	// Build symbol action count string from actual counts
-	// const symbolActionCount = SUPPORTED_MARKETS.map((symbol) => {
-	// 	const count = symbolActionCounts?.get(symbol) ?? 0;
-	// 	return `${symbol}: ${count}`;
-	// }).join(", ");
+	// Tracked debt: symbol action count context is currently collected but not injected
+	// into active prompts. See problems.md issue #16.
 
-	const userPrompt = USER_PROMPT.replaceAll(
-		"{{INVOKATION_TIMES}}",
-		account.invocationCount.toString(),
-	)
-		.replaceAll("{{CURRENT_TIME}}", currentTime)
-		.replaceAll("{{TOTAL_MINUTES}}", account.totalMinutes.toString())
-		.replaceAll("{{AVAILABLE_CASH}}", availableCashLabel)
-		.replaceAll("{{EXPOSURE_TO_EQUITY_PCT}}", exposurePercentLabel)
-		.replaceAll("{{RISK_TO_EQUITY_PCT}}", riskToEquityPct)
-		// .replaceAll("{{SYMBOL_ACTION_COUNT}}", symbolActionCount)
-		.replaceAll("{{MARKET_INTELLIGENCE}}", marketIntelligence)
-		.replaceAll(
-			"{{PORTFOLIO_SNAPSHOT}}",
-			buildPortfolioSnapshotSection({
-				portfolio,
-				openPositions,
-				exposureSummary,
-			}),
-		)
-		.replaceAll(
-			"{{OPEN_POSITIONS_TABLE}}",
-			buildOpenPositionsSection(openPositions),
-		)
-		.replaceAll(
-			"{{PERFORMANCE_OVERVIEW}}",
-			buildPerformanceOverview({ performanceMetrics }),
-		)
-		.replaceAll(
-			"{{COMPETITION_STANDINGS}}",
-			competition?.standings ?? "No leaderboard data",
-		)
-		.replaceAll(
-			"{{COMPETITION_PNL_DELTA}}",
-			competition?.pnlDeltaToLeader ?? "N/A",
-		)
-		.replaceAll(
-			"{{COMPETITION_OPEN_POSITIONS}}",
-			competition?.openPositionsSummary ?? "No peer position data",
-		)
-		.replaceAll("{{NEWS}}", newsDigest || "No recent news.");
+	const userPrompt = renderPromptTemplate(USER_PROMPT, {
+		"{{INVOKATION_TIMES}}": account.invocationCount.toString(),
+		"{{CURRENT_TIME}}": currentTime,
+		"{{TOTAL_MINUTES}}": account.totalMinutes.toString(),
+		"{{AVAILABLE_CASH}}": availableCashLabel,
+		"{{EXPOSURE_TO_EQUITY_PCT}}": exposurePercentLabel,
+		"{{RISK_TO_EQUITY_PCT}}": riskToEquityPct,
+		"{{MARKET_INTELLIGENCE}}": marketIntelligence,
+		"{{PORTFOLIO_SNAPSHOT}}": buildPortfolioSnapshotSection({
+			portfolio,
+			openPositions,
+			exposureSummary,
+		}),
+		"{{OPEN_POSITIONS_TABLE}}": buildOpenPositionsSection(openPositions),
+		"{{PERFORMANCE_OVERVIEW}}": buildPerformanceOverview({
+			performanceMetrics,
+		}),
+		"{{COMPETITION_STANDINGS}}": competition.standings,
+		"{{COMPETITION_PNL_DELTA}}": competition.pnlDeltaToLeader,
+		"{{COMPETITION_OPEN_POSITIONS}}": competition.openPositionsSummary,
+		"{{NEWS}}": newsDigest,
+	});
 
 	// Build compact state summary for prepareStep updates
 	const stateSummary = buildStateSummary({
@@ -181,13 +178,4 @@ export function buildTradingPrompts(params: TradingPromptParams): {
 		variantId: variant,
 		stateSummary,
 	};
-}
-
-/**
- * @deprecated Use buildTradingPrompts() for system/user split
- * Kept for backward compatibility - returns combined prompt
- */
-export function buildTradingPrompt(params: TradingPromptParams): string {
-	const { systemPrompt, userPrompt } = buildTradingPrompts(params);
-	return `${systemPrompt}\n\n${userPrompt}`;
 }

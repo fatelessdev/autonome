@@ -1,10 +1,11 @@
+import { toFiniteNumber } from "@/core/shared/trading/calculations";
 import type { PerformanceMetrics } from "@/server/features/trading/analysis/performanceMetrics";
 import type {
 	EnrichedOpenPosition,
 	ExposureSummary,
 } from "@/server/features/trading/data/openPositionEnrichment";
-import { toNumeric } from "@/server/features/trading/data/openPositionEnrichment";
 import type { PortfolioSnapshot } from "@/server/features/trading/data/portfolio";
+import { formatPercentValue } from "@/shared/formatting/numberFormat";
 
 /**
  * Calculate exposure to equity as the percentage of equity that is actually deployed.
@@ -28,7 +29,7 @@ function formatUsd(
 	value: number | string | null | undefined,
 	digits = 2,
 ): string {
-	const numeric = toNumeric(value);
+	const numeric = toFiniteNumber(value);
 	if (numeric === null) return "N/A";
 	return `$${numeric.toFixed(digits)}`;
 }
@@ -37,18 +38,9 @@ function formatNullableNumber(
 	value: number | string | null | undefined,
 	digits = 4,
 ): string {
-	const numeric = toNumeric(value);
+	const numeric = toFiniteNumber(value);
 	if (numeric === null) return "N/A";
 	return numeric.toFixed(digits);
-}
-
-function formatPercent(
-	value: number | string | null | undefined,
-	digits = 2,
-): string {
-	const numeric = toNumeric(value);
-	if (numeric === null) return "N/A";
-	return `${numeric.toFixed(digits)}%`;
 }
 
 function formatConfidence(value: number | null | undefined): string {
@@ -57,6 +49,11 @@ function formatConfidence(value: number | null | undefined): string {
 	}
 	const normalized = value <= 1 ? value * 100 : value;
 	return `${normalized.toFixed(1)}%`;
+}
+
+function sanitizeQuotedPromptField(value: string | null | undefined): string {
+	if (!value) return "N/A";
+	return value.replaceAll('"', "'");
 }
 
 export function buildOpenPositionsSection(
@@ -96,12 +93,12 @@ export function buildOpenPositionsSection(
 		}
 		if (position.unrealizedIntradayPlpc != null) {
 			pnlParts.push(
-				`intraday_pl_pct ${formatPercent(position.unrealizedIntradayPlpc * 100, 2)}`,
+				`intraday_pl_pct ${formatPercentValue(position.unrealizedIntradayPlpc * 100, { decimals: 2, fallback: "N/A" })}`,
 			);
 		}
 		if (position.changeToday != null) {
 			pnlParts.push(
-				`change_today ${formatPercent(position.changeToday * 100, 2)}`,
+				`change_today ${formatPercentValue(position.changeToday * 100, { decimals: 2, fallback: "N/A" })}`,
 			);
 		}
 		const pnlLine = pnlParts.join(" | ");
@@ -110,18 +107,22 @@ export function buildOpenPositionsSection(
 		const riskParts: string[] = [];
 		if (position.riskUsd !== null) {
 			riskParts.push(`risk_usd ${formatUsd(position.riskUsd, 2)}`);
-			riskParts.push(`risk_pct ${formatPercent(position.riskPercent, 2)}`);
+			riskParts.push(
+				`risk_pct ${formatPercentValue(position.riskPercent, { decimals: 2, fallback: "N/A" })}`,
+			);
 		}
 		if (position.rewardUsd !== null) {
 			riskParts.push(`reward_usd ${formatUsd(position.rewardUsd, 2)}`);
-			riskParts.push(`reward_pct ${formatPercent(position.rewardPercent, 2)}`);
+			riskParts.push(
+				`reward_pct ${formatPercentValue(position.rewardPercent, { decimals: 2, fallback: "N/A" })}`,
+			);
 		}
 		if (position.riskRewardRatio !== null) {
 			riskParts.push(`rr_ratio ${position.riskRewardRatio.toFixed(2)}`);
 		}
 
 		// Line 4: Exit plan (quote string fields for clarity)
-		const exitPlanLine = `exit_plan: target ${formatNullableNumber(position.exitPlan?.target, 2)} | stop ${formatNullableNumber(position.exitPlan?.stop, 2)} | invalidation "${position.exitPlan?.invalidation ?? "N/A"}" | time_exit "${position.exitPlan?.timeExit ?? "N/A"}" | cooldown_until ${position.exitPlan?.cooldownUntil ?? "N/A"}`;
+		const exitPlanLine = `exit_plan: target ${formatNullableNumber(position.exitPlan?.target, 2)} | stop ${formatNullableNumber(position.exitPlan?.stop, 2)} | invalidation "${sanitizeQuotedPromptField(position.exitPlan?.invalidation)}" | time_exit "${sanitizeQuotedPromptField(position.exitPlan?.timeExit)}" | cooldown_until ${position.exitPlan?.cooldownUntil ?? "N/A"}`;
 
 		// Line 5: Intent context (explicit labels)
 		const intentLine = `intent: signal ${position.signal ?? position.sign} | confidence ${formatConfidence(position.confidence)} | decision_status ${position.decisionStatus ?? "N/A"} | last_decision_at ${position.lastDecisionAt ?? "N/A"}`;
@@ -151,32 +152,44 @@ export function buildPortfolioSnapshotSection({
 	const riskPct =
 		portfolio.totalValue > 0
 			? (exposureSummary.totalRiskUsd / portfolio.totalValue) * 100
-			: 0;
+			: null;
 	const maxRiskPct =
 		portfolio.totalValue > 0
 			? (exposureSummary.maxPositionRiskUsd / portfolio.totalValue) * 100
-			: 0;
+			: null;
 	const cashUtilizationPct =
 		portfolio.totalValue > 0
 			? ((portfolio.totalValue - portfolio.availableCash) /
 					portfolio.totalValue) *
 				100
-			: 0;
+			: null;
 
 	const netExposure =
 		exposureSummary.longExposure - exposureSummary.shortExposure;
 	const exposurePctLabel =
 		exposurePct !== null && Number.isFinite(exposurePct)
 			? exposurePct.toFixed(1)
-			: "0.0";
+			: "N/A";
+	const cashUtilizationPctLabel =
+		cashUtilizationPct !== null && Number.isFinite(cashUtilizationPct)
+			? `${cashUtilizationPct.toFixed(1)}%`
+			: "N/A";
+	const riskPctLabel =
+		riskPct !== null && Number.isFinite(riskPct)
+			? `${riskPct.toFixed(2)}%`
+			: "N/A";
+	const maxRiskPctLabel =
+		maxRiskPct !== null && Number.isFinite(maxRiskPct)
+			? `${maxRiskPct.toFixed(2)}%`
+			: "N/A";
 
 	// All fields always shown - zeros are meaningful, AI should never infer
 	return [
 		`portfolio_value: ${formatUsd(portfolio.totalValue)} | available_cash: ${formatUsd(portfolio.availableCash)} | open_positions: ${openPositions.length}`,
-		`cash_utilization_pct: ${cashUtilizationPct.toFixed(1)}% | exposure_to_equity_pct: ${exposurePctLabel}%`,
+		`cash_utilization_pct: ${cashUtilizationPctLabel} | exposure_to_equity_pct: ${exposurePctLabel === "N/A" ? "N/A" : `${exposurePctLabel}%`}`,
 		`gross_exposure_usd: ${formatUsd(exposureSummary.totalNotional)} | long_exposure: ${formatUsd(exposureSummary.longExposure)} | short_exposure: ${formatUsd(exposureSummary.shortExposure)} | net_exposure: ${formatUsd(netExposure)}`,
 		`unrealized_pnl: ${formatUsd(exposureSummary.totalUnrealized)} | scaled_realized_pnl: ${formatUsd(exposureSummary.totalRealized)}`,
-		`gross_risk_usd: ${formatUsd(exposureSummary.totalRiskUsd)} | risk_to_equity_pct: ${riskPct.toFixed(2)}% | max_single_position_risk_usd: ${formatUsd(exposureSummary.maxPositionRiskUsd)} | max_single_position_risk_pct: ${maxRiskPct.toFixed(2)}%`,
+		`gross_risk_usd: ${formatUsd(exposureSummary.totalRiskUsd)} | risk_to_equity_pct: ${riskPctLabel} | max_single_position_risk_usd: ${formatUsd(exposureSummary.maxPositionRiskUsd)} | max_single_position_risk_pct: ${maxRiskPctLabel}`,
 	].join("\n");
 }
 
@@ -189,7 +202,7 @@ export function buildPerformanceOverview({
 	return [
 		`closed_trade_realized_pnl: ${formatUsd(performanceMetrics.closedTradeRealizedPnl)} | trade_count: ${performanceMetrics.tradeCount} | win_rate: ${performanceMetrics.winRate}`,
 		`total_return_since_start: ${performanceMetrics.totalReturnPercent} | annualized_sharpe_ratio: ${performanceMetrics.sharpeRatio}`,
-		`current_drawdown: ${performanceMetrics.currentDrawdown} | max_drawdown: ${performanceMetrics.maxDrawdown}`,
+		`current_drawdown: ${performanceMetrics.currentDrawdown} | max_drawdown: ${performanceMetrics.maxDrawdown} | recovery_factor: ${performanceMetrics.recoveryFactor}`,
 	].join("\n");
 }
 

@@ -6,6 +6,8 @@
  */
 
 import { QueryClient } from "@tanstack/react-query";
+import { isValidVariantId } from "@/core/shared/variants";
+import { fallback_model } from "@/env";
 
 import { listModels } from "@/server/db/tradingRepository";
 import {
@@ -17,6 +19,7 @@ import {
 	emitAllDataChanged,
 	emitBatchComplete,
 } from "@/server/events/workflowEvents";
+import { getLeaderboardData } from "@/server/features/analytics";
 import { buildCompetitionSnapshot } from "@/server/features/trading/analysis/competitionSnapshot";
 import { calculatePerformanceMetrics } from "@/server/features/trading/analysis/performanceMetrics";
 import type { Account } from "@/server/features/trading/contracts/accounts";
@@ -38,13 +41,15 @@ import {
 	summarizePositionRisk,
 } from "@/server/features/trading/data/openPositionEnrichment";
 import { portfolioQuery } from "@/server/features/trading/data/portfolio.server";
+import { getOpenPositions } from "@/server/features/trading/data/positions";
 import { openPositionsQuery } from "@/server/features/trading/data/positions.server";
-import { CONSENSUS_MODEL_NAME } from "@/server/features/trading/execution/orchestrator";
-import { buildTradingPrompts } from "@/server/features/trading/prompting/promptBuilder";
+import { closePosition } from "@/server/features/trading/execution/closePosition";
 import {
-	DEFAULT_VARIANT,
-	type VariantId,
-} from "@/server/features/trading/prompting/prompts/variants";
+	isConsensusModel,
+	prepareConsensusWorkflowFromModels,
+} from "@/server/features/trading/execution/orchestrator";
+import { buildTradingPrompts } from "@/server/features/trading/prompting/promptBuilder";
+import type { VariantId } from "@/server/features/trading/prompting/prompts/variants";
 import {
 	getSharedNewsDigest,
 	invalidateNewsCache,
@@ -60,6 +65,138 @@ export interface TradeWorkflowResult {
 }
 
 const AGENT_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes per agent call
+const PRIMARY_MODEL_ATTEMPTS = 2;
+const FALLBACK_MODEL_ATTEMPTS = 2;
+const FALLBACK_FAILURE_KILL_SWITCH_THRESHOLD = 2;
+
+type WorkflowExecutionError = Error & {
+	transient?: boolean;
+};
+
+interface FallbackCandidate {
+	id: string;
+	reasoningModel: string;
+	source: "leaderboard" | "env";
+}
+
+const resolveVariantId = (variant: unknown, context: string): VariantId => {
+	if (!isValidVariantId(variant)) {
+		throw new Error(`Invalid or missing variant for ${context}`);
+	}
+	return variant;
+};
+
+const isTransientExecutionError = (error: unknown): boolean => {
+	const withTransient = error as WorkflowExecutionError | null;
+	if (withTransient?.transient === true) {
+		return true;
+	}
+
+	const message =
+		error instanceof Error
+			? `${error.message} ${(error.cause as Error | undefined)?.message ?? ""}`
+			: String(error);
+	const lower = message.toLowerCase();
+
+	return [
+		"timeout",
+		"timed out",
+		"abort",
+		"rate limit",
+		"429",
+		"503",
+		"502",
+		"504",
+		"temporarily unavailable",
+		"network",
+		"socket",
+		"econn",
+		"enotfound",
+		"fetch failed",
+	].some((token) => lower.includes(token));
+};
+
+const toTradingAccount = (model: {
+	id: string;
+	name: string;
+	openRouterModelName: string;
+	alpacaApiKey: string;
+	alpacaApiSecret: string;
+	invocationCount: number;
+	totalMinutes: number;
+	variant: VariantId;
+}): Account => ({
+	alpacaApiKey: model.alpacaApiKey,
+	alpacaApiSecret: model.alpacaApiSecret,
+	modelName: model.openRouterModelName,
+	name: model.name,
+	invocationCount: model.invocationCount,
+	id: model.id,
+	totalMinutes: model.totalMinutes,
+	variant: model.variant,
+});
+
+const resolveFallbackCandidates = async (params: {
+	baseModel: {
+		id: string;
+		name: string;
+		openRouterModelName: string;
+		variant: VariantId;
+	};
+	validModels: Array<{
+		id: string;
+		openRouterModelName: string;
+		variant: VariantId;
+	}>;
+}): Promise<FallbackCandidate[]> => {
+	const leaderboard = await getLeaderboardData("7d", params.baseModel.variant);
+	const sorted = [...leaderboard].sort((a, b) => b.pnlPercent - a.pnlPercent);
+	const validById = new Map(
+		params.validModels.map((model) => [model.id, model]),
+	);
+
+	const candidates: FallbackCandidate[] = [];
+	for (const entry of sorted) {
+		if (entry.modelId === params.baseModel.id) continue;
+		const model = validById.get(entry.modelId);
+		if (!model) continue;
+		if (model.variant !== params.baseModel.variant) continue;
+		candidates.push({
+			id: model.id,
+			reasoningModel: model.openRouterModelName,
+			source: "leaderboard",
+		});
+		if (candidates.length === 2) break;
+	}
+
+	if (candidates.length === 0 && fallback_model) {
+		candidates.push({
+			id: "env:fallback_model",
+			reasoningModel: fallback_model,
+			source: "env",
+		});
+	}
+
+	return candidates;
+};
+
+const triggerKillSwitch = async (account: Account): Promise<void> => {
+	const openPositions = await getOpenPositions(account);
+	if (openPositions.length === 0) {
+		console.warn(
+			`[KillSwitch] No open positions for ${account.name} (${account.id})`,
+		);
+		return;
+	}
+
+	const symbols = [
+		...new Set(openPositions.map((position) => position.symbol)),
+	];
+	console.error(
+		`[KillSwitch] Closing ${symbols.length} position(s) for ${account.name} (${account.id})`,
+	);
+	await closePosition(account, symbols);
+};
 
 /**
  * Runs a complete trade workflow for a single account.
@@ -95,24 +232,18 @@ export async function runTradeWorkflow(account: Account): Promise<string> {
 	const symbolActionCounts = new Map<string, number>();
 
 	// Fetch shared market data (cached across all models in the same cycle)
-	let marketIntelligence = "Market data unavailable.";
-	let newsDigest = "";
-	try {
-		const [marketResult, newsResult] = await Promise.all([
-			getSharedMarketIntelligence({
-				alpacaApiKey: account.alpacaApiKey,
-				alpacaApiSecret: account.alpacaApiSecret,
-			}),
-			getSharedNewsDigest({
-				alpacaApiKey: account.alpacaApiKey,
-				alpacaApiSecret: account.alpacaApiSecret,
-			}),
-		]);
-		marketIntelligence = marketResult.formatted;
-		newsDigest = newsResult.formatted;
-	} catch (error) {
-		console.error("Failed to assemble market intelligence", error);
-	}
+	const [marketResult, newsResult] = await Promise.all([
+		getSharedMarketIntelligence({
+			alpacaApiKey: account.alpacaApiKey,
+			alpacaApiSecret: account.alpacaApiSecret,
+		}),
+		getSharedNewsDigest({
+			alpacaApiKey: account.alpacaApiKey,
+			alpacaApiSecret: account.alpacaApiSecret,
+		}),
+	]);
+	const marketIntelligence = marketResult.formatted;
+	const newsDigest = newsResult.formatted;
 
 	const currentTime = new Intl.DateTimeFormat("en-US", {
 		timeZone: "Asia/Kolkata",
@@ -126,12 +257,17 @@ export async function runTradeWorkflow(account: Account): Promise<string> {
 
 	// Calculate performance metrics
 	const currentPortfolioValue = Number.parseFloat(portfolio.total);
+	if (!Number.isFinite(currentPortfolioValue)) {
+		throw new Error(
+			`Invalid portfolio total for ${account.name}: ${portfolio.total}`,
+		);
+	}
 	const performanceMetrics = await calculatePerformanceMetrics(
 		account,
 		currentPortfolioValue,
 	);
 
-	const variantId = account.variant ?? DEFAULT_VARIANT;
+	const variantId = resolveVariantId(account.variant, `account ${account.id}`);
 
 	// Leaderboard context (variant-scoped)
 	const competitionSnapshot = await buildCompetitionSnapshot({
@@ -248,7 +384,11 @@ export async function runTradeWorkflow(account: Account): Promise<string> {
 			}),
 		});
 
-		return failureMessage;
+		const wrappedError = new Error(failureMessage, {
+			cause: error instanceof Error ? error : undefined,
+		}) as WorkflowExecutionError;
+		wrappedError.transient = isTransientExecutionError(error);
+		throw wrappedError;
 	}
 
 	// Process successful result
@@ -304,48 +444,135 @@ export async function executeAllModelTrades(): Promise<{
 }> {
 	const models = await listModels();
 
-	// Separate consensus model from regular models
-	const consensusModel = models.find((m) => m.name === CONSENSUS_MODEL_NAME);
-	const regularModels = models.filter((m) => m.name !== CONSENSUS_MODEL_NAME);
+	// Consensus is intentionally prepared-only for now.
+	const consensusPlan = prepareConsensusWorkflowFromModels(models);
+	if (consensusPlan) {
+		console.log(
+			`[TradeExecutor] Consensus account ready with ${consensusPlan.voterCount} voters (execution disabled in cycle)`,
+		);
+	}
 
-	const validModels = regularModels.filter((model) => {
+	const regularModels = models.filter((m) => !isConsensusModel(m.name));
+
+	const validModels: Array<
+		(typeof regularModels)[number] & { variant: VariantId }
+	> = [];
+
+	for (const model of regularModels) {
 		if (!model.alpacaApiKey || !model.alpacaApiSecret) {
 			console.warn(`Model ${model.id} missing Alpaca credentials; skipping`);
-			return false;
+			continue;
 		}
-		const variant = (model.variant as VariantId) ?? DEFAULT_VARIANT;
+
+		if (!isValidVariantId(model.variant)) {
+			console.warn(
+				`[TradeExecutor] Skipping ${model.name}: invalid or missing variant`,
+			);
+			continue;
+		}
+
+		const variant = model.variant;
 		if (!TRADEABLE_VARIANT_IDS.includes(variant)) {
 			console.log(
 				`[TradeExecutor] Skipping ${model.name}: variant "${variant}" is not tradeable`,
 			);
-			return false;
+			continue;
 		}
-		return true;
-	});
 
-	if (validModels.length === 0 && !consensusModel) {
+		validModels.push({ ...model, variant });
+	}
+
+	if (validModels.length === 0) {
 		return { successCount: 0, failureCount: 0, totalModels: 0 };
 	}
 
 	const runModel = async (
 		model: (typeof validModels)[number],
 	): Promise<{ modelId: string; success: boolean }> => {
-		try {
-			await runTradeWorkflow({
-				alpacaApiKey: model.alpacaApiKey,
-				alpacaApiSecret: model.alpacaApiSecret,
-				modelName: model.openRouterModelName,
-				name: model.name,
-				invocationCount: model.invocationCount,
-				id: model.id,
-				totalMinutes: model.totalMinutes,
-				variant: (model.variant as VariantId) ?? DEFAULT_VARIANT,
-			});
-			return { modelId: model.id, success: true };
-		} catch (error) {
-			console.error(`[TradeExecutor] Model ${model.name} failed:`, error);
+		const baseAccount = toTradingAccount(model);
+
+		let primaryFailures = 0;
+		let lastPrimaryError: unknown = null;
+		for (let attempt = 1; attempt <= PRIMARY_MODEL_ATTEMPTS; attempt++) {
+			try {
+				await runTradeWorkflow(baseAccount);
+				return { modelId: model.id, success: true };
+			} catch (error) {
+				primaryFailures++;
+				lastPrimaryError = error;
+				console.error(
+					`[TradeExecutor] Primary attempt ${attempt}/${PRIMARY_MODEL_ATTEMPTS} failed for ${model.name}:`,
+					error,
+				);
+			}
+		}
+
+		if (!isTransientExecutionError(lastPrimaryError)) {
+			console.error(
+				`[TradeExecutor] ${model.name} failed with non-transient error; fallback skipped`,
+			);
 			return { modelId: model.id, success: false };
 		}
+
+		const fallbackCandidates = await resolveFallbackCandidates({
+			baseModel: model,
+			validModels,
+		});
+
+		if (fallbackCandidates.length === 0) {
+			console.error(
+				`[TradeExecutor] ${model.name} has no eligible fallback reasoning model`,
+			);
+			return { modelId: model.id, success: false };
+		}
+
+		let fallbackFailures = 0;
+		for (const candidate of fallbackCandidates) {
+			const fallbackAccount: Account = {
+				...baseAccount,
+				modelName: candidate.reasoningModel,
+			};
+
+			for (let attempt = 1; attempt <= FALLBACK_MODEL_ATTEMPTS; attempt++) {
+				try {
+					console.warn(
+						`[TradeExecutor] Fallback attempt ${attempt}/${FALLBACK_MODEL_ATTEMPTS} for ${model.name} using ${candidate.source} candidate ${candidate.id} (${candidate.reasoningModel})`,
+					);
+					await runTradeWorkflow(fallbackAccount);
+					return { modelId: model.id, success: true };
+				} catch (error) {
+					fallbackFailures++;
+					console.error(
+						`[TradeExecutor] Fallback failure ${fallbackFailures} for ${model.name} using ${candidate.id}:`,
+						error,
+					);
+
+					if (fallbackFailures >= FALLBACK_FAILURE_KILL_SWITCH_THRESHOLD) {
+						try {
+							await triggerKillSwitch(baseAccount);
+						} catch (killSwitchError) {
+							console.error(
+								`[KillSwitch] Failed for ${model.name}:`,
+								killSwitchError,
+							);
+						}
+						return { modelId: model.id, success: false };
+					}
+
+					if (!isTransientExecutionError(error)) {
+						break;
+					}
+				}
+			}
+		}
+
+		if (primaryFailures > 0) {
+			console.error(
+				`[TradeExecutor] ${model.name} failed after ${primaryFailures} primary attempt(s) and ${fallbackFailures} fallback failure(s)`,
+			);
+		}
+
+		return { modelId: model.id, success: false };
 	};
 
 	const results = await Promise.all(validModels.map(runModel));

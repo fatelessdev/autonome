@@ -61,17 +61,6 @@ export function createTradeAgent(config: TradeAgentConfig) {
 		headers: {
 			Authorization: `Bearer ${nimApiKey}`,
 		},
-		// fetch: async (url, options) => {
-		// 	if (options.method === 'POST' && options.body) {
-		// 		const body = JSON.parse(options.body as string);
-
-		// 		// INJECT YOUR CUSTOM PARAMETERS HERE
-		// 		body.chat_template_kwargs = { thinking: true };
-
-		// 		options.body = JSON.stringify(body);
-		// 	}
-		// 	return fetch(url, options);
-		// },
 	});
 
 	const openRouterApiKey = getNextOpenRouterApiKey();
@@ -84,7 +73,7 @@ export function createTradeAgent(config: TradeAgentConfig) {
 	});
 
 	// Select model based on provider
-	const modelProvider = getModelProvider(account.name);
+	const modelProvider = getModelProvider(account.modelName);
 	// biome-ignore lint/suspicious/noExplicitAny: Provider SDKs currently resolve to incompatible model package versions.
 	const selectedModel: any =
 		modelProvider === "openrouter"
@@ -95,12 +84,6 @@ export function createTradeAgent(config: TradeAgentConfig) {
 
 	// Track step count for telemetry
 	let currentStepNumber = 0;
-
-	// Build output configuration - only use structured output for OpenRouter models
-	// NIM models don't support structuredOutputs, so we rely on tool calls only
-	// const _outputConfig = useOpenRouter
-	// 	? Output.object({ schema: agentOutputSchema })
-	// 	: undefined;
 
 	// Create the agent
 	const agent = new ToolLoopAgent({
@@ -132,14 +115,7 @@ export function createTradeAgent(config: TradeAgentConfig) {
 			return {
 				...settings,
 				...(requiresAutoToolChoice && { toolChoice: "auto" as const }),
-				providerOptions: {
-					// openrouter: {
-					// 	reasoning: {
-					// 		effort: options?.reasoningEffort ?? "high",
-					// 		exclude: false,
-					// 	},
-					// },
-				},
+				providerOptions: {},
 			};
 		},
 		// Append state update as new message instead of rewriting history.
@@ -156,35 +132,44 @@ export function createTradeAgent(config: TradeAgentConfig) {
 				return baseResult;
 			}
 
-			try {
-				// Get compact state summary (not full prompt)
-				const stateSummary = await rebuildUserPrompt();
+			// Get compact state summary (not full prompt)
+			const stateSummary = await rebuildUserPrompt();
 
-				// Append as a new user message instead of rewriting the first one
-				// This preserves the original context and shows state progression
-				const updatedMessages = [
-					...messages,
-					{
-						role: "user" as const,
-						content: stateSummary,
-					},
-				];
+			// Append as a new user message instead of rewriting the first one
+			// This preserves the original context and shows state progression
+			const updatedMessages = [
+				...messages,
+				{
+					role: "user" as const,
+					content: stateSummary,
+				},
+			];
 
-				return { ...baseResult, messages: updatedMessages };
-			} catch (error) {
-				console.warn(
-					`[TradeAgent] Failed to refresh prompt for step ${stepNumber}:`,
-					error,
-				);
-				return baseResult;
-			}
+			return { ...baseResult, messages: updatedMessages };
 		},
 		// Per-step telemetry for cost tracking and debugging
 		onStepFinish: ({ toolCalls, usage }) => {
 			currentStepNumber++;
 			const toolNames = toolCalls?.map((tc) => tc.toolName) ?? [];
-			const inputTokens = usage?.inputTokens ?? 0;
-			const outputTokens = usage?.outputTokens ?? 0;
+			if (
+				typeof usage?.inputTokens !== "number" ||
+				!Number.isFinite(usage.inputTokens)
+			) {
+				throw new Error(
+					`Missing or invalid inputTokens in agent step telemetry for account ${account.id}`,
+				);
+			}
+			if (
+				typeof usage.outputTokens !== "number" ||
+				!Number.isFinite(usage.outputTokens)
+			) {
+				throw new Error(
+					`Missing or invalid outputTokens in agent step telemetry for account ${account.id}`,
+				);
+			}
+
+			const inputTokens = usage.inputTokens;
+			const outputTokens = usage.outputTokens;
 
 			// Capture step telemetry via callback
 			if (onStepTelemetry) {
@@ -224,9 +209,6 @@ export function createTradeAgent(config: TradeAgentConfig) {
 				},
 			},
 		},
-		// Structured output schema - only for OpenRouter models that support it
-		// NIM models don't support structuredOutputs, so we rely on tool calls only
-		// ...(outputConfig && { output: outputConfig }),
 		// Create tools with shared context
 		tools: createTradingTools(toolContext),
 	});

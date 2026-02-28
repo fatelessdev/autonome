@@ -30,8 +30,10 @@ export const env = createEnv({
 		// General server configuration
 		SERVER_URL: z.string().url().optional(),
 		API_PORT: z.coerce.number().default(8081),
+		FRONTEND_PORT: z.coerce.number().default(5173),
 		API_URL: z.string().url().default("http://localhost:8081"),
 		CORS_ORIGINS: z.string().optional(),
+		VERCEL: z.string().optional(),
 		// Backend-only variables - optional on Vercel frontend deployment
 		DATABASE_URL: z.string().url().optional(),
 		NIM_API_KEY: z.string().optional(),
@@ -60,6 +62,7 @@ export const env = createEnv({
 
 		// TAAPI.io integration (optional for supplementary indicators)
 		TAAPI_API_KEY: z.string().optional(),
+		FALLBACK_MODEL: z.string().optional(),
 	},
 
 	clientPrefix: "VITE_",
@@ -79,6 +82,8 @@ export const ALPACA_PAPER = env.ALPACA_PAPER;
 
 // TAAPI API key for supplementary indicators (optional)
 export const TAAPI_API_KEY = env.TAAPI_API_KEY;
+// Optional reasoning-model fallback when a competition has only one model.
+export const fallback_model = env.FALLBACK_MODEL;
 
 type ApiKeyRotator = {
 	getNext: () => string;

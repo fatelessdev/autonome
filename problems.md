@@ -1,113 +1,77 @@
 # Known Issues & Technical Debt
 
-**Last updated:** 2026-02-26
+**Last updated:** 2026-02-28
 
-This document tracks active issues and remaining architectural debt in the Autonome codebase.
+This file lists issues that are currently reproducible in the codebase. Stale paths and already-resolved items were removed during this refresh.
+
+---
+
+## Recently Fixed (2026-02-28)
+
+1. Recovery factor added to analytics and trading prompt context
+- **Files:** `src/core/shared/trading/calculations.ts`, `src/server/features/analytics/calculations.ts`, `src/server/features/analytics/types.ts`, `src/server/orpc/router/analytics.ts`, `src/server/features/trading/analysis/performanceMetrics.ts`, `src/server/features/trading/prompting/promptSections.ts`, `src/routes/analytics.tsx`
+- **Resolution:** Added `recoveryFactor` (`net profit / max absolute drawdown`) and wired it through analytics + prompt outputs.
+
+2. Retry fallback chain and kill-switch behavior implemented
+- **Files:** `src/server/features/trading/execution/tradeWorkflow.ts`, `src/env.ts`, `src/server/features/trading/agent/tradeAgentFactory.ts`
+- **Resolution:** Added 2 primary attempts, leaderboard fallback reasoning-model chain, single-model env fallback (`FALLBACK_MODEL`), and kill-switch close-all after fallback failure threshold.
+
+3. Prompt rendering and safety hardened
+- **Files:** `src/server/features/trading/prompting/promptBuilder.ts`, `src/server/features/trading/prompting/promptSections.ts`
+- **Resolution:** Added strict placeholder rendering (fail-fast on missing tokens) and quote sanitization for injected text fields.
+
+4. Cooldown/perf and indicator-threshold cleanup completed
+- **Files:** `src/server/features/trading/execution/cooldown.ts`, `src/server/features/trading/agent/tools/createPositionTool.ts`, `src/core/shared/trading/indicatorThresholds.ts`, `src/server/features/trading/data/taapiIndicators.ts`
+- **Resolution:** Extracted cooldown helpers, improved symbol lookup efficiency, and centralized ADX/Bollinger threshold constants.
+
+5. Unused create-position wrapper removed
+- **Files:** `src/server/features/trading/execution/createPosition.server.ts`
+- **Resolution:** Deleted unused wrapper after reference verification.
 
 ---
 
 ## High Issues
 
-### 1. Bracket Close Sync Is Missing (HIGH)
-**File:** `src/server/features/trading/openPositions.ts`, `ordersRepository.server.ts`
+### 1. Bracket-Close DB Reconciliation Still Missing (HIGH)
+**Files:** `src/server/features/trading/data/positions.ts`, `src/server/db/ordersRepository.server.ts`
 **Severity:** High
-**Description:** Fetch-time DB auto-reconciliation is intentionally disabled. When an Alpaca bracket SL/TP closes a position, broker state is correct immediately, but DB order metadata can remain OPEN until an explicit lifecycle sync runs.
-**Impact:** UI/prompt open positions are now correct (live-first), but DB audit/history metadata can drift and later analytics based only on DB status can lag.
-**Fix needed:** Add explicit sync via webhook or scheduled workflow step to close orphaned OPEN orders with precise `closeTrigger` (`bracket_sl` / `bracket_tp`). Do not reintroduce read-path mutation.
-
----
-
-## SSOT Violations (Single Source of Truth)
-
-### 3. Hardcoded `COIN_STYLES` in crypto-tracker (MEDIUM)
-**File:** `src/components/crypto-tracker.tsx` ~L26
-**SSOT:** `src/core/shared/markets/marketMetadata.ts`
-**Description:** `COIN_STYLES` object hardcodes coin badges, logo paths, and decimal precision for each symbol. Adding/removing a market requires updating this file separately.
-**Fix needed:** Move `logo`, `decimals`, and `badge` into `marketMetadata.ts` and derive `COIN_STYLES` from it.
-
-### 4. Coin Metadata (logo, decimals) Not in SSOT (MEDIUM)
-**Files:** `src/components/crypto-tracker.tsx`, `src/components/trades-sidebar/positions-tab.tsx`
-**SSOT:** `src/core/shared/markets/marketMetadata.ts`
-**Description:** Two separate files define icon/logo/decimal mappings for coins. The `MARKETS` SSOT only stores `symbol`, `canonical`, and `assetClass` — it should also include `logo`, `decimals`, and `badge` metadata so all UI components derive from one source.
-**Fix needed:** Extend `MARKETS` entries in `marketMetadata.ts` with `logo: string`, `decimals: number` properties. Derive UI maps from this SSOT.
-
-### 5. Stale "Guardian" References in Comments/Docs (LOW)
-**Files & lines:**
-- `src/core/shared/variants/index.ts` L178-179 — JSDoc example uses `"Guardian"`
-- `src/core/utils/excelExport.ts` L238 — Comment lists "Guardian" as a variant
-- `src/core/shared/cache/cacheConfig.ts` L74-75 — JSDoc example uses `{ variant: "Guardian" }`
-- `src/server/features/analytics/queries.server.ts` L293 — JSDoc uses `"Guardian"` as example
-- `src/server/features/trading/prompts/old/prompt3.ts` L12 — "GUARDIAN / MONK MODE"
-**Description:** "Guardian" is a retired variant name. These stale references in comments/docs could confuse future developers.
-**Fix needed:** Update all JSDoc/comments to use current variant names (Apex, Trendsurfer, Contrarian, Sovereign).
-
-### 6. Stale Excel Export Comment (LOW)
-**File:** `src/core/utils/excelExport.ts` L234-241
-**Description:** Comment lists old variant names ("Situational", "Minimal", "Guardian", "Max") that don't exist. Code correctly uses `VARIANT_IDS` for iteration — only the comment is wrong.
-**Fix needed:** Update the JSDoc to reflect current variant names.
+**Description:** Open positions are sourced live from Alpaca (correct for UI/agent), but DB `"Orders"` status is not explicitly reconciled when Alpaca closes positions via bracket SL/TP. This can leave DB rows OPEN after broker closure.
+**Impact:** History/audit/analytics paths that rely on DB lifecycle fields can drift from broker truth.
+**Fix needed:** Add an explicit lifecycle sync (webhook or scheduled step) that closes orphaned OPEN orders and writes accurate `closeTrigger` (for example `bracket_sl` / `bracket_tp`). Keep read paths mutation-free.
 
 ---
 
 ## Duplicated Code
 
-### 8. Duplicate `formatPercent` Function (4 copies) (MEDIUM)
-| File | Line | Implementation |
-|------|------|----------------|
-| `src/routes/analytics.tsx` | 52 | `(value, decimals=2) => \`${value >= 0 ? "+" : ""}${value.toFixed(decimals)}%\`` |
-| `src/routes/leaderboard.tsx` | 46 | `(value) => \`${value.toFixed(2)}%\`` |
-| `src/routes/failures.tsx` | 51 | `(value) => \`${value.toFixed(2)}%\`` |
-| `src/server/features/trading/promptSections.ts` | 42 | `function formatPercent(value, decimals)` |
-**Impact:** Inconsistent behavior (analytics.tsx adds `+` prefix, others don't). Bug fixes must be applied in 4 places.
-**Fix needed:** Create a single `formatPercent` in `src/core/shared/formatting/numberFormat.ts` and import everywhere.
+### 5. Cache Timing Constants Are Still Scattered (LOW)
+**Files:** `src/server/db/tradingRepository.server.ts`, `src/server/features/trading/data/positions.server.ts`, `src/server/features/trading/data/tradingQueries.server.ts`
+**SSOT target:** `src/core/shared/cache/cacheConfig.ts`
+**Description:** `CACHE_TIMING` exists, but many query definitions still hardcode timing numbers (`15_000`, `30_000`, `60_000`, `2 * 60_000`, etc.).
+**Fix needed:** Replace ad-hoc timing values with imports from `CACHE_TIMING` where semantics match.
 
-### 9. Event System Boilerplate (5 copies) (MEDIUM)
-**Files:**
-- `src/server/events/workflowEvents.ts`
-- `src/server/features/trading/events/tradeEvents.ts`
-- `src/server/features/trading/events/positionEvents.ts`
-- `src/server/features/trading/events/conversationEvents.ts`
-- `src/server/features/portfolio/events/portfolioEvents.ts`
-**Description:** Each file repeats the same pattern:
-```typescript
-const emitter = new EventEmitter();
-emitter.setMaxListeners(50);
-const EVENT_KEY = "...";
-export const emitXEvent = (event) => { emitter.emit(EVENT_KEY, event); };
-export const subscribeToXEvents = (listener) => { ... return unsubscribe; };
-```
-**Fix needed:** Create a shared `createTypedEventBus<T>()` factory to eliminate boilerplate.
-
-### 10. Scattered `staleTime`/`gcTime` Cache Values (LOW)
-**Files:** `queries.server.ts`, `openPositions.server.ts`, `marketData.server.ts`, `getPortfolio.server.ts`, `priceTracker.ts`
-**SSOT:** `src/core/shared/cache/cacheConfig.ts` (exists but underutilized)
-**Description:** Multiple server-side query options define cache timing as magic numbers (15_000, 60_000, 20_000, 30_000, 10_000) rather than importing from `CACHE_TIMING` config.
-**Fix needed:** Centralize all cache timing constants in `cacheConfig.ts` and import across all query files.
-
-### 11. Duplicated 5-minute Trade Cycle Interval (LOW)
-| File | Line | Value |
-|------|------|-------|
-| `src/server/workflows/tradeCycle.ts` | 25 | `TRADE_CYCLE_INTERVAL_MS = 5 * 60 * 1000` |
-| `src/core/shared/trading/dashboardQueries.ts` | 16 | `BASE_REFRESH_MS = 5 * 60 * 1000` |
-**Fix needed:** Extract to a shared constant in `@/core/shared/trading/calculations.ts` or a new `constants.ts`.
+### 6. 5-Minute Interval Constant Is Repeated (LOW)
+**Files:** `src/server/workflows/tradeCycle.ts`, `src/core/shared/trading/dashboardQueries.ts`, `src/server/integrations/alpaca-news/client.ts`
+**Description:** The same `5 * 60 * 1000` interval appears in multiple modules with different local names.
+**Fix needed:** Extract a shared constant for the canonical trade-cycle cadence and reuse it.
 
 ---
 
-## Other Issues
+## Trading Semantics
 
-### 12. Leverage Ghost References in UI/Analytics (~19 files) (LOW)
-**Files:** `competitionSnapshot.ts`, `queries.server.ts`, `tradingDecisions.ts`, `consensusOrchestrator.ts`, `analytics/calculations.ts`, `analytics/types.ts`, `analytics/queries.server.ts`, `positionsRepository.ts`, `dashboardQueries.ts`, `dashboardTypes.ts`, `trades-sidebar/utils.ts`, `positions-tab.tsx`, `model-chat-tab.tsx`, `excelExport.ts`, `numberFormat.ts`, `orpc/router/trading.ts`, `orpc/router/analytics.ts`, `orpc/schema.ts`, `analytics.tsx`
-**Description:** ~19 files still reference `leverage` in non-breaking ways — reading from the DB column (null for new orders). UI shows "1.0x" for new positions.
-**Fix needed:** Remove leverage display from all UI components, analytics calculations, and export utilities.
+### 7. Leverage Fields Still Drive Spot-Flow Surfaces (LOW)
+**Files:** `src/server/features/trading/execution/consensusOrchestrator.ts`, `src/db/schema.ts`, `src/core/utils/excelExport.ts`, `src/components/trades-sidebar/model-chat-tab.tsx`, `src/core/shared/trading/dashboardQueries.ts`
+**Description:** The codebase still carries leverage values/prompts (including consensus instructions like "Use leverage 1-5x") despite spot-oriented execution behavior.
+**Fix needed:** Decide if leverage remains a first-class concept. If not, remove leverage from prompt/schema/UI/analytics paths consistently.
 
-### 13. ConsensusOrchestrator Dead Leverage Code (LOW)
-**File:** `src/server/features/trading/consensusOrchestrator.ts`
-**Description:** Internal consensus types still have `leverage` fields. The median-leverage calculation produces no useful output for spot trading. The consensus prompt still says "Use leverage 1-5x".
-**Fix needed:** Remove `leverage` from types, calculations, and prompt text.
+### 8. `WORKFLOW_POSTGRES_URL` Is Declared But Not Consumed In Runtime Code (LOW)
+**Files:** `src/env.ts`, `src/server/workflows/tradeCycle.ts`
+**Description:** Env validation includes `WORKFLOW_POSTGRES_URL`, but no application code wires it into workflow world configuration.
+**Fix needed:** Either wire it to workflow runtime configuration or remove the variable from env/docs to avoid dead config.
 
-### 15. WORKFLOW_POSTGRES_URL Not Wired (LOW)
-**File:** `src/env.ts`
-**Description:** `WORKFLOW_POSTGRES_URL` is defined in env validation but not connected to any runtime code. The Workflow DevKit world likely needs this for durable state persistence.
-**Fix needed:** Wire `WORKFLOW_POSTGRES_URL` to the workflow world configuration (via `WORKFLOW_TARGET_WORLD` env var or equivalent).
+### 9. Symbol Action Counts Are Collected But Not Injected Into Active Prompts (LOW)
+**Files:** `src/server/features/trading/execution/tradeWorkflow.ts`, `src/server/features/trading/prompting/promptBuilder.ts`
+**Description:** `symbolActionCounts` is tracked in tool context and passed into prompt builder, but active prompts do not render a related section. `{{SYMBOL_ACTION_COUNT}}` appears only in archived prompt templates.
+**Fix needed:** Either inject a compact symbol-action-count section into active prompts or remove unused prompt-builder plumbing.
 
 ---
 
@@ -115,22 +79,15 @@ export const subscribeToXEvents = (listener) => { ... return unsubscribe; };
 
 | Issue | Severity | Effort | Priority |
 |-------|----------|--------|----------|
-| #1 Bracket trigger reconciliation | High | 4 hours | P1 |
-| #3 COIN_STYLES not from SSOT | Medium | 1 hour | P2 |
-| #4 Coin metadata not in SSOT | Medium | 1 hour | P2 |
-| #8 Duplicate formatPercent | Medium | 30 min | P2 |
-| #9 Event system boilerplate | Medium | 2 hours | P2 |
-| #5 Stale Guardian refs | Low | 15 min | P3 |
-| #6 Stale Excel comment | Low | 5 min | P3 |
-| #10 Scattered cache timing | Low | 1 hour | P3 |
-| #11 Duplicated interval const | Low | 10 min | P3 |
-| #12 Leverage ghost refs | Low | 3 hours | P3 |
-| #13 Consensus dead leverage | Low | 1 hour | P3 |
-| #15 WORKFLOW_POSTGRES_URL | Low | 15 min | P3 |
+| #1 Bracket-close DB reconciliation | High | 4h | P1 |
+| #5 Scattered cache timings | Low | 1h | P3 |
+| #6 Duplicated 5-minute interval | Low | 15m | P3 |
+| #7 Leverage semantics drift | Low | 2-3h | P3 |
+| #8 Unused workflow env var | Low | 15m | P3 |
+| #9 Symbol action count prompt context | Low | 20m | P3 |
 
-
-**Estimated total to fix remaining:** ~16 hours
+**Estimated total to fix remaining:** ~8-9 hours
 
 ---
 
-*Related documentation: See `AGENTS.md` for architecture overview.*
+*Related documentation: `AGENTS.md`.*

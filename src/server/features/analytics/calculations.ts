@@ -6,6 +6,7 @@
 import {
 	calculateExpectancy,
 	calculateHoldTimeMinutes,
+	calculateRecoveryFactorFromPnls,
 	calculateReturnPercent,
 	calculateSharpeRatioFromTrades,
 	calculateTotalPnl,
@@ -124,6 +125,7 @@ export function calculateAdvancedStats(
 			maxHoldTimeMinutes: 0,
 			longPercent: 0,
 			expectancy: 0,
+			recoveryFactor: 0,
 			avgLeverage: 0,
 			medianLeverage: 0,
 			maxLeverage: 0,
@@ -141,7 +143,10 @@ export function calculateAdvancedStats(
 		.sort((a, b) => a - b);
 	const avgTradeSize = mean(tradeSizes);
 	const medianTradeSize = median(tradeSizes);
-	const maxTradeSize = tradeSizes[tradeSizes.length - 1] ?? 0;
+	const maxTradeSize = tradeSizes.at(-1);
+	if (maxTradeSize == null) {
+		throw new Error(`Failed to compute maxTradeSize for model ${modelId}`);
+	}
 
 	// Hold times
 	const holdTimes = trades
@@ -149,7 +154,12 @@ export function calculateAdvancedStats(
 		.sort((a, b) => a - b);
 	const avgHoldTimeMinutes = mean(holdTimes);
 	const medianHoldTimeMinutes = median(holdTimes);
-	const maxHoldTimeMinutes = holdTimes[holdTimes.length - 1] ?? 0;
+	const maxHoldTimeMinutes = holdTimes.at(-1);
+	if (maxHoldTimeMinutes == null) {
+		throw new Error(
+			`Failed to compute maxHoldTimeMinutes for model ${modelId}`,
+		);
+	}
 
 	// Long percentage
 	const longTrades = trades.filter((t) => t.side === "LONG").length;
@@ -158,6 +168,7 @@ export function calculateAdvancedStats(
 	// Expectancy using shared calculation
 	const pnls = trades.map((t) => t.realizedPnl);
 	const expectancy = calculateExpectancy(pnls);
+	const recoveryFactor = calculateRecoveryFactorFromPnls(pnls);
 
 	// Leverage stats (filter nulls)
 	const leverages = trades
@@ -167,7 +178,17 @@ export function calculateAdvancedStats(
 	const avgLeverage = leverages.length > 0 ? mean(leverages) : 0;
 	const medianLeverage = median(leverages);
 	const maxLeverage =
-		leverages.length > 0 ? (leverages[leverages.length - 1] ?? 0) : 0;
+		leverages.length > 0
+			? (() => {
+					const value = leverages.at(-1);
+					if (value == null) {
+						throw new Error(
+							`Failed to compute maxLeverage for model ${modelId}`,
+						);
+					}
+					return value;
+				})()
+			: 0;
 
 	// Confidence stats (filter nulls)
 	const confidences = trades
@@ -177,7 +198,17 @@ export function calculateAdvancedStats(
 	const avgConfidence = confidences.length > 0 ? mean(confidences) : 0;
 	const medianConfidence = median(confidences);
 	const maxConfidence =
-		confidences.length > 0 ? (confidences[confidences.length - 1] ?? 0) : 0;
+		confidences.length > 0
+			? (() => {
+					const value = confidences.at(-1);
+					if (value == null) {
+						throw new Error(
+							`Failed to compute maxConfidence for model ${modelId}`,
+						);
+					}
+					return value;
+				})()
+			: 0;
 
 	return {
 		modelId,
@@ -192,6 +223,7 @@ export function calculateAdvancedStats(
 		maxHoldTimeMinutes,
 		longPercent,
 		expectancy,
+		recoveryFactor,
 		avgLeverage,
 		medianLeverage,
 		maxLeverage,

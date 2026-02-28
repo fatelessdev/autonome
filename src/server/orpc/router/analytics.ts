@@ -48,6 +48,7 @@ const AdvancedStatsSchema = z.object({
 	maxHoldTimeMinutes: z.number(),
 	longPercent: z.number(),
 	expectancy: z.number(),
+	recoveryFactor: z.number(),
 	avgLeverage: z.number(),
 	medianLeverage: z.number(),
 	maxLeverage: z.number(),

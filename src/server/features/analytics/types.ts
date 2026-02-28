@@ -34,6 +34,7 @@ export interface AdvancedStats {
 	maxHoldTimeMinutes: number;
 	longPercent: number;
 	expectancy: number;
+	recoveryFactor: number;
 	avgLeverage: number;
 	medianLeverage: number;
 	maxLeverage: number;

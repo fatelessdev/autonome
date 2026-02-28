@@ -4,6 +4,10 @@
  */
 
 import {
+	ADX_THRESHOLDS,
+	BOLLINGER_BANDS_PERIOD,
+} from "@/core/shared/trading/indicatorThresholds";
+import {
 	type ADXResult,
 	type BBandsResult,
 	type IchimokuResult,
@@ -46,6 +50,16 @@ const formatValue = (value: number | null | undefined, digits = 2): string => {
 	return value.toFixed(digits);
 };
 
+const requireFinite = (
+	value: number | null | undefined,
+	field: string,
+): number => {
+	if (value == null || !Number.isFinite(value)) {
+		throw new Error(`Missing or invalid TAAPI field: ${field}`);
+	}
+	return value;
+};
+
 /**
  * Format BBands result for prompt
  * Includes Bollinger Bandwidth (BBW): ((Upper - Lower) / Mid) * 100
@@ -54,18 +68,18 @@ const formatValue = (value: number | null | undefined, digits = 2): string => {
 const formatBBands = (bbands: BBandsResult | null): string => {
 	if (!bbands) return "Bollinger Bands: N/A";
 
-	const upper = bbands.valueUpperBand;
-	const mid = bbands.valueMiddleBand;
-	const lower = bbands.valueLowerBand;
+	const upper = requireFinite(bbands.valueUpperBand, "bbands.valueUpperBand");
+	const mid = requireFinite(bbands.valueMiddleBand, "bbands.valueMiddleBand");
+	const lower = requireFinite(bbands.valueLowerBand, "bbands.valueLowerBand");
 
 	// Calculate Bollinger Bandwidth (BBW)
 	let bandwidthStr = "N/A";
-	if (mid && mid !== 0 && upper !== null && lower !== null) {
+	if (mid !== 0) {
 		const bandwidth = ((upper - lower) / mid) * 100;
 		bandwidthStr = `${bandwidth.toFixed(2)}%`;
 	}
 
-	return `Bollinger Bands (20): Upper=${formatValue(upper)}, Mid=${formatValue(mid)}, Lower=${formatValue(lower)} | Bandwidth=${bandwidthStr}`;
+	return `Bollinger Bands (${BOLLINGER_BANDS_PERIOD}): Upper=${formatValue(upper)}, Mid=${formatValue(mid)}, Lower=${formatValue(lower)} | Bandwidth=${bandwidthStr}`;
 };
 
 /**
@@ -76,18 +90,20 @@ const formatBBands = (bbands: BBandsResult | null): string => {
  * - ADX > 40: Strong trend
  */
 const formatADX = (adx: ADXResult | null): string => {
-	if (!adx || adx.value === undefined) return "ADX: N/A";
+	if (!adx) return "ADX: N/A";
+
+	const adxValue = requireFinite(adx.value, "adx.value");
 
 	let trendStrength: string;
-	if (adx.value < 20) {
+	if (adxValue < ADX_THRESHOLDS.WEAK_TREND_MAX) {
 		trendStrength = "weak/ranging";
-	} else if (adx.value < 40) {
+	} else if (adxValue < ADX_THRESHOLDS.STRONG_TREND_MIN) {
 		trendStrength = "trending";
 	} else {
 		trendStrength = "strong trend";
 	}
 
-	return `ADX(14): ${formatValue(adx.value, 1)} (${trendStrength})`;
+	return `ADX(14): ${formatValue(adxValue, 1)} (${trendStrength})`;
 };
 
 /**
@@ -97,8 +113,12 @@ const formatADX = (adx: ADXResult | null): string => {
 const formatSupertrend = (supertrend: SupertrendResult | null): string => {
 	if (!supertrend) return "Supertrend: N/A";
 
+	if (typeof supertrend.valueAdvice !== "string") {
+		throw new Error("Missing or invalid TAAPI field: supertrend.valueAdvice");
+	}
+	const value = requireFinite(supertrend.value, "supertrend.value");
 	const signal = supertrend.valueAdvice.toUpperCase();
-	return `Supertrend: ${formatValue(supertrend.value)} | Signal: ${signal}`;
+	return `Supertrend: ${formatValue(value)} | Signal: ${signal}`;
 };
 
 /**
@@ -114,19 +134,23 @@ const formatIchimoku = (
 	currentPrice?: number,
 ): string => {
 	if (!ichimoku) return "Ichimoku Cloud: N/A";
+	const conversion = requireFinite(ichimoku.conversion, "ichimoku.conversion");
+	const base = requireFinite(ichimoku.base, "ichimoku.base");
+	const spanA = requireFinite(ichimoku.spanA, "ichimoku.spanA");
+	const spanB = requireFinite(ichimoku.spanB, "ichimoku.spanB");
 
 	const lines: string[] = [];
 	lines.push(
-		`Ichimoku: Tenkan=${formatValue(ichimoku.conversion)}, Kijun=${formatValue(ichimoku.base)}`,
+		`Ichimoku: Tenkan=${formatValue(conversion)}, Kijun=${formatValue(base)}`,
 	);
 	lines.push(
-		`  Cloud: SpanA=${formatValue(ichimoku.spanA)}, SpanB=${formatValue(ichimoku.spanB)}`,
+		`  Cloud: SpanA=${formatValue(spanA)}, SpanB=${formatValue(spanB)}`,
 	);
 
 	// Determine cloud status if we have price
 	if (currentPrice !== undefined && currentPrice !== null) {
-		const cloudTop = Math.max(ichimoku.spanA, ichimoku.spanB);
-		const cloudBottom = Math.min(ichimoku.spanA, ichimoku.spanB);
+		const cloudTop = Math.max(spanA, spanB);
+		const cloudBottom = Math.min(spanA, spanB);
 
 		let cloudStatus: string;
 		if (currentPrice > cloudTop) {
@@ -149,20 +173,21 @@ const formatIchimoku = (
  * - Price < VWAP: Bearish (institutional selling pressure)
  */
 const formatVWAP = (vwap: VWAPResult | null, currentPrice?: number): string => {
-	if (!vwap || vwap.value === undefined) return "VWAP: N/A";
+	if (!vwap) return "VWAP: N/A";
+	const vwapValue = requireFinite(vwap.value, "vwap.value");
 
 	let status = "";
 	if (currentPrice !== undefined && currentPrice !== null) {
-		const diff = currentPrice - vwap.value;
-		const diffPct = (diff / vwap.value) * 100;
-		if (currentPrice > vwap.value) {
+		const diff = currentPrice - vwapValue;
+		const diffPct = (diff / vwapValue) * 100;
+		if (currentPrice > vwapValue) {
 			status = ` | Price > VWAP (+${diffPct.toFixed(2)}%, Bullish)`;
 		} else {
 			status = ` | Price < VWAP (${diffPct.toFixed(2)}%, Bearish)`;
 		}
 	}
 
-	return `VWAP: ${formatValue(vwap.value)}${status}`;
+	return `VWAP: ${formatValue(vwapValue)}${status}`;
 };
 
 /**

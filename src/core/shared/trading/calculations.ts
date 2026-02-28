@@ -12,6 +12,48 @@ import { normalizeNumber } from "@/core/shared/formatting/numberFormat";
 export const INITIAL_CAPITAL = 100_000;
 export const RISK_FREE_RATE = 0;
 
+// ==================== Numeric Validation Utilities ====================
+
+/**
+ * Parse an unknown value to a finite number, or return null.
+ * Use for optional fields where null is a valid outcome.
+ */
+export function toFiniteNumber(value: unknown): number | null {
+	if (typeof value === "number") {
+		return Number.isFinite(value) ? value : null;
+	}
+	if (typeof value === "string" && value.trim().length > 0) {
+		const parsed = Number.parseFloat(value);
+		return Number.isFinite(parsed) ? parsed : null;
+	}
+	return null;
+}
+
+/**
+ * Require a finite number, throwing with context on failure.
+ * Use for required fields where null/NaN indicates a data integrity bug.
+ */
+export function requireFiniteNumber(value: unknown, context: string): number {
+	const parsed = toFiniteNumber(value);
+	if (parsed === null) {
+		throw new Error(`Invalid numeric value for ${context}: ${String(value)}`);
+	}
+	return parsed;
+}
+
+/**
+ * Require a non-null/undefined value, throwing with context on failure.
+ */
+export function requirePresent<T>(
+	value: T | null | undefined,
+	context: string,
+): T {
+	if (value == null) {
+		throw new Error(`Missing required value for ${context}`);
+	}
+	return value;
+}
+
 // ==================== P&L Calculations ====================
 
 export interface PositionForPnL {
@@ -71,15 +113,33 @@ export function calculateWinRate(pnls: number[]): number {
  * Returns as a positive percentage (e.g., 32.5 = 32.5% drawdown).
  */
 export function calculateMaxDrawdown(values: number[]): number {
-	if (values.length < 2) return 0;
-	let peak = values[0] ?? 0;
+	if (values.length < 1) return 0;
+	let peak = Number.NEGATIVE_INFINITY;
 	let maxDd = 0;
 	for (const v of values) {
+		if (!Number.isFinite(v)) continue;
 		if (v > peak) peak = v;
-		const dd = ((peak - v) / peak) * 100;
+		const dd = peak > 0 ? ((peak - v) / peak) * 100 : 0;
 		if (dd > maxDd) maxDd = dd;
 	}
 	return maxDd;
+}
+
+/**
+ * Compute maximum absolute drawdown from a series of equity values.
+ * Returns currency units (for example, dollars), not percentage.
+ */
+export function calculateMaxDrawdownAbsolute(values: number[]): number {
+	if (values.length < 1) return 0;
+	let peak = Number.NEGATIVE_INFINITY;
+	let maxDdAbs = 0;
+	for (const v of values) {
+		if (!Number.isFinite(v)) continue;
+		if (v > peak) peak = v;
+		const ddAbs = peak - v;
+		if (ddAbs > maxDdAbs) maxDdAbs = ddAbs;
+	}
+	return maxDdAbs;
 }
 
 /**
@@ -89,7 +149,7 @@ export function calculateMaxDrawdown(values: number[]): number {
 export function calculateCurrentDrawdown(values: number[]): number {
 	if (values.length < 1) return 0;
 	const peak = Math.max(...values);
-	const current = values[values.length - 1] ?? 0;
+	const current = values[values.length - 1];
 	if (peak <= 0) return 0;
 	return ((peak - current) / peak) * 100;
 }
@@ -126,8 +186,8 @@ export function median(sortedValues: number[]): number {
 	if (sortedValues.length === 0) return 0;
 	const mid = Math.floor(sortedValues.length / 2);
 	return sortedValues.length % 2 !== 0
-		? (sortedValues[mid] ?? 0)
-		: ((sortedValues[mid - 1] ?? 0) + (sortedValues[mid] ?? 0)) / 2;
+		? sortedValues[mid]
+		: (sortedValues[mid - 1] + sortedValues[mid]) / 2;
 }
 
 // ==================== Sharpe Ratio ====================
@@ -163,8 +223,8 @@ export function calculateSharpeRatioFromPortfolio(
 	// Calculate period returns
 	const returns: number[] = [];
 	for (let i = 1; i < portfolioValues.length; i++) {
-		const prevValue = portfolioValues[i - 1] ?? 0;
-		const currValue = portfolioValues[i] ?? 0;
+		const prevValue = portfolioValues[i - 1];
+		const currValue = portfolioValues[i];
 		if (prevValue > 0) {
 			returns.push((currValue - prevValue) / prevValue);
 		}
@@ -181,18 +241,6 @@ export function calculateSharpeRatioFromPortfolio(
 
 	// Require minimum 30 data points for statistical significance
 	if (returns.length < 30) {
-		const meanReturn = mean(returns);
-		const stdDev = standardDeviation(returns, meanReturn);
-
-		if (stdDev === 0) {
-			return {
-				sharpeRatio: 0,
-				sharpeRatioFormatted: "N/A (no volatility)",
-				isValid: false,
-				reason: "No volatility in returns",
-			};
-		}
-
 		return {
 			sharpeRatio: 0,
 			sharpeRatioFormatted: "N/A (insufficient data)",
@@ -313,4 +361,36 @@ export function calculateExpectancy(pnls: number[]): number {
 	const lossPct = losses.length / pnls.length;
 
 	return winPct * avgWin - lossPct * avgLoss;
+}
+
+/**
+ * Recovery factor = net profit / max absolute drawdown.
+ * Returns 0 when drawdown is zero or invalid.
+ */
+export function calculateRecoveryFactor(values: number[]): number {
+	if (values.length < 2) return 0;
+	const start = values[0];
+	const end = values[values.length - 1];
+	if (!Number.isFinite(start) || !Number.isFinite(end)) {
+		return 0;
+	}
+	const netProfit = end - start;
+	const maxDrawdownAbs = calculateMaxDrawdownAbsolute(values);
+	if (!(maxDrawdownAbs > 0)) return 0;
+	return netProfit / maxDrawdownAbs;
+}
+
+/**
+ * Recovery factor from trade-level realized P&Ls.
+ * Uses cumulative equity curve starting at 0.
+ */
+export function calculateRecoveryFactorFromPnls(pnls: number[]): number {
+	if (pnls.length === 0) return 0;
+	const equityCurve: number[] = [0];
+	let running = 0;
+	for (const pnl of pnls) {
+		running += pnl;
+		equityCurve.push(running);
+	}
+	return calculateRecoveryFactor(equityCurve);
 }

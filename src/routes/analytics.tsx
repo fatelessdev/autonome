@@ -1,4 +1,6 @@
-﻿import { useQuery } from "@tanstack/react-query";
+﻿"use no memo";
+
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import {
 	type ColumnDef,
@@ -15,7 +17,7 @@ import {
 	Download,
 	Loader2,
 } from "lucide-react";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useId, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -30,7 +32,8 @@ import {
 import { useVariant, type VariantId } from "@/components/variant-provider";
 import { VariantSelector } from "@/components/variant-selector";
 import { cn } from "@/core/lib/utils";
-import { getModelInfo } from "@/core/shared/models/modelConfig";
+import { formatPercentValue } from "@/core/shared/formatting/numberFormat";
+import { findModelInfo } from "@/core/shared/models/modelConfig";
 import { normalizeIdentifier } from "@/core/shared/strings/normalizeIdentifier";
 import { formatHoldTime } from "@/core/shared/trading/calculations";
 import { getVariantBadgeClasses } from "@/core/shared/variants";
@@ -54,10 +57,6 @@ const formatUsd = (value: number) =>
 		currencyDisplay: "narrowSymbol",
 		maximumFractionDigits: 2,
 	}).format(value);
-
-// Percent formatter
-const formatPercent = (value: number, decimals = 2) =>
-	`${value >= 0 ? "+" : ""}${value.toFixed(decimals)}%`;
 
 const normalizeModelKey = (value: string) =>
 	normalizeIdentifier(value, "model");
@@ -130,6 +129,7 @@ function averageAdvancedByModel(stats: AdvancedStats[]): AdvancedStats[] {
 		"maxHoldTimeMinutes",
 		"longPercent",
 		"expectancy",
+		"recoveryFactor",
 		"avgLeverage",
 		"medianLeverage",
 		"maxLeverage",
@@ -155,6 +155,7 @@ function averageAdvancedByModel(stats: AdvancedStats[]): AdvancedStats[] {
 			maxHoldTimeMinutes: 0,
 			longPercent: 0,
 			expectancy: 0,
+			recoveryFactor: 0,
 			avgLeverage: 0,
 			medianLeverage: 0,
 			maxLeverage: 0,
@@ -217,10 +218,10 @@ function getOverallColumns(showVariant: boolean): ColumnDef<OverallStats>[] {
 			),
 			cell: ({ row }) => {
 				const modelName = row.getValue<string>("modelName");
-				const modelInfo = getModelInfo(modelName);
+				const modelInfo = findModelInfo(modelName);
 				return (
 					<div className="flex items-center gap-2">
-						{modelInfo.logo ? (
+						{modelInfo?.logo ? (
 							<div
 								className="h-5 w-5 rounded-full flex items-center justify-center overflow-hidden"
 								style={{ backgroundColor: modelInfo.color }}
@@ -234,7 +235,7 @@ function getOverallColumns(showVariant: boolean): ColumnDef<OverallStats>[] {
 						) : (
 							<div
 								className="h-5 w-5 rounded flex items-center justify-center text-[8px] font-bold text-white"
-								style={{ backgroundColor: modelInfo.color }}
+								style={{ backgroundColor: modelInfo?.color }}
 							>
 								{modelName.slice(0, 2).toUpperCase()}
 							</div>
@@ -285,7 +286,7 @@ function getOverallColumns(showVariant: boolean): ColumnDef<OverallStats>[] {
 				const value = row.getValue<number>("returnPercent");
 				return (
 					<span className={cn(value >= 0 ? "text-green-500" : "text-red-500")}>
-						{formatPercent(value)}
+						{formatPercentValue(value, { includeSign: true })}
 					</span>
 				);
 			},
@@ -361,10 +362,10 @@ function getAdvancedColumns(showVariant: boolean): ColumnDef<AdvancedStats>[] {
 			),
 			cell: ({ row }) => {
 				const modelName = row.getValue<string>("modelName");
-				const modelInfo = getModelInfo(modelName);
+				const modelInfo = findModelInfo(modelName);
 				return (
 					<div className="flex items-center gap-2">
-						{modelInfo.logo ? (
+						{modelInfo?.logo ? (
 							<div
 								className="h-5 w-5 rounded-full flex items-center justify-center overflow-hidden"
 								style={{ backgroundColor: modelInfo.color }}
@@ -378,7 +379,7 @@ function getAdvancedColumns(showVariant: boolean): ColumnDef<AdvancedStats>[] {
 						) : (
 							<div
 								className="h-5 w-5 rounded flex items-center justify-center text-[8px] font-bold text-white"
-								style={{ backgroundColor: modelInfo.color }}
+								style={{ backgroundColor: modelInfo?.color }}
 							>
 								{modelName.slice(0, 2).toUpperCase()}
 							</div>
@@ -547,6 +548,8 @@ function AnalyticsTable<T extends OverallStats | AdvancedStats>({
 	data: T[];
 	columns: ColumnDef<T>[];
 }) {
+	"use no memo";
+
 	const [sorting, setSorting] = useState<SortingState>([]);
 
 	const table = useReactTable({
@@ -644,45 +647,45 @@ function AnalyticsRoute() {
 
 	const handleExport = async () => {
 		setIsExporting(true);
-		try {
-			// Ensure we have fresh data
-			const [overallResult, advancedResult] = await Promise.all([
-				refetchOverall(),
-				refetchAdvanced(),
-			]);
+		const results = await Promise.all([
+			refetchOverall(),
+			refetchAdvanced(),
+		]).catch((error) => {
+			console.error("Analytics export failed", error);
+			return null;
+		});
 
-			const overall = overallResult.data?.overall ?? overallData?.overall ?? [];
-			const advanced =
-				advancedResult.data?.advanced ?? advancedData?.advanced ?? [];
-
-			if (overall.length === 0 && advanced.length === 0) {
-				console.warn("No data to export");
-				return;
-			}
-
-			exportAnalyticsToExcel(overall, advanced, runInfo?.runStartTime ?? null);
-		} finally {
+		if (!results) {
 			setIsExporting(false);
+			return;
 		}
+
+		const [overallResult, advancedResult] = results;
+		const overall = overallResult.data?.overall ?? overallData?.overall ?? [];
+		const advanced =
+			advancedResult.data?.advanced ?? advancedData?.advanced ?? [];
+
+		if (overall.length === 0 && advanced.length === 0) {
+			console.warn("No data to export");
+		} else {
+			exportAnalyticsToExcel(overall, advanced, runInfo?.runStartTime ?? null);
+		}
+		setIsExporting(false);
 	};
 
-	useEffect(() => {
-		if (selectedVariant !== "all" && showAverage) {
-			setShowAverage(false);
-		}
-	}, [selectedVariant, showAverage]);
+	const canShowAverage = selectedVariant === "all";
+	const showAverageForView = canShowAverage && showAverage;
+	const displayOverall = !data?.overall
+		? []
+		: showAverageForView
+			? averageOverallByModel(data.overall)
+			: data.overall;
 
-	const displayOverall = useMemo(() => {
-		if (!data?.overall) return [];
-		if (selectedVariant !== "all" || !showAverage) return data.overall;
-		return averageOverallByModel(data.overall);
-	}, [data?.overall, selectedVariant, showAverage]);
-
-	const displayAdvanced = useMemo(() => {
-		if (!data?.advanced) return [];
-		if (selectedVariant !== "all" || !showAverage) return data.advanced;
-		return averageAdvancedByModel(data.advanced);
-	}, [data?.advanced, selectedVariant, showAverage]);
+	const displayAdvanced = !data?.advanced
+		? []
+		: showAverageForView
+			? averageAdvancedByModel(data.advanced)
+			: data.advanced;
 
 	return (
 		<div className="relative flex h-screen flex-col overflow-hidden">
@@ -732,7 +735,7 @@ function AnalyticsRoute() {
 						</div>
 
 						{/* Average checkbox - only show in aggregate mode */}
-						{selectedVariant === "all" && (
+						{canShowAverage && (
 							<div className="flex items-center gap-1.5">
 								<Checkbox
 									id={averageAnalyticsId}
@@ -785,16 +788,12 @@ function AnalyticsRoute() {
 				) : mode === "overall" && displayOverall.length ? (
 					<AnalyticsTable
 						data={displayOverall}
-						columns={getOverallColumns(
-							selectedVariant === "all" && !showAverage,
-						)}
+						columns={getOverallColumns(canShowAverage && !showAverageForView)}
 					/>
 				) : mode === "advanced" && displayAdvanced.length ? (
 					<AnalyticsTable
 						data={displayAdvanced}
-						columns={getAdvancedColumns(
-							selectedVariant === "all" && !showAverage,
-						)}
+						columns={getAdvancedColumns(canShowAverage && !showAverageForView)}
 					/>
 				) : (
 					<div className="flex h-64 items-center justify-center">
