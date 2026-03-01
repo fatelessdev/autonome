@@ -86,15 +86,6 @@ const computeAverage = (values: Numberish[]): number | null => {
 	return filtered.reduce((total, value) => total + value, 0) / filtered.length;
 };
 
-const safeSeries = (fn: () => number[]): number[] => {
-	try {
-		return fn();
-	} catch (error) {
-		console.warn("Indicator computation failed", error);
-		return [];
-	}
-};
-
 /**
  * Convert Alpaca bars to our internal Candlestick format.
  */
@@ -117,13 +108,13 @@ const buildSeries = (
 	const midPrices = getMidPrices(candles);
 	const volumes = getVolumes(candles);
 
-	const ema20 = safeSeries(() => getEma(midPrices, 20));
-	const ema50 = safeSeries(() => getEma(midPrices, 50));
-	const macd = safeSeries(() => getMacd(midPrices));
-	const rsi7 = safeSeries(() => getRsi(closes, 7));
-	const rsi14 = safeSeries(() => getRsi(closes, 14));
-	const atr10 = safeSeries(() => getAtr(candles, 10));
-	const atr14 = safeSeries(() => getAtr(candles, 14));
+	const ema20 = getEma(midPrices, 20);
+	const ema50 = getEma(midPrices, 50);
+	const macd = getMacd(midPrices);
+	const rsi7 = getRsi(closes, 7);
+	const rsi14 = getRsi(closes, 14);
+	const atr10 = getAtr(candles, 10);
+	const atr14 = getAtr(candles, 14);
 
 	return {
 		timeframe,
@@ -193,6 +184,11 @@ async function fetchBars(
 		end: now.toISOString(),
 		limit,
 	});
+	if (bars.length === 0) {
+		throw new Error(
+			`No market bars returned for ${alpacaSymbol} (${timeframe}, limit=${limit})`,
+		);
+	}
 
 	return barsToCandlesticks(bars);
 }

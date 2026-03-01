@@ -10,6 +10,7 @@ import {
 	formatConfidenceValue,
 	formatPriceLabel,
 } from "@/shared/formatting/numberFormat";
+import { toCanonical } from "@/shared/markets/marketMetadata";
 import type { ExitPlanSelection } from "./types";
 
 type ExitPlanDialogProps = {
@@ -30,7 +31,7 @@ export function ExitPlanDialog({ selection, onClose }: ExitPlanDialogProps) {
 				>
 					<DialogHeader>
 						<DialogTitle className="flex items-center justify-between gap-3 ">
-							<span>{selection.position.symbol} Exit Plan</span>
+							<span>{toCanonical(selection.position.symbol)} Exit Plan</span>
 						</DialogTitle>
 						<DialogDescription className="text-foreground">
 							{selection.modelLabel} ·{" "}

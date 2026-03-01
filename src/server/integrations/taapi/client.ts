@@ -25,8 +25,7 @@ const FETCH_TIMEOUT_MS = 30_000; // 30 second timeout for API calls
 // Get API key from environment
 const getTaapiApiKey = (): string => {
 	if (!TAAPI_API_KEY) {
-		console.warn("[TAAPI] TAAPI_API_KEY not set, API calls will fail");
-		return "";
+		throw new Error("[TAAPI] TAAPI_API_KEY not configured");
 	}
 	return TAAPI_API_KEY;
 };
@@ -232,7 +231,7 @@ export class TaapiClient {
 	 * Check if TAAPI is configured and available
 	 */
 	isConfigured(): boolean {
-		return !!getTaapiApiKey();
+		return !!TAAPI_API_KEY;
 	}
 
 	/**

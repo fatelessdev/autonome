@@ -210,6 +210,12 @@ export async function createPosition(
 		}
 
 		try {
+			if (!Number.isFinite(quantity) || quantity <= 0) {
+				throw new Error(
+					`Invalid quantity for ${symbol}: expected positive finite number, received ${quantity}`,
+				);
+			}
+
 			const alpacaSymbol = toAlpacaSymbol(symbol);
 			const orderQty = Math.abs(quantity);
 			const orderSide = side === "LONG" ? "buy" : "sell";
@@ -274,8 +280,14 @@ export async function createPosition(
 				);
 			}
 
-			// If the order isn't filled yet (pending), use qty as expected
-			const effectiveQty = filledQty || orderQty;
+			// If Alpaca omits filled_qty but we have a confirmed fill price, fallback to the submitted qty.
+			const effectiveQty =
+				Number.isFinite(filledQty) && filledQty > 0 ? filledQty : orderQty;
+			if (!Number.isFinite(effectiveQty) || effectiveQty <= 0) {
+				throw new Error(
+					`Invalid effective quantity for ${symbol}: ${effectiveQty}`,
+				);
+			}
 
 			// For crypto: place independent SL/TP orders after the entry fills.
 			// These are standalone orders (not bracket) since Alpaca doesn't support

@@ -1,3 +1,4 @@
+import { toFiniteNumber } from "@/core/shared/trading/calculations";
 import type {
 	TradingDecisionWithContext,
 	TradingSignal,
@@ -19,17 +20,6 @@ export interface EnrichedOpenPosition extends OpenPositionSummary {
 	rewardUsd: number | null;
 	rewardPercent: number | null;
 	riskRewardRatio: number | null;
-}
-
-export function toNumeric(
-	value: number | string | null | undefined,
-): number | null {
-	if (typeof value === "number" && Number.isFinite(value)) return value;
-	if (typeof value === "string" && value.trim().length > 0) {
-		const parsed = Number.parseFloat(value);
-		if (Number.isFinite(parsed)) return parsed;
-	}
-	return null;
 }
 
 export const resolveQuantity = (
@@ -55,9 +45,8 @@ export const resolveQuantity = (
 export const resolveNotionalUsd = (
 	position: OpenPositionSummary,
 ): number | null => {
-	const candidate = (position as { notional?: unknown }).notional;
-	if (typeof candidate === "number" || typeof candidate === "string") {
-		const notionalValue = toNumeric(candidate);
+	if (position.notional != null) {
+		const notionalValue = toFiniteNumber(position.notional);
 		if (notionalValue !== null) {
 			return Math.abs(notionalValue);
 		}
@@ -69,7 +58,7 @@ export const resolveNotionalUsd = (
 		position.markPrice ??
 		position.liquidationPrice ??
 		null;
-	const referencePrice = toNumeric(referencePriceCandidate);
+	const referencePrice = toFiniteNumber(referencePriceCandidate);
 
 	if (quantity !== null && referencePrice !== null) {
 		return Math.abs(quantity * referencePrice);
@@ -161,8 +150,8 @@ export const enrichOpenPositions = (
 	decisionIndex: Map<string, TradingDecisionWithContext>,
 ): EnrichedOpenPosition[] => {
 	return positions.map((position) => {
-		const symbolKey = position.symbol?.toUpperCase?.() ?? position.symbol;
-		const decision = symbolKey ? decisionIndex.get(symbolKey) : undefined;
+		const symbolKey = position.symbol.toUpperCase();
+		const decision = decisionIndex.get(symbolKey);
 		const exitPlan = mergeExitPlans(decision, position.exitPlan ?? null);
 		const notionalUsd = resolveNotionalUsd(position);
 		const { riskUsd, riskPercent, rewardUsd, rewardPercent, riskRewardRatio } =
@@ -190,19 +179,29 @@ export const enrichOpenPositions = (
 export const summarizePositionRisk = (positions: EnrichedOpenPosition[]) => {
 	return positions.reduce(
 		(acc, position) => {
-			const quantity =
-				resolveQuantity(position) ?? Math.abs(position.quantity ?? 0);
+			const quantity = resolveQuantity(position);
 			const notional =
 				position.notionalUsd ??
-				(position.entryPrice != null && quantity > 0
+				(position.entryPrice != null && quantity !== null && quantity > 0
 					? Math.abs(position.entryPrice * quantity)
 					: null) ??
-				(position.markPrice != null && quantity > 0
+				(position.markPrice != null && quantity !== null && quantity > 0
 					? Math.abs(position.markPrice * quantity)
 					: null);
 
-			const unrealized = toNumeric(position.unrealizedPnl) ?? 0;
-			const realized = toNumeric(position.realizedPnl) ?? 0;
+			const unrealized = toFiniteNumber(position.unrealizedPnl);
+			if (unrealized === null) {
+				throw new Error(
+					`Missing or invalid unrealizedPnl for open position ${position.symbol}`,
+				);
+			}
+
+			const realized = toFiniteNumber(position.realizedPnl);
+			if (realized === null) {
+				throw new Error(
+					`Missing or invalid realizedPnl for open position ${position.symbol}`,
+				);
+			}
 
 			if (notional != null) {
 				acc.totalNotional += notional;

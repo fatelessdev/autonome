@@ -2,6 +2,7 @@ import { queryOptions } from "@tanstack/react-query";
 import { isValidVariantId } from "@/core/shared/variants";
 import { orpc } from "@/server/orpc/client";
 import { normalizeNumber } from "@/shared/formatting/numberFormat";
+import { toCanonical } from "@/shared/markets/marketMetadata";
 
 import type {
 	Conversation,
@@ -9,7 +10,6 @@ import type {
 	Position,
 	PositionExitPlan,
 	Trade,
-	TradeSide,
 } from "./dashboardTypes";
 
 const BASE_REFRESH_MS = 5 * 60 * 1000;
@@ -23,266 +23,138 @@ export const DASHBOARD_QUERY_KEYS = {
 	conversations: () => ["dashboard", "conversations"] as const,
 } as const;
 
-type TradesResponse = { trades?: unknown };
-type PositionsResponse = { positions?: unknown };
-type ConversationsResponse = { conversations?: unknown };
-
-function normalizeTradeSide(side: unknown): TradeSide {
-	if (typeof side !== "string") return "UNKNOWN";
-	const normalized = side.toUpperCase();
-	return normalized === "LONG" || normalized === "SHORT"
-		? normalized
-		: "UNKNOWN";
+function toTrade(
+	trade: Awaited<
+		ReturnType<typeof orpc.trading.getTrades.call>
+	>["trades"][number],
+): Trade {
+	return {
+		id: trade.id,
+		modelId: trade.modelId,
+		modelName: trade.modelName,
+		modelVariant:
+			typeof trade.modelVariant === "string" &&
+			isValidVariantId(trade.modelVariant)
+				? trade.modelVariant
+				: undefined,
+		modelRouterName: trade.modelRouterName ?? "",
+		modelKey: trade.modelKey ?? trade.modelRouterName ?? trade.modelId,
+		symbol: toCanonical(trade.symbol),
+		side: trade.side === "short" ? "SHORT" : "LONG",
+		quantity: normalizeNumber(trade.quantity),
+		entryPrice: normalizeNumber(trade.entryPrice),
+		exitPrice: normalizeNumber(trade.exitPrice),
+		netPnl: normalizeNumber(trade.netPnl),
+		openedAt: trade.openedAt,
+		closedAt: trade.closedAt,
+		holdingTime: trade.holdingTime ?? null,
+		timestamp: trade.timestamp,
+	};
 }
 
-function normalizeTrades(payload: TradesResponse): Trade[] {
-	const raw = Array.isArray(payload.trades) ? payload.trades : [];
-	return raw
-		.map((entry) => {
-			if (!entry || typeof entry !== "object") return null;
-			const record = entry as Record<string, unknown>;
-			const id = typeof record.id === "string" ? record.id : null;
-			const modelId =
-				typeof record.modelId === "string" ? record.modelId : null;
+function toExitPlan(
+	exitPlan:
+		| {
+				target?: number | null;
+				stop?: number | null;
+				invalidation?: string | null;
+		  }
+		| undefined,
+): PositionExitPlan | null {
+	if (!exitPlan) return null;
 
-			if (!id || !modelId) return null;
-
-			return {
-				id,
-				modelId,
-				modelName: typeof record.modelName === "string" ? record.modelName : "",
-				modelVariant:
-					typeof record.modelVariant === "string" &&
-					isValidVariantId(record.modelVariant)
-						? record.modelVariant
-						: undefined,
-				modelRouterName:
-					typeof record.modelRouterName === "string"
-						? record.modelRouterName
-						: "",
-				modelKey:
-					typeof record.modelKey === "string" && record.modelKey.length > 0
-						? record.modelKey
-						: typeof record.modelRouterName === "string" &&
-								record.modelRouterName.length > 0
-							? record.modelRouterName
-							: modelId,
-				symbol: typeof record.symbol === "string" ? record.symbol : "",
-				side: normalizeTradeSide(record.side),
-				quantity: normalizeNumber(record.quantity),
-				entryPrice: normalizeNumber(record.entryPrice),
-				exitPrice: normalizeNumber(record.exitPrice),
-				netPnl: normalizeNumber(record.netPnl),
-				openedAt: typeof record.openedAt === "string" ? record.openedAt : null,
-				closedAt:
-					typeof record.closedAt === "string"
-						? record.closedAt
-						: new Date().toISOString(),
-				holdingTime:
-					typeof record.holdingTime === "string" ? record.holdingTime : null,
-				timestamp:
-					typeof record.timestamp === "string" ? record.timestamp : null,
-			} as Trade;
-		})
-		.filter((trade): trade is Trade => Boolean(trade));
+	return {
+		target: normalizeNumber(exitPlan.target),
+		stop: normalizeNumber(exitPlan.stop),
+		invalidation: exitPlan.invalidation ?? null,
+	};
 }
 
-function normalizeExitPlan(plan: unknown): PositionExitPlan | null {
-	if (!plan || typeof plan !== "object") return null;
-	const record = plan as Record<string, unknown>;
-	const target = normalizeNumber(record.target);
-	const stop = normalizeNumber(record.stop);
-	const invalidation =
-		typeof record.invalidation === "string"
-			? record.invalidation
-			: typeof record.invalidation === "object" && record.invalidation !== null
-				? ((record.invalidation as { message?: string }).message ?? null)
-				: null;
-	const confidence = normalizeNumber(record.confidence);
-
-	if (
-		target == null &&
-		stop == null &&
-		invalidation == null &&
-		confidence == null
-	) {
-		return null;
-	}
-
-	return { target, stop, invalidation, confidence };
-}
-
-function normalizePosition(entry: unknown): Position | null {
-	if (!entry || typeof entry !== "object") return null;
-	const record = entry as Record<string, unknown>;
-	const symbol = typeof record.symbol === "string" ? record.symbol : null;
-
-	if (!symbol) return null;
-
-	const rawSign =
-		typeof record.side === "string" ? record.side.toUpperCase() : "LONG";
-	const sign = rawSign === "SHORT" ? "SHORT" : "LONG";
-	const normalizedNotional = normalizeNumber(record.notional);
+function toPosition(
+	position: Awaited<
+		ReturnType<typeof orpc.trading.getPositions.call>
+	>["positions"][number]["positions"][number],
+): Position {
+	const symbol = toCanonical(position.symbol);
+	const normalizedNotional = normalizeNumber(position.notional);
 
 	return {
 		symbol,
 		position: symbol,
-		sign,
-		quantity: normalizeNumber(record.quantity),
-		entryPrice: normalizeNumber(record.entryPrice),
-		currentPrice: normalizeNumber(record.currentPrice),
-		unrealizedPnl: String(normalizeNumber(record.unrealizedPnl) ?? 0),
-		realizedPnl: String(normalizeNumber(record.realizedPnl) ?? 0),
-		liquidationPrice: String(normalizeNumber(record.liquidationPrice) ?? 0),
-		leverage:
-			typeof record.leverage === "number" && Number.isFinite(record.leverage)
-				? record.leverage
-				: undefined,
+		sign: position.side === "short" ? "SHORT" : "LONG",
+		quantity: normalizeNumber(position.quantity),
+		entryPrice: normalizeNumber(position.entryPrice),
+		currentPrice: normalizeNumber(position.currentPrice),
+		unrealizedPnl: String(normalizeNumber(position.unrealizedPnl) ?? 0),
+		realizedPnl: "0",
+		liquidationPrice: "0",
+		leverage: normalizeNumber(position.leverage) ?? undefined,
 		notional:
 			normalizedNotional != null ? String(normalizedNotional) : undefined,
-		exitPlan: normalizeExitPlan(record.exitPlan),
-		confidence: normalizeNumber(record.confidence),
+		exitPlan: toExitPlan(position.exitPlan),
+		confidence: normalizeNumber(position.confidence),
 		signal:
-			typeof record.signal === "string" &&
-			["LONG", "SHORT", "HOLD"].includes(record.signal.toUpperCase())
-				? (record.signal.toUpperCase() as Position["signal"])
+			position.signal === "LONG" ||
+			position.signal === "SHORT" ||
+			position.signal === "HOLD"
+				? position.signal
 				: "HOLD",
-		lastDecisionAt:
-			typeof record.lastDecisionAt === "string" ? record.lastDecisionAt : null,
-		decisionStatus:
-			typeof record.decisionStatus === "string" ? record.decisionStatus : null,
+		lastDecisionAt: position.lastDecisionAt ?? null,
+		decisionStatus: position.decisionStatus ?? null,
 	};
 }
 
-function normalizePositions(payload: PositionsResponse): ModelPositions[] {
-	const raw = Array.isArray(payload.positions) ? payload.positions : [];
-	return raw
-		.map((entry) => {
-			if (!entry || typeof entry !== "object") return null;
-			const record = entry as Record<string, unknown>;
-			const modelId =
-				typeof record.modelId === "string" ? record.modelId : null;
-			const modelName =
-				typeof record.modelName === "string" ? record.modelName : modelId;
-
-			if (!modelId || !modelName) return null;
-
-			const positionsRaw = Array.isArray(record.positions)
-				? record.positions
-				: [];
-			const positions = positionsRaw
-				.map((position) => normalizePosition(position))
-				.filter((pos): pos is Position => Boolean(pos));
-
-			return {
-				modelId,
-				modelName,
-				modelVariant:
-					typeof record.modelVariant === "string" &&
-					isValidVariantId(record.modelVariant)
-						? record.modelVariant
-						: undefined,
-				modelLogo:
-					typeof record.modelLogo === "string" ? record.modelLogo : modelName,
-				positions,
-				totalUnrealizedPnl:
-					typeof record.totalUnrealizedPnl === "number"
-						? record.totalUnrealizedPnl
-						: undefined,
-			} as ModelPositions;
-		})
-		.filter((group): group is ModelPositions => group !== null);
+function toModelPositions(
+	group: Awaited<
+		ReturnType<typeof orpc.trading.getPositions.call>
+	>["positions"][number],
+): ModelPositions {
+	return {
+		modelId: group.modelId,
+		modelName: group.modelName,
+		modelVariant:
+			typeof group.modelVariant === "string" &&
+			isValidVariantId(group.modelVariant)
+				? group.modelVariant
+				: undefined,
+		modelLogo: group.modelLogo ?? group.modelName,
+		positions: group.positions.map(toPosition),
+		totalUnrealizedPnl: normalizeNumber(group.totalUnrealizedPnl) ?? undefined,
+	};
 }
 
-type ConversationMetadata = {
-	raw: unknown;
-	decisions: unknown;
-	results: unknown;
-};
-
-function normalizeConversations(
-	payload: ConversationsResponse,
-): Conversation[] {
-	const raw = Array.isArray(payload.conversations) ? payload.conversations : [];
-	return raw
-		.map((entry) => {
-			if (!entry || typeof entry !== "object") return null;
-			const record = entry as Record<string, unknown>;
-			const id = typeof record.id === "string" ? record.id : null;
-			const modelId =
-				typeof record.modelId === "string" ? record.modelId : null;
-			if (!id || !modelId) return null;
-			const responsePayload =
-				record.responsePayload && typeof record.responsePayload === "object"
-					? (record.responsePayload as Record<string, unknown>)
-					: null;
-			const prompt =
-				typeof responsePayload?.prompt === "string"
-					? responsePayload.prompt
-					: null;
-
-			const toolCallsRaw = Array.isArray(record.toolCalls)
-				? record.toolCalls
-				: [];
-			const toolCalls = toolCallsRaw
-				.map((toolCall) => {
-					if (!toolCall || typeof toolCall !== "object") return null;
-					const tc = toolCall as Record<string, unknown>;
-					const toolCallId = typeof tc.id === "string" ? tc.id : null;
-					const type = typeof tc.type === "string" ? tc.type : null;
-					if (!toolCallId || !type) return null;
-
-					const metadata =
-						typeof tc.metadata === "object" && tc.metadata != null
-							? (tc.metadata as ConversationMetadata)
-							: { raw: tc.metadata, decisions: [], results: [] };
-
-					return {
-						id: toolCallId,
-						type,
-						metadata: {
-							raw: "raw" in metadata ? metadata.raw : tc.metadata,
-							decisions: Array.isArray(metadata.decisions)
-								? metadata.decisions
-								: [],
-							results: Array.isArray(metadata.results) ? metadata.results : [],
-						},
-						timestamp:
-							typeof tc.timestamp === "string"
-								? tc.timestamp
-								: new Date().toISOString(),
-					};
-				})
-				.filter((toolCall): toolCall is Conversation["toolCalls"][number] =>
-					Boolean(toolCall),
-				);
-
-			return {
-				id,
-				modelId,
-				modelName:
-					typeof record.modelName === "string" ? record.modelName : "Unknown",
-				modelVariant:
-					typeof record.modelVariant === "string" &&
-					isValidVariantId(record.modelVariant)
-						? record.modelVariant
-						: undefined,
-				modelLogo:
-					typeof record.modelLogo === "string"
-						? record.modelLogo
-						: "unknown-model",
-				response: typeof record.response === "string" ? record.response : "",
-				prompt,
-				timestamp:
-					typeof record.timestamp === "string"
-						? record.timestamp
-						: new Date().toISOString(),
-				toolCalls,
-			} as Conversation;
-		})
-		.filter((conversation): conversation is Conversation =>
-			Boolean(conversation),
-		);
+function toConversation(
+	conversation: Awaited<
+		ReturnType<typeof orpc.models.getInvocations.call>
+	>["conversations"][number],
+): Conversation {
+	return {
+		id: conversation.id,
+		modelId: conversation.modelId,
+		modelName: conversation.modelName,
+		modelVariant:
+			typeof conversation.modelVariant === "string" &&
+			isValidVariantId(conversation.modelVariant)
+				? conversation.modelVariant
+				: undefined,
+		modelLogo: conversation.modelLogo,
+		response: conversation.response ?? "",
+		prompt:
+			typeof conversation.responsePayload?.prompt === "string"
+				? conversation.responsePayload.prompt
+				: null,
+		timestamp: conversation.timestamp,
+		toolCalls: conversation.toolCalls.map((toolCall) => ({
+			id: toolCall.id,
+			type: toolCall.type,
+			metadata: {
+				raw: toolCall.metadata.raw,
+				decisions: toolCall.metadata.decisions,
+				results: toolCall.metadata.results,
+			},
+			timestamp: toolCall.timestamp,
+		})),
+	};
 }
 
 async function fetchTrades(variant?: VariantFilter): Promise<Trade[]> {
@@ -290,28 +162,18 @@ async function fetchTrades(variant?: VariantFilter): Promise<Trade[]> {
 		limit: 100,
 		variant: variant && variant !== "all" ? variant : undefined,
 	});
-	return normalizeTrades({ trades: data.trades });
+
+	return data.trades.map(toTrade);
 }
 
 async function fetchPositions(): Promise<ModelPositions[]> {
 	const data = await orpc.trading.getPositions.call({});
-	return normalizePositions({ positions: data.positions });
+	return data.positions.map(toModelPositions);
 }
 
 async function fetchConversations(): Promise<Conversation[]> {
 	const data = await orpc.models.getInvocations.call({});
-	const transformed = data.conversations.map((conv) => ({
-		id: conv.id,
-		modelId: conv.modelId,
-		modelName: conv.modelName,
-		modelVariant: conv.modelVariant,
-		modelLogo: conv.modelLogo,
-		response: conv.response ?? "",
-		responsePayload: conv.responsePayload,
-		timestamp: conv.timestamp,
-		toolCalls: conv.toolCalls,
-	}));
-	return normalizeConversations({ conversations: transformed });
+	return data.conversations.map(toConversation);
 }
 
 export const tradesQueryOptions = (variant?: VariantFilter) =>

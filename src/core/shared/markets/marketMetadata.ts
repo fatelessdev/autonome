@@ -10,53 +10,80 @@ export const MARKETS = {
 		symbol: "BTC/USD",
 		canonical: "BTC",
 		assetClass: "crypto" as const,
+		badge: "BTC",
+		logo: "/coins/btc.svg",
+		decimals: 2,
 	},
 	ETH: {
 		symbol: "ETH/USD",
 		canonical: "ETH",
 		assetClass: "crypto" as const,
+		badge: "ETH",
+		logo: "/coins/eth.svg",
+		decimals: 2,
 	},
 	SOL: {
 		symbol: "SOL/USD",
 		canonical: "SOL",
 		assetClass: "crypto" as const,
+		badge: "SOL",
+		logo: "/coins/sol.svg",
+		decimals: 3,
 	},
 	XRP: {
 		symbol: "XRP/USD",
 		canonical: "XRP",
 		assetClass: "crypto" as const,
+		badge: "XRP",
+		logo: "/coins/xrp.svg",
+		decimals: 4,
 	},
 	HYPE: {
 		symbol: "HYPE/USD",
 		canonical: "HYPE",
 		assetClass: "crypto" as const,
+		badge: "HYPE",
+		logo: "/coins/hype.webp",
+		decimals: 4,
 	},
 } as const;
 
-type MarketSymbol = keyof typeof MARKETS;
+export type MarketSymbol = keyof typeof MARKETS;
 
 export const SUPPORTED_MARKETS: MarketSymbol[] = Object.keys(
 	MARKETS,
 ) as MarketSymbol[];
 
+export function isSupportedMarketSymbol(value: string): value is MarketSymbol {
+	return value in MARKETS;
+}
+
 const normalizeRawSymbol = (value: string) =>
 	value.toUpperCase().trim().replace(/\s+/g, "");
 
+function findMarketByAlpacaSymbol(normalizedSymbol: string) {
+	return Object.values(MARKETS).find(
+		(market) => market.symbol === normalizedSymbol,
+	);
+}
+
 /**
- * Resolve an Alpaca symbol (e.g. "BTC/USD") back to canonical form ("BTC").
+ * Resolve an Alpaca symbol (e.g. "BTC/USD") or canonical symbol (e.g. "BTC")
+ * back to canonical form ("BTC").
  */
 export function toCanonical(alpacaSymbol: string): string {
 	const normalized = normalizeRawSymbol(alpacaSymbol);
-
-	if (MARKETS[normalized as MarketSymbol]) {
-		return normalized;
+	const direct = MARKETS[normalized as MarketSymbol];
+	if (direct) {
+		return direct.canonical;
 	}
 
-	for (const market of Object.values(MARKETS)) {
-		if (market.symbol === normalized) return market.canonical;
+	const market = findMarketByAlpacaSymbol(normalized);
+	if (market) {
+		return market.canonical;
 	}
 
-	return normalized;
+	throw new Error(`Unsupported Alpaca market symbol: ${alpacaSymbol}`);
 }
 
 /**
@@ -64,18 +91,15 @@ export function toCanonical(alpacaSymbol: string): string {
  */
 export function toAlpacaSymbol(canonical: string): string {
 	const normalized = normalizeRawSymbol(canonical);
-
-	for (const market of Object.values(MARKETS)) {
-		if (market.symbol === normalized) {
-			return market.symbol;
-		}
+	const direct = MARKETS[normalized as MarketSymbol];
+	if (direct) {
+		return direct.symbol;
 	}
 
-	const base = toCanonical(normalized).toUpperCase();
-	const market = MARKETS[base as MarketSymbol];
-	if (!market) {
-		throw new Error(`Unsupported Alpaca market symbol: ${canonical}`);
+	const market = findMarketByAlpacaSymbol(normalized);
+	if (market) {
+		return market.symbol;
 	}
 
-	return market.symbol;
+	throw new Error(`Unsupported Alpaca market symbol: ${canonical}`);
 }

@@ -4,6 +4,7 @@ import rehypeRaw from "rehype-raw";
 import remarkGfm from "remark-gfm";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { toCanonical } from "@/shared/markets/marketMetadata";
 import { ModelChatSkeleton } from "./loading-skeletons";
 import type { Conversation } from "./types";
 import {
@@ -330,7 +331,7 @@ export function ModelChatTab({
 																					<div className="flex flex-col gap-1">
 																						<div className="flex flex-wrap items-center gap-2">
 																							<span className="text-sm font-semibold uppercase tracking-wide">
-																								{decision.symbol}
+																								{toCanonical(decision.symbol)}
 																							</span>
 																							<Badge
 																								variant={badgeVariant}

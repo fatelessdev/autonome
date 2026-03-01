@@ -52,6 +52,7 @@ export async function runRetentionPolicyJob() {
 			"[Portfolio Retention] Error running retention policy:",
 			error,
 		);
+		throw error;
 	}
 }
 
@@ -110,43 +111,35 @@ export async function recordPortfolios() {
 		allModels
 			.filter((model) => model.alpacaApiKey && model.alpacaApiSecret)
 			.map(async (model) => {
-				try {
-					const account: Account = {
-						alpacaApiKey: model.alpacaApiKey,
-						alpacaApiSecret: model.alpacaApiSecret,
-						name: model.name,
-						modelName: model.openRouterModelName,
-						invocationCount: model.invocationCount,
-						id: model.id,
-						totalMinutes: model.totalMinutes,
-					};
-					const portfolio = await queryClient.fetchQuery(
-						portfolioQuery(account),
-					);
-					return { model, portfolio, error: null };
-				} catch (error) {
-					return { model, portfolio: null, error };
-				}
+				const account: Account = {
+					alpacaApiKey: model.alpacaApiKey,
+					alpacaApiSecret: model.alpacaApiSecret,
+					name: model.name,
+					modelName: model.openRouterModelName,
+					invocationCount: model.invocationCount,
+					id: model.id,
+					totalMinutes: model.totalMinutes,
+				};
+				const portfolio = await queryClient.fetchQuery(portfolioQuery(account));
+				return { model, portfolio };
 			}),
 	);
 
-	// Batch create snapshots for valid portfolios
-	const validSnapshots = portfolioResults
-		.filter(
-			(
-				item,
-			): item is typeof item & {
-				portfolio: NonNullable<typeof item.portfolio>;
-			} =>
-				Boolean(
-					item.portfolio?.total &&
-						!Number.isNaN(Number.parseFloat(item.portfolio.total)),
-				),
-		)
-		.map(({ model, portfolio }) => ({
+	const validSnapshots = portfolioResults.map(({ model, portfolio }) => {
+		if (
+			typeof portfolio.total !== "string" ||
+			!Number.isFinite(Number.parseFloat(portfolio.total))
+		) {
+			throw new Error(
+				`Invalid portfolio total for model ${model.id}: ${String(portfolio.total)}`,
+			);
+		}
+
+		return {
 			modelId: model.id,
 			netPortfolio: portfolio.total,
-		}));
+		};
+	});
 
 	await Promise.all(
 		validSnapshots.map(({ modelId, netPortfolio }) =>
@@ -163,14 +156,4 @@ export async function recordPortfolios() {
 			snapshotsCreated: validSnapshots.length,
 		},
 	});
-
-	// Log errors
-	for (const { model, error } of portfolioResults) {
-		if (error) {
-			console.error(
-				`[Portfolio Tracker] Error recording portfolio for ${model.name}:`,
-				error,
-			);
-		}
-	}
 }

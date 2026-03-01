@@ -5,7 +5,7 @@ import {
 	formatPriceLabel,
 	formatQuantityValue,
 } from "@/shared/formatting/numberFormat";
-import { getModelInfo } from "@/shared/models/modelConfig";
+import { findModelInfo } from "@/shared/models/modelConfig";
 import type { Conversation, TradingDecisionCard } from "./types";
 
 export const extractMarkdownPreview = (
@@ -230,8 +230,8 @@ export const resolveModelIdentity = (source: ModelIdentitySource) => {
 		.map((value) => value.trim());
 
 	for (const candidate of candidates) {
-		const info = getModelInfo(candidate);
-		if (info.logo) {
+		const info = findModelInfo(candidate);
+		if (info?.logo) {
 			return info;
 		}
 	}
@@ -244,12 +244,14 @@ export const resolveModelIdentity = (source: ModelIdentitySource) => {
 		"Unknown Model";
 
 	if (candidates.length > 0) {
-		const info = getModelInfo(candidates[0]);
-		return {
-			logo: info.logo,
-			color: info.color,
-			label: info.logo ? info.label : fallbackLabel,
-		};
+		const info = findModelInfo(candidates[0]);
+		if (info) {
+			return {
+				logo: info.logo,
+				color: info.color,
+				label: info.logo ? info.label : fallbackLabel,
+			};
+		}
 	}
 
 	return {

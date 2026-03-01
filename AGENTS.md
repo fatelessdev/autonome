@@ -21,7 +21,10 @@ Use this file as the source of truth for coding-agent behavior in this repo.
 7. No backward-compatibility shims (early-stage product).
 8. Do not remove/hide existing UI features unless explicitly requested.
 9. Keep trading/accounting semantics authoritative: Alpaca for live position state, DB Orders for lifecycle metadata.
-10. Always leverages skill files to your advantage.
+10. Skill usage is mandatory preflight: identify and load relevant skill files before writing code.
+11. Prefer fail-fast behavior across server and UI when required data/contracts are invalid.
+12. Do not use silent fallbacks that mask bad shapes or broken invariants in core paths.
+13. External API retries are allowed only for transient provider/network failures, with a default budget of 2 retries (3 total attempts) and short exponential backoff.
 
 ---
 
@@ -53,6 +56,10 @@ Use this file as the source of truth for coding-agent behavior in this repo.
 
 When implementing any feature/fix, do this sequence:
 
+0. **Skill activation gate (required before coding)**
+   - Identify domains touched by the task (for example: React UI, oRPC contracts, Drizzle, Hono, workflow orchestration, AI SDK).
+   - Load and apply relevant skill files before making edits.
+   - If no relevant skill exists, state that explicitly and proceed with normal codebase rules.
 1. **Map the full surface area first**
    - If touching trading: inspect prompts, tools, workflow step, router, queries, DB writes.
    - If touching UI realtime: inspect SSE producer + event bus + client invalidation.
@@ -89,6 +96,11 @@ When implementing any feature/fix, do this sequence:
 ### SSE behavior
 - Prefer one stream per UI concern (currently dashboard multiplex + workflow stream).
 - SSE payloads are change signals; queries are source of truth.
+
+### Error handling philosophy
+- For required fields and contract violations, throw explicit errors with context rather than defaulting to empty values.
+- In UI data flows, prefer explicit error states over partially rendered views based on silent fallback data.
+- Keep defensive checks that enforce invariants; remove defensive checks that only hide data-quality bugs.
 
 ---
 

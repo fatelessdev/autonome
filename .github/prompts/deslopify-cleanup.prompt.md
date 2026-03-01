@@ -23,6 +23,9 @@ Perform a focused cleanup pass that does all of the following in the target area
 5. Do not remove or hide existing user-facing features unless explicitly requested.
 6. Do not add compatibility shims or bandaid fallbacks.
 7. Never revert unrelated working-tree changes.
+8. Keep defensive checks that enforce invariants; remove fallback branches that only mask bad data/contracts.
+9. In UI/query flows, prefer explicit error states over silent partial rendering from placeholder defaults.
+10. For external providers (Alpaca/TAAPI/LLM APIs), allow retries only for transient failures with a default max of 2 retries (3 total attempts) and short exponential backoff.
 
 ## Trading-Specific Rule
 For Alpaca trading execution paths, avoid permissive symbol coercion that silently normalizes legacy forms. Do not treat `BTC`, `BTCUSD`, and `BTC/USD` as equivalent through fallback behavior unless the path explicitly requires that behavior and it is documented as intentional.
@@ -42,3 +45,6 @@ Return a concise implementation report with:
 4. **Behavioral Notes**: fail-fast changes and any intentional behavior shifts.
 5. **Validation Results**: command outcomes.
 6. **Follow-ups**: high-value next cleanup targets.
+
+## Decision Rule
+If an intended cleanup could reduce correctness, observability, or readability, do not apply it; explain why and choose the safer, cleaner alternative.

@@ -58,12 +58,9 @@ For example, if you want stochrsi, ichimoku, and bbands, request all three at on
 	execute: async ({ symbol, timeframe, indicators }: FetchIndicatorsInput) => {
 		// Check if TAAPI is configured
 		if (!taapiClient.isConfigured()) {
-			return JSON.stringify({
-				error: true,
-				message:
-					"TAAPI_API_KEY not configured. Cannot fetch additional indicators.",
-				hint: "Add TAAPI_API_KEY to your .env file to enable this feature.",
-			});
+			throw new Error(
+				"TAAPI_API_KEY not configured. Cannot fetch additional indicators.",
+			);
 		}
 
 		try {
@@ -89,12 +86,19 @@ For example, if you want stochrsi, ichimoku, and bbands, request all three at on
 
 			// Format results for AI consumption
 			const formatted: Record<string, unknown> = {};
+			const failedIndicators: string[] = [];
 			for (const [id, value] of Object.entries(results)) {
 				if (value === null) {
-					formatted[id] = "Error fetching indicator";
+					failedIndicators.push(id);
 				} else {
 					formatted[id] = value;
 				}
+			}
+
+			if (failedIndicators.length > 0) {
+				throw new Error(
+					`TAAPI returned null indicator values for: ${failedIndicators.join(", ")}`,
+				);
 			}
 
 			return JSON.stringify(
@@ -111,11 +115,7 @@ For example, if you want stochrsi, ichimoku, and bbands, request all three at on
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			console.error("[fetchIndicatorsTool] Error:", message);
-			return JSON.stringify({
-				error: true,
-				message: `Failed to fetch indicators: ${message}`,
-				hint: "Try again in a few seconds if rate limited. Free plan allows 1 request per 15 seconds.",
-			});
+			throw new Error(`Failed to fetch indicators: ${message}`);
 		}
 	},
 });

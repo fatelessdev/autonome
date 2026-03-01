@@ -17,6 +17,7 @@ import { QueryClient } from "@tanstack/react-query";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { getModelProvider } from "@/core/shared/models/modelConfig";
+import type { Model } from "@/db/schema";
 import {
 	getNextAihubmixApiKey,
 	getNextNimApiKey,
@@ -46,8 +47,8 @@ import { MARKETS } from "@/shared/markets/marketMetadata";
 
 export interface ConsensusVoter {
 	modelId: string;
-	modelName: string;
-	openRouterModelName: string;
+	name: string;
+	routerModelName: string;
 	weight: number; // 0-1, higher = more influence
 }
 
@@ -56,6 +57,12 @@ export interface ConsensusConfig {
 	minAgreement: number; // Minimum voters that must agree (e.g., 2 for 2/3)
 	confidenceThreshold: number; // 0-10, minimum avg confidence to execute
 	timeoutMs: number;
+}
+
+export interface ConsensusPreparationResult {
+	account: Account;
+	config: ConsensusConfig;
+	voterCount: number;
 }
 
 export interface VoterDecision {
@@ -96,6 +103,42 @@ export interface ConsensusResult {
 	voterResults: VoterResult[];
 	reasoning: string;
 }
+
+const toErrorMessage = (error: unknown): string =>
+	error instanceof Error ? error.message : String(error);
+
+const buildFailedVoterResult = (
+	voterId: string,
+	voterName: string,
+	error: unknown,
+	latencyMs: number,
+): VoterResult => {
+	const message = toErrorMessage(error);
+	return {
+		voterId,
+		voterName,
+		decision: {
+			action: "HOLD",
+			symbol: null,
+			side: null,
+			confidence: 0,
+			quantity: null,
+			leverage: null,
+			stopLoss: null,
+			takeProfit: null,
+			reasoning: `Error: ${message}`,
+		},
+		latencyMs,
+		error: message,
+	};
+};
+
+const getMedian = (values: number[]): number => {
+	if (values.length === 0) {
+		throw new Error("Cannot compute median of empty value set");
+	}
+	return values.sort((a, b) => a - b)[Math.floor(values.length / 2)];
+};
 
 // ==================== Schemas ====================
 
@@ -181,14 +224,14 @@ async function getVoterDecision(
 	const startTime = Date.now();
 
 	try {
-		const provider = getModelProvider(voter.modelName);
+		const provider = getModelProvider(voter.name);
 		const isOpenRouter = provider === "openrouter";
 		const model =
 			provider === "openrouter"
-				? openrouter(voter.openRouterModelName)
+				? openrouter(voter.routerModelName)
 				: provider === "aihubmix"
-					? aihubmix(voter.openRouterModelName)
-					: nim.chatModel(voter.openRouterModelName);
+					? aihubmix(voter.routerModelName)
+					: nim.chatModel(voter.routerModelName);
 
 		const availableSymbols = Object.keys(MARKETS).join(", ");
 		const riskPerTrade = portfolio.totalValue * 0.03; // 3% risk per trade
@@ -267,34 +310,23 @@ Vote with confidence 1-10 (only vote BUY/SELL if confidence >= 6).`;
 		});
 
 		console.log(
-			`[Consensus] ${voter.modelName} voted: ${result.object.action} ${result.object.symbol ?? ""} (confidence: ${result.object.confidence})`,
+			`[Consensus] ${voter.name} voted: ${result.object.action} ${result.object.symbol ?? ""} (confidence: ${result.object.confidence})`,
 		);
 
 		return {
 			voterId: voter.modelId,
-			voterName: voter.modelName,
+			voterName: voter.name,
 			decision: result.object,
 			latencyMs: Date.now() - startTime,
 		};
 	} catch (error) {
-		console.error(`[Consensus] ${voter.modelName} error:`, error);
-		return {
-			voterId: voter.modelId,
-			voterName: voter.modelName,
-			decision: {
-				action: "HOLD",
-				symbol: null,
-				side: null,
-				confidence: 0,
-				quantity: null,
-				leverage: null,
-				stopLoss: null,
-				takeProfit: null,
-				reasoning: `Error: ${error instanceof Error ? error.message : String(error)}`,
-			},
-			latencyMs: Date.now() - startTime,
-			error: error instanceof Error ? error.message : String(error),
-		};
+		console.error(`[Consensus] ${voter.name} error:`, error);
+		return buildFailedVoterResult(
+			voter.modelId,
+			voter.name,
+			error,
+			Date.now() - startTime,
+		);
 	}
 }
 
@@ -306,6 +338,9 @@ function aggregateVotes(
 	config: ConsensusConfig,
 ): ConsensusResult {
 	const validResults = results.filter((r) => !r.error);
+	if (validResults.length === 0) {
+		throw new Error("Consensus voting failed: all voters returned errors");
+	}
 
 	// Count votes by action
 	const voteCounts = {
@@ -338,7 +373,12 @@ function aggregateVotes(
 	let weightTotal = 0;
 	for (const vote of winningVotes) {
 		const voter = voters.find((v) => v.modelId === vote.voterId);
-		const weight = voter?.weight ?? 1;
+		if (!voter) {
+			throw new Error(
+				`Missing voter configuration for result voterId=${vote.voterId}`,
+			);
+		}
+		const weight = voter.weight;
 		weightedSum += vote.decision.confidence * weight;
 		weightTotal += weight;
 	}
@@ -375,22 +415,21 @@ function aggregateVotes(
 			.map((d) => d.takeProfit)
 			.filter((t): t is number => t !== null);
 
-		const medianQuantity =
-			quantities.length > 0
-				? quantities.sort((a, b) => a - b)[Math.floor(quantities.length / 2)]
-				: 0;
-		const medianLeverage =
-			leverages.length > 0
-				? leverages.sort((a, b) => a - b)[Math.floor(leverages.length / 2)]
-				: 1;
-		const medianStop =
-			stops.length > 0
-				? stops.sort((a, b) => a - b)[Math.floor(stops.length / 2)]
-				: null;
-		const medianTarget =
-			targets.length > 0
-				? targets.sort((a, b) => a - b)[Math.floor(targets.length / 2)]
-				: null;
+		if (quantities.length === 0) {
+			throw new Error(
+				"Consensus marked executable but no agreeing voter provided quantity",
+			);
+		}
+		if (leverages.length === 0) {
+			throw new Error(
+				"Consensus marked executable but no agreeing voter provided leverage",
+			);
+		}
+
+		const medianQuantity = getMedian(quantities);
+		const medianLeverage = getMedian(leverages);
+		const medianStop = stops.length > 0 ? getMedian(stops) : null;
+		const medianTarget = targets.length > 0 ? getMedian(targets) : null;
 
 		executionParams = {
 			quantity: medianQuantity,
@@ -412,6 +451,11 @@ function aggregateVotes(
 		symbols.length > 0
 			? [...symbolCounts.entries()].sort((a, b) => b[1] - a[1])[0][0]
 			: null;
+	if (shouldExecute && !consensusSymbol) {
+		throw new Error(
+			"Consensus marked executable but no symbol was provided by agreeing voters",
+		);
+	}
 
 	// Compile reasoning from agreeing voters
 	const reasoning = winningVotes
@@ -467,23 +511,13 @@ export async function runConsensusVoting(
 				),
 			),
 		]).catch(
-			(error): VoterResult => ({
-				voterId: voter.modelId,
-				voterName: voter.modelName,
-				decision: {
-					action: "HOLD",
-					symbol: null,
-					side: null,
-					confidence: 0,
-					quantity: null,
-					leverage: null,
-					stopLoss: null,
-					takeProfit: null,
-					reasoning: `Error: ${error instanceof Error ? error.message : String(error)}`,
-				},
-				latencyMs: config.timeoutMs,
-				error: error instanceof Error ? error.message : String(error),
-			}),
+			(error): VoterResult =>
+				buildFailedVoterResult(
+					voter.modelId,
+					voter.name,
+					error,
+					config.timeoutMs,
+				),
 		),
 	);
 
@@ -495,44 +529,14 @@ export async function runConsensusVoting(
 
 export const DEFAULT_CONSENSUS_CONFIG: ConsensusConfig = {
 	voters: [
-		// {
-		// 	modelId: "minimax-m2",
-		// 	modelName: "minimax-m2",
-		// 	openRouterModelName: "minimaxai/minimax-m2",
-		// 	weight: 1.0, // Slightly higher weight for reasoning model
-		// },
-		// {
-		// 	modelId: "deepseek-v3.1-terminus",
-		// 	modelName: "deepseek-v3.1-terminus",
-		// 	openRouterModelName: "deepseek-ai/deepseek-v3.1-terminus",
-		// 	weight: 1.0,
-		// },
-		// {
-		// 	modelId: "kimi-k2-instruct-0905",
-		// 	modelName: "kimi-k2-instruct-0905",
-		// 	openRouterModelName: "moonshotai/kimi-k2-instruct-0905",
-		// 	weight: 1.0,
-		// },
-		// {
-		// 	modelId: "gpt-oss-120b",
-		// 	modelName: "gpt-oss-120b",
-		// 	openRouterModelName: "openai/gpt-oss-120b",
-		// 	weight: 1.0,
-		// },
-		// {
-		// 	modelId: "deepseek-ai/deepseek-r1-0528",
-		// 	modelName: "deepseek-r1-0528",
-		// 	openRouterModelName: "deepseek-ai/deepseek-r1-0528",
-		// 	weight: 1.0,
-		// },
 		{
 			modelId: "kat-coder-pro",
-			modelName: "kat-coder-pro",
-			openRouterModelName: "kwaipilot/kat-coder-pro:free",
+			name: "kat-coder-pro",
+			routerModelName: "kwaipilot/kat-coder-pro:free",
 			weight: 1.0,
 		},
 	],
-	minAgreement: 2, // At least 2/3 must agree
+	minAgreement: 1, // single voter default config
 	confidenceThreshold: 6, // Average confidence must be >= 6
 	timeoutMs: 60000, // 60 second timeout per voter
 };
@@ -541,6 +545,81 @@ export const DEFAULT_CONSENSUS_CONFIG: ConsensusConfig = {
 
 /** Reserved model name for the consensus orchestrator */
 export const CONSENSUS_MODEL_NAME = "consensus-orchestrator";
+
+const toConsensusAccount = (model: Model): Account => ({
+	id: model.id,
+	name: model.name,
+	modelName: model.openRouterModelName,
+	alpacaApiKey: model.alpacaApiKey,
+	alpacaApiSecret: model.alpacaApiSecret,
+	invocationCount: model.invocationCount,
+	totalMinutes: model.totalMinutes,
+	variant: model.variant,
+});
+
+export const isConsensusModel = (modelName: string): boolean =>
+	modelName.trim().toLowerCase() === CONSENSUS_MODEL_NAME;
+
+const computeDefaultMinAgreement = (voterCount: number): number => {
+	if (voterCount <= 0) {
+		throw new Error("Cannot compute min agreement with zero voters");
+	}
+	return Math.max(1, Math.ceil((voterCount * 2) / 3));
+};
+
+export function buildConsensusConfigFromVoterModels(
+	models: Model[],
+): ConsensusConfig {
+	if (models.length === 0) {
+		throw new Error("Consensus requires at least one voter model");
+	}
+
+	const voters = models.map((model) => {
+		// Fail fast when a voter model cannot be resolved to a provider contract.
+		getModelProvider(model.name);
+		return {
+			modelId: model.id,
+			name: model.name,
+			routerModelName: model.openRouterModelName,
+			weight: 1,
+		};
+	});
+
+	return {
+		voters,
+		minAgreement: computeDefaultMinAgreement(voters.length),
+		confidenceThreshold: 6,
+		timeoutMs: 60_000,
+	};
+}
+
+export function prepareConsensusWorkflowFromModels(
+	models: Model[],
+): ConsensusPreparationResult | null {
+	const consensusAccountModel = models.find((model) =>
+		isConsensusModel(model.name),
+	);
+	if (!consensusAccountModel) {
+		return null;
+	}
+
+	const voterModels = models.filter(
+		(model) =>
+			model.id !== consensusAccountModel.id && !isConsensusModel(model.name),
+	);
+	if (voterModels.length === 0) {
+		throw new Error(
+			`Consensus account "${consensusAccountModel.name}" is configured but there are no voter models available`,
+		);
+	}
+
+	const config = buildConsensusConfigFromVoterModels(voterModels);
+	return {
+		account: toConsensusAccount(consensusAccountModel),
+		config,
+		voterCount: config.voters.length,
+	};
+}
 
 /**
  * Run the full consensus workflow:
@@ -564,24 +643,18 @@ export async function runConsensusWorkflow(
 	const openPositions = enrichOpenPositions(openPositionsRaw, new Map());
 
 	// Fetch shared market data (cached across all models in the same cycle)
-	let marketIntelligence = "Market data unavailable.";
-	let newsDigest = "";
-	try {
-		const [marketResult, news] = await Promise.all([
-			getSharedMarketIntelligence({
-				alpacaApiKey: consensusAccount.alpacaApiKey,
-				alpacaApiSecret: consensusAccount.alpacaApiSecret,
-			}),
-			getSharedNewsDigest({
-				alpacaApiKey: consensusAccount.alpacaApiKey,
-				alpacaApiSecret: consensusAccount.alpacaApiSecret,
-			}),
-		]);
-		marketIntelligence = marketResult.formatted;
-		newsDigest = news.formatted;
-	} catch (error) {
-		console.error("[Consensus] Failed to fetch market data", error);
-	}
+	const [marketResult, news] = await Promise.all([
+		getSharedMarketIntelligence({
+			alpacaApiKey: consensusAccount.alpacaApiKey,
+			alpacaApiSecret: consensusAccount.alpacaApiSecret,
+		}),
+		getSharedNewsDigest({
+			alpacaApiKey: consensusAccount.alpacaApiKey,
+			alpacaApiSecret: consensusAccount.alpacaApiSecret,
+		}),
+	]);
+	const marketIntelligence = marketResult.formatted;
+	const newsDigest = news.formatted;
 
 	// Create invocation record
 	const modelInvocation = await createInvocationMutation(consensusAccount.id);
@@ -709,7 +782,7 @@ export async function runConsensusWorkflow(
 
 		return response;
 	} catch (error) {
-		const failureMessage = `Consensus workflow failed: ${error instanceof Error ? error.message : String(error)}`;
+		const failureMessage = `Consensus workflow failed: ${toErrorMessage(error)}`;
 		console.error(`[Consensus] ${failureMessage}`, error);
 
 		// Increment failed workflow count

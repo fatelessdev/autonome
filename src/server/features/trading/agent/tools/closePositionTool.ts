@@ -45,9 +45,12 @@ export function closePositionTool(ctx: ToolContext) {
 			// Before closing, capture cooldown info from open positions
 			for (const symbol of symbolsToClose) {
 				const upper = symbol.toUpperCase();
-				const position = ctx.openPositions.find(
-					(p) => p.symbol?.toUpperCase() === upper,
-				);
+				const position = ctx.openPositions.find((p) => {
+					if (!p.symbol) {
+						throw new Error("Encountered open position with missing symbol");
+					}
+					return p.symbol.toUpperCase() === upper;
+				});
 				if (position?.exitPlan?.cooldownUntil && position.sign) {
 					ctx.closedPositionCooldowns.set(upper, {
 						side: position.sign as "LONG" | "SHORT",

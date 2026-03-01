@@ -7,14 +7,15 @@
 import { queryOptions } from "@tanstack/react-query";
 import { and, asc, desc, eq, inArray, isNull, ne, or } from "drizzle-orm";
 import {
-	DEFAULT_VARIANT,
 	isValidVariantId,
 	VARIANT_IDS,
 	type VariantId,
 } from "@/core/shared/variants";
 import { db } from "@/db";
 import { models, orders } from "@/db/schema";
+import { fetchLatestDecisionIndex } from "@/server/features/trading/contracts/decisionIndex";
 import { refreshConversationEvents } from "@/server/features/trading/data/conversationsSnapshot.server";
+import { enrichOpenPositions } from "@/server/features/trading/data/openPositionEnrichment";
 import { getOpenPositions } from "@/server/features/trading/data/positions";
 import { getMarketDataProvider } from "@/server/providers/alpaca";
 import { formatIstTimestamp } from "@/shared/formatting/dateFormat";
@@ -39,20 +40,44 @@ const formatDuration = (openedAt: Date, closedAt: Date) => {
 	return parts.join(" ");
 };
 
-const parseFiniteNumber = (
+const parseRequiredFiniteNumber = (
 	value: string | null | undefined,
 	fieldName: string,
 	context: string,
-): number | null => {
-	if (!value) return null;
+): number => {
+	if (!value) {
+		throw new Error(`Missing numeric ${fieldName} in ${context}`);
+	}
 	const parsed = Number.parseFloat(value);
 	if (!Number.isFinite(parsed)) {
-		console.warn(
-			`[queries] Invalid numeric ${fieldName} in ${context}: ${value}`,
-		);
-		return null;
+		throw new Error(`Invalid numeric ${fieldName} in ${context}: ${value}`);
 	}
 	return parsed;
+};
+
+const requirePresent = <T>(
+	value: T | null | undefined,
+	fieldName: string,
+	context: string,
+): T => {
+	if (value == null) {
+		throw new Error(`Missing ${fieldName} in ${context}`);
+	}
+	return value;
+};
+
+const requireModelCredentials = (model: {
+	id: string;
+	alpacaApiKey: string | null;
+	alpacaApiSecret: string | null;
+}): { apiKey: string; apiSecret: string } => {
+	if (!model.alpacaApiKey || !model.alpacaApiSecret) {
+		throw new Error(`Missing Alpaca credentials for model ${model.id}`);
+	}
+	return {
+		apiKey: model.alpacaApiKey,
+		apiSecret: model.alpacaApiSecret,
+	};
 };
 
 /**
@@ -87,30 +112,26 @@ export async function fetchCryptoPrices(
 	const normalized = symbols.map((s) => toCanonical(s).toUpperCase());
 	const alpacaSymbols = normalized.map((s) => toAlpacaSymbol(s));
 
-	try {
-		const creds = await getAnyAlpacaCredentials();
-		if (!creds) {
-			console.warn(
-				"[crypto-prices] No Alpaca credentials available in any model",
-			);
-			return normalized.map((s) => ({ symbol: s, price: null }));
-		}
-
-		const md = getMarketDataProvider(creds.alpacaApiKey, creds.alpacaApiSecret);
-
-		const snapshots = await md.getSnapshots(alpacaSymbols);
-
-		return normalized.map((canonical, i) => {
-			const snap = snapshots[alpacaSymbols[i]];
-			const price =
-				snap?.latest_trade?.price ?? snap?.latest_quote?.ask_price ?? null;
-			return { symbol: canonical, price };
-		});
-	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
-		console.warn("[crypto-prices] Failed to fetch from Alpaca:", message);
-		return normalized.map((s) => ({ symbol: s, price: null }));
+	const creds = await getAnyAlpacaCredentials();
+	if (!creds) {
+		throw new Error("No Alpaca credentials available in any model");
 	}
+
+	const md = getMarketDataProvider(creds.alpacaApiKey, creds.alpacaApiSecret);
+
+	const snapshots = await md.getSnapshots(alpacaSymbols);
+
+	return normalized.map((canonical, i) => {
+		const snap = snapshots[alpacaSymbols[i]];
+		const price =
+			snap?.latest_trade?.price ?? snap?.latest_quote?.ask_price ?? null;
+		if (price == null || !Number.isFinite(price)) {
+			throw new Error(
+				`Missing latest price for ${canonical} (alpacaSymbol=${alpacaSymbols[i]})`,
+			);
+		}
+		return { symbol: canonical, price };
+	});
 }
 
 // ==========================================
@@ -185,27 +206,45 @@ export async function fetchTrades(
 	});
 
 	const variantResults = await Promise.all(variantQueries);
-	const closedOrders = variantResults
-		.flat()
-		.sort(
-			(a, b) => (b.closedAt?.getTime() ?? 0) - (a.closedAt?.getTime() ?? 0),
-		);
+	const closedOrders = variantResults.flat().sort((a, b) => {
+		if (!a.closedAt) {
+			throw new Error(`Closed order ${a.id} is missing closedAt`);
+		}
+		if (!b.closedAt) {
+			throw new Error(`Closed order ${b.id} is missing closedAt`);
+		}
+		return b.closedAt.getTime() - a.closedAt.getTime();
+	});
 
 	return closedOrders.map((order) => {
+		if (!order.model) {
+			throw new Error(
+				`Closed order ${order.id} is missing required model relation`,
+			);
+		}
+		if (!order.closedAt) {
+			throw new Error(`Closed order ${order.id} is missing closedAt`);
+		}
+		if (!isValidVariantId(order.model.variant)) {
+			throw new Error(
+				`Closed order ${order.id} has invalid model variant: ${order.model.variant}`,
+			);
+		}
+
 		const openedAt = order.openedAt;
-		const closedAt = order.closedAt ?? new Date();
+		const closedAt = order.closedAt;
 		const holdingTime = formatDuration(openedAt, closedAt);
-		const quantity = parseFiniteNumber(
+		const quantity = parseRequiredFiniteNumber(
 			order.quantity,
 			"quantity",
 			`order:${order.id}`,
 		);
-		const entryPrice = parseFiniteNumber(
+		const entryPrice = parseRequiredFiniteNumber(
 			order.entryPrice,
 			"entryPrice",
 			`order:${order.id}`,
 		);
-		const exitPrice = parseFiniteNumber(
+		const exitPrice = parseRequiredFiniteNumber(
 			order.exitPrice,
 			"exitPrice",
 			`order:${order.id}`,
@@ -214,15 +253,15 @@ export async function fetchTrades(
 		return {
 			id: order.id,
 			modelId: order.modelId,
-			modelName: order.model?.name ?? "Unknown",
-			modelRouterName: order.model?.openRouterModelName ?? null,
-			modelVariant: order.model?.variant ?? DEFAULT_VARIANT,
+			modelName: order.model.name,
+			modelRouterName: order.model.openRouterModelName ?? null,
+			modelVariant: order.model.variant,
 			symbol: order.symbol,
 			side: order.side,
 			quantity,
 			entryPrice,
 			exitPrice,
-			netPnl: parseFiniteNumber(
+			netPnl: parseRequiredFiniteNumber(
 				order.realizedPnl,
 				"realizedPnl",
 				`order:${order.id}`,
@@ -256,121 +295,103 @@ export async function fetchPositions(options?: FetchPositionsOptions) {
 	const { variant } = options ?? {};
 	const normalizedVariant = isValidVariantId(variant) ? variant : undefined;
 
-	try {
-		// Fetch models - filter by variant if specified
-		const modelFilter = normalizedVariant
-			? eq(models.variant, normalizedVariant)
-			: undefined;
+	// Fetch models - filter by variant if specified
+	const modelFilter = normalizedVariant
+		? eq(models.variant, normalizedVariant)
+		: undefined;
 
-		const dbModels = await db
-			.select({
-				id: models.id,
-				name: models.name,
-				modelLogo: models.openRouterModelName,
-				variant: models.variant,
-				alpacaApiKey: models.alpacaApiKey,
-				alpacaApiSecret: models.alpacaApiSecret,
-				invocationCount: models.invocationCount,
-				totalMinutes: models.totalMinutes,
-			})
-			.from(models)
-			.where(modelFilter);
+	const dbModels = await db
+		.select({
+			id: models.id,
+			name: models.name,
+			modelLogo: models.openRouterModelName,
+			variant: models.variant,
+			alpacaApiKey: models.alpacaApiKey,
+			alpacaApiSecret: models.alpacaApiSecret,
+			invocationCount: models.invocationCount,
+			totalMinutes: models.totalMinutes,
+		})
+		.from(models)
+		.where(modelFilter);
 
-		const results = await Promise.all(
-			dbModels.map(async (model) => {
-				try {
-					if (!model.alpacaApiKey || !model.alpacaApiSecret) {
-						return {
-							modelId: model.id,
-							modelName: model.name,
-							modelLogo: model.modelLogo,
-							modelVariant: model.variant,
-							positions: [],
-							totalUnrealizedPnl: 0,
-						};
-					}
+	const results = await Promise.all(
+		dbModels.map(async (model) => {
+			const { apiKey, apiSecret } = requireModelCredentials(model);
 
-					const livePositions = await getOpenPositions({
-						id: model.id,
-						name: model.name,
-						modelName: model.modelLogo,
-						alpacaApiKey: model.alpacaApiKey,
-						alpacaApiSecret: model.alpacaApiSecret,
-						invocationCount: model.invocationCount,
-						totalMinutes: model.totalMinutes,
-						variant: model.variant,
-					});
+			const [livePositionsRaw, decisionIndex] = await Promise.all([
+				getOpenPositions({
+					id: model.id,
+					name: model.name,
+					modelName: model.modelLogo,
+					alpacaApiKey: apiKey,
+					alpacaApiSecret: apiSecret,
+					invocationCount: model.invocationCount,
+					totalMinutes: model.totalMinutes,
+					variant: model.variant,
+				}),
+				fetchLatestDecisionIndex(model.id),
+			]);
 
-					const positions = livePositions.map((pos) => {
-						if (pos.entryPrice == null) {
-							throw new Error(
-								`Missing entryPrice for open position ${pos.symbol} on model ${model.id}`,
-							);
-						}
+			const livePositions = enrichOpenPositions(
+				livePositionsRaw,
+				decisionIndex,
+			);
 
-						return {
-							symbol: pos.symbol,
-							position: pos.position,
-							sign: pos.sign,
-							side: pos.sign,
-							quantity: pos.quantity,
-							entryPrice: pos.entryPrice,
-							markPrice: pos.markPrice ?? null,
-							currentPrice: pos.markPrice ?? null,
-							notional: pos.notional ?? "0.00",
-							unrealizedPnl: pos.unrealizedPnl,
-							realizedPnl: pos.realizedPnl,
-							liquidationPrice: pos.liquidationPrice ?? "N/A",
-							leverage: null,
-							confidence: pos.confidence ?? null,
-							signal: pos.signal ?? pos.sign,
-							exitPlan: pos.exitPlan
-								? {
-										...pos.exitPlan,
-										confidence: pos.confidence ?? null,
-									}
-								: null,
-							lastDecisionAt: pos.lastDecisionAt ?? null,
-							decisionStatus: pos.decisionStatus ?? null,
-						};
-					});
+			const positions = livePositions.map((pos) => {
+				const entryPrice = requirePresent(
+					pos.entryPrice,
+					"entryPrice",
+					`open position ${pos.symbol} on model ${model.id}`,
+				);
+				const notional = requirePresent(
+					pos.notional,
+					"notional",
+					`open position ${pos.symbol} on model ${model.id}`,
+				);
 
-					const totalUnrealizedPnl = positions.reduce((sum, position) => {
-						const pnl = parseFiniteNumber(
-							position.unrealizedPnl,
-							"unrealizedPnl",
-							`model:${model.id}:${position.symbol}`,
-						);
-						return sum + (pnl ?? 0);
-					}, 0);
+				return {
+					symbol: pos.symbol,
+					position: pos.position,
+					sign: pos.sign,
+					side: pos.sign,
+					quantity: pos.quantity,
+					entryPrice,
+					markPrice: pos.markPrice ?? null,
+					currentPrice: pos.markPrice ?? null,
+					notional,
+					unrealizedPnl: pos.unrealizedPnl,
+					realizedPnl: pos.realizedPnl,
+					liquidationPrice: pos.liquidationPrice ?? null,
+					leverage: null,
+					confidence: pos.confidence ?? null,
+					signal: pos.signal ?? pos.sign,
+					exitPlan: pos.exitPlan ?? null,
+					lastDecisionAt: pos.lastDecisionAt ?? null,
+					decisionStatus: pos.decisionStatus ?? null,
+				};
+			});
 
-					return {
-						modelId: model.id,
-						modelName: model.name,
-						modelLogo: model.modelLogo,
-						modelVariant: model.variant,
-						positions,
-						totalUnrealizedPnl,
-					};
-				} catch (error) {
-					console.error(`Error fetching positions for ${model.id}`, error);
-					return {
-						modelId: model.id,
-						modelName: model.name,
-						modelLogo: model.modelLogo,
-						modelVariant: model.variant,
-						positions: [],
-						totalUnrealizedPnl: 0,
-					};
-				}
-			}),
-		);
+			const totalUnrealizedPnl = positions.reduce((sum, position) => {
+				const pnl = parseRequiredFiniteNumber(
+					position.unrealizedPnl,
+					"unrealizedPnl",
+					`model:${model.id}:${position.symbol}`,
+				);
+				return sum + pnl;
+			}, 0);
 
-		return results;
-	} catch (error) {
-		console.error("Error in fetchPositions function", error);
-		throw error;
-	}
+			return {
+				modelId: model.id,
+				modelName: model.name,
+				modelLogo: model.modelLogo,
+				modelVariant: model.variant,
+				positions,
+				totalUnrealizedPnl,
+			};
+		}),
+	);
+
+	return results;
 }
 
 // ==========================================

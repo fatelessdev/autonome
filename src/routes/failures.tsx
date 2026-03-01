@@ -6,7 +6,7 @@ import {
 	ChevronRight,
 	Loader2,
 } from "lucide-react";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useId, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,7 +33,8 @@ import {
 import { useVariant, type VariantId } from "@/components/variant-provider";
 import { VariantSelector } from "@/components/variant-selector";
 import { cn } from "@/core/lib/utils";
-import { getModelInfo } from "@/core/shared/models/modelConfig";
+import { formatPercentValue } from "@/core/shared/formatting/numberFormat";
+import { findModelInfo } from "@/core/shared/models/modelConfig";
 import { getVariantBadgeClasses } from "@/core/shared/variants";
 import type { FailureEntry } from "@/server/features/analytics/types";
 import { orpc } from "@/server/orpc/client";
@@ -52,11 +53,9 @@ const formatDate = (date: Date) =>
 		minute: "2-digit",
 	}).format(new Date(date));
 
-const formatPercent = (value: number) => `${value.toFixed(2)}%`;
-
 function FailureCard({ failure }: { failure: FailureEntry }) {
 	const [isOpen, setIsOpen] = useState(false);
-	const modelInfo = getModelInfo(failure.modelName);
+	const modelInfo = findModelInfo(failure.modelName);
 
 	// Parse response payload for more details
 	const payload = failure.responsePayload as Record<string, unknown> | null;
@@ -76,7 +75,7 @@ function FailureCard({ failure }: { failure: FailureEntry }) {
 					<CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
 						<div className="flex items-center justify-between">
 							<div className="flex items-center gap-3">
-								{modelInfo.logo ? (
+								{modelInfo?.logo ? (
 									<div
 										className="h-8 w-8 rounded-full flex items-center justify-center overflow-hidden"
 										style={{ backgroundColor: modelInfo.color }}
@@ -90,7 +89,7 @@ function FailureCard({ failure }: { failure: FailureEntry }) {
 								) : (
 									<div
 										className="h-8 w-8 rounded flex items-center justify-center text-xs font-bold text-white"
-										style={{ backgroundColor: modelInfo.color }}
+										style={{ backgroundColor: modelInfo?.color }}
 									>
 										{failure.modelName.slice(0, 2).toUpperCase()}
 									</div>
@@ -181,7 +180,7 @@ function FailureCard({ failure }: { failure: FailureEntry }) {
 										try {
 											parsedMeta = JSON.parse(tc.metadata);
 										} catch {
-											// Ignore
+											// Metadata may be malformed from failed agent runs
 										}
 
 										const results = (parsedMeta?.results as unknown[]) || [];
@@ -265,18 +264,13 @@ function FailuresRoute() {
 			input: { limit: 50, variant: selectedVariant as VariantFilter },
 		}),
 	);
-
-	// Reset showTotal when switching away from aggregate view
-	useEffect(() => {
-		if (selectedVariant !== "all" && showTotal) {
-			setShowTotal(false);
-		}
-	}, [selectedVariant, showTotal]);
+	const canShowTotal = selectedVariant === "all";
+	const showTotalForView = canShowTotal && showTotal;
 
 	// Calculate totaled stats when "Total" is checked
-	const displayModelStats = useMemo(() => {
+	const displayModelStats = (() => {
 		if (!data?.modelStats) return [];
-		if (selectedVariant !== "all" || !showTotal) return data.modelStats;
+		if (!showTotalForView) return data.modelStats;
 
 		// Group by model name and sum the stats
 		const byModelName = new Map<string, typeof data.modelStats>();
@@ -312,7 +306,7 @@ function FailuresRoute() {
 						: 0,
 			};
 		});
-	}, [data?.modelStats, selectedVariant, showTotal]);
+	})();
 
 	return (
 		<div className="flex-1 min-h-0 overflow-hidden">
@@ -342,7 +336,7 @@ function FailuresRoute() {
 							onChange={setSelectedVariant}
 							className="sm:hidden"
 						/>
-						{selectedVariant === "all" && (
+						{canShowTotal && (
 							<div className="flex items-center gap-2">
 								<Checkbox
 									id={totalFailuresId}
@@ -388,12 +382,12 @@ function FailuresRoute() {
 								</TableHeader>
 								<TableBody>
 									{displayModelStats.map((stat) => {
-										const modelInfo = getModelInfo(stat.modelName);
+										const modelInfo = findModelInfo(stat.modelName);
 										return (
 											<TableRow key={`${stat.modelId}-${stat.variant}`}>
 												<TableCell className="font-medium">
 													<div className="flex items-center gap-2">
-														{modelInfo.logo ? (
+														{modelInfo?.logo ? (
 															<div
 																className="h-5 w-5 rounded-full flex items-center justify-center overflow-hidden"
 																style={{ backgroundColor: modelInfo.color }}
@@ -407,7 +401,7 @@ function FailuresRoute() {
 														) : (
 															<div
 																className="h-5 w-5 rounded flex items-center justify-center text-[8px] font-bold text-white"
-																style={{ backgroundColor: modelInfo.color }}
+																style={{ backgroundColor: modelInfo?.color }}
 															>
 																{stat.modelName.slice(0, 2).toUpperCase()}
 															</div>
@@ -458,7 +452,7 @@ function FailuresRoute() {
 																	: "text-muted-foreground",
 														)}
 													>
-														{formatPercent(stat.failureRate)}
+														{formatPercentValue(stat.failureRate)}
 													</span>
 												</TableCell>
 											</TableRow>

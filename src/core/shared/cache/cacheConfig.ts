@@ -71,8 +71,8 @@ export const QUERY_KEY_PREFIX = {
  *
  * Usage:
  * ```ts
- * createQueryKey(QUERY_KEY_PREFIX.TRADING, "positions", { variant: "Guardian" })
- * // => ["trading", "positions", { variant: "Guardian" }]
+ * createQueryKey(QUERY_KEY_PREFIX.TRADING, "positions", { variant: "Trendsurfer" })
+ * // => ["trading", "positions", { variant: "Trendsurfer" }]
  * ```
  */
 export function createQueryKey(

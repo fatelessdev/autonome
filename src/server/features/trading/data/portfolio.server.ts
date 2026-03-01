@@ -13,6 +13,6 @@ export const portfolioQuery = (account: Account) =>
 		queryFn: () => getPortfolio(account),
 		staleTime: 10_000, // 10 seconds
 		gcTime: 1 * 60_000,
-		retry: 3,
+		retry: 2,
 		retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
 	});

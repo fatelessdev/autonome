@@ -271,7 +271,10 @@ export async function executeUnsafeQuery(sqlText: string): Promise<unknown[]> {
 	// WARNING: This bypasses typed query construction and must remain restricted
 	// to validated chat SQL tooling paths.
 	const result = await db.execute(sql.raw(sqlText));
-	return Array.isArray(result.rows) ? result.rows : [];
+	if (!Array.isArray(result.rows)) {
+		throw new Error("Unsafe SQL execution did not return row array payload");
+	}
+	return result.rows;
 }
 
 export { ToolCallType, type ToolCallTypeValue };

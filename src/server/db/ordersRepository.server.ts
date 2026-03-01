@@ -1,4 +1,5 @@
-import { and, desc, eq, inArray, isNull, ne, or } from "drizzle-orm";
+import { and, desc, eq, isNull, ne, or } from "drizzle-orm";
+import { requireFiniteNumber } from "@/core/shared/trading/calculations";
 import { db } from "@/db";
 import { type Order, OrderStatus, orders } from "@/db/schema";
 import { toCanonical } from "@/shared/markets/marketMetadata";
@@ -119,6 +120,24 @@ export async function closeOrder(params: CloseOrderParams): Promise<Order> {
  * Uses formula: newAvgEntry = (prevNotional + newNotional) / totalQty
  */
 export async function scaleIntoOrder(params: ScaleOrderParams): Promise<Order> {
+	const existing = await db.query.orders.findFirst({
+		where: eq(orders.id, params.orderId),
+		columns: { quantity: true },
+	});
+	if (!existing) {
+		throw new Error(`Order ${params.orderId} not found for scale-in`);
+	}
+
+	const existingQuantity = requireFiniteNumber(
+		existing.quantity,
+		`order ${params.orderId}.quantity`,
+	);
+
+	const additionalQuantity = requireFiniteNumber(
+		params.additionalQuantity,
+		`order ${params.orderId}.additionalQuantity`,
+	);
+
 	const updateData: {
 		quantity: string;
 		entryPrice: string;
@@ -133,17 +152,7 @@ export async function scaleIntoOrder(params: ScaleOrderParams): Promise<Order> {
 			cooldownUntil: string | null;
 		} | null;
 	} = {
-		quantity: (
-			parseFloat(params.additionalQuantity) +
-			parseFloat(
-				(
-					await db.query.orders.findFirst({
-						where: eq(orders.id, params.orderId),
-						columns: { quantity: true },
-					})
-				)?.quantity ?? "0",
-			)
-		).toString(),
+		quantity: (additionalQuantity + existingQuantity).toString(),
 		entryPrice: params.newAvgEntryPrice,
 		updatedAt: new Date(),
 	};
@@ -159,19 +168,6 @@ export async function scaleIntoOrder(params: ScaleOrderParams): Promise<Order> {
 		.returning();
 
 	return updated;
-}
-
-/**
- * Get all open orders (active positions) for a model
- */
-export async function getOpenOrdersByModel(modelId: string): Promise<Order[]> {
-	return db.query.orders.findMany({
-		where: and(
-			eq(orders.modelId, modelId),
-			eq(orders.status, OrderStatus.OPEN),
-		),
-		orderBy: desc(orders.openedAt),
-	});
 }
 
 /**
@@ -201,20 +197,11 @@ export async function getOpenOrderBySymbol(
 	symbol: string,
 ): Promise<Order | undefined> {
 	const canonical = toCanonical(symbol).toUpperCase();
-	const symbolCandidates = [
-		canonical,
-		`${canonical}USD`,
-		`${canonical}/USD`,
-		`${canonical}-USD`,
-		`${canonical}USDT`,
-		`${canonical}/USDT`,
-		`${canonical}-USDT`,
-	].filter((value, index, array) => array.indexOf(value) === index);
 
 	return db.query.orders.findFirst({
 		where: and(
 			eq(orders.modelId, modelId),
-			inArray(orders.symbol, symbolCandidates),
+			eq(orders.symbol, canonical),
 			eq(orders.status, OrderStatus.OPEN),
 		),
 		orderBy: desc(orders.openedAt),
@@ -286,7 +273,16 @@ export async function getTotalRealizedPnl(modelId: string): Promise<number> {
 	});
 
 	return closedOrders.reduce((sum, order) => {
-		return sum + (parseFloat(order.realizedPnl ?? "0") || 0);
+		if (order.realizedPnl == null) {
+			throw new Error(
+				`Missing realizedPnl for closed order while summing model ${modelId}`,
+			);
+		}
+		const pnl = requireFiniteNumber(
+			order.realizedPnl,
+			`model ${modelId}.realizedPnl`,
+		);
+		return sum + pnl;
 	}, 0);
 }
 
@@ -301,7 +297,9 @@ export async function closeOrdersByIds(
 
 	for (const orderId of orderIds) {
 		const priceData = exitPrices.get(orderId);
-		if (!priceData) continue;
+		if (!priceData) {
+			throw new Error(`Missing exit price data for order ${orderId}`);
+		}
 
 		const closed = await closeOrder({
 			orderId,

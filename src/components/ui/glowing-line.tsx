@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { type ChartConfig, ChartContainer } from "@/components/ui/chart";
 import { useVariant, VARIANT_TABS } from "@/components/variant-provider";
 import { cn } from "@/core/lib/utils";
-import { getModelInfo } from "@/shared/models/modelConfig";
+import { findModelInfo } from "@/shared/models/modelConfig";
 
 type ChartDatum = {
 	month: string;
@@ -117,12 +117,12 @@ const CustomEndDot = ({
 	}
 
 	const originalKey = seriesMeta[resolvedKey]?.originalKey ?? resolvedKey;
-	const modelInfo = getModelInfo(originalKey);
-	const { logo, color } = modelInfo;
+	const modelInfo = findModelInfo(originalKey);
+	const { logo, color = "hsl(var(--chart-1))" } = modelInfo ?? {};
 	const isHovered = hoveredLine === resolvedKey;
 	const isDimmed = Boolean(hoveredLine && hoveredLine !== resolvedKey);
 	const fallbackGlyph =
-		(modelInfo.label || originalKey || resolvedKey)
+		(modelInfo?.label || originalKey || resolvedKey)
 			.trim()
 			.charAt(0)
 			.toUpperCase() || "•";
@@ -228,7 +228,7 @@ const CustomTooltip = ({
 	}
 
 	const originalKey = seriesMeta[hoveredLine]?.originalKey ?? hoveredLine;
-	const modelInfo = getModelInfo(originalKey);
+	const modelInfo = findModelInfo(originalKey);
 
 	const formattedValue =
 		valueMode === "percent"
@@ -243,7 +243,7 @@ const CustomTooltip = ({
 	return (
 		<div
 			style={{
-				backgroundColor: modelInfo.color,
+				backgroundColor: modelInfo?.color ?? "hsl(var(--chart-1))",
 				color: "white",
 				padding: "8px 12px",
 				borderRadius: "6px",
@@ -297,8 +297,10 @@ export function GlowingLineChart({
 			return;
 		}
 		const logos = modelKeys
-			.map((key) => getModelInfo(seriesMeta[key]?.originalKey ?? key).logo)
-			.filter((logo) => typeof logo === "string" && logo.length > 0);
+			.map((key) => findModelInfo(seriesMeta[key]?.originalKey ?? key)?.logo)
+			.filter(
+				(logo): logo is string => typeof logo === "string" && logo.length > 0,
+			);
 
 		const uniqueLogos = Array.from(new Set(logos));
 
@@ -476,9 +478,9 @@ export function GlowingLineChart({
 		}
 
 		const originalKey = seriesMeta[hoveredLine]?.originalKey ?? hoveredLine;
-		const info = getModelInfo(originalKey);
+		const info = findModelInfo(originalKey);
 		return {
-			stroke: info.color,
+			stroke: info?.color ?? "hsl(var(--chart-1))",
 			strokeWidth: 2,
 			strokeDasharray: "5 5",
 			opacity: 0.5,
@@ -576,9 +578,9 @@ export function GlowingLineChart({
 						<defs>
 							{modelKeys.map((key) => {
 								const originalKey = seriesMeta[key]?.originalKey ?? key;
-								const modelInfo = getModelInfo(originalKey);
+								const modelInfo = findModelInfo(originalKey);
 								const color =
-									modelInfo.color ||
+									modelInfo?.color ||
 									chartConfig[key]?.color ||
 									"hsl(var(--chart-1))";
 
@@ -681,9 +683,9 @@ export function GlowingLineChart({
 						{/* Lines on top of areas */}
 						{prioritizedKeys.map((key) => {
 							const originalKey = seriesMeta[key]?.originalKey ?? key;
-							const modelInfo = getModelInfo(originalKey);
+							const modelInfo = findModelInfo(originalKey);
 							const color =
-								modelInfo.color ||
+								modelInfo?.color ||
 								chartConfig[key]?.color ||
 								"hsl(var(--chart-1))";
 							const isHovered = hoveredLine === key;

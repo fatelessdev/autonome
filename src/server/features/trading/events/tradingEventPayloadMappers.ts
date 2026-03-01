@@ -58,31 +58,48 @@ type ConversationQueryItem = {
 export function mapPositionToEventData(
 	p: PositionQueryItem,
 ): PositionEventData {
+	if (typeof p.modelLogo !== "string" || p.modelLogo.length === 0) {
+		throw new Error(`Missing modelLogo for position event model ${p.modelId}`);
+	}
+
 	return {
 		modelId: p.modelId,
 		modelName: p.modelName,
-		modelLogo: p.modelLogo ?? "",
+		modelLogo: p.modelLogo,
 		positions: p.positions,
 		totalUnrealizedPnl: p.totalUnrealizedPnl,
 	};
 }
 
 export function mapTradeToEventData(t: TradeQueryItem): TradeEventData {
-	const qty = t.quantity ?? 0;
-	const entry = t.entryPrice ?? 0;
-	const exit = t.exitPrice ?? 0;
+	if (typeof t.modelRouterName !== "string" || t.modelRouterName.length === 0) {
+		throw new Error(
+			`Missing modelRouterName for trade event ${t.id} (model ${t.modelId})`,
+		);
+	}
+	if (t.side !== "LONG" && t.side !== "SHORT") {
+		throw new Error(`Invalid trade side for event ${t.id}: ${t.side}`);
+	}
+
+	const entryNotional =
+		t.quantity != null && t.entryPrice != null
+			? t.quantity * t.entryPrice
+			: null;
+	const exitNotional =
+		t.quantity != null && t.exitPrice != null ? t.quantity * t.exitPrice : null;
+
 	return {
 		id: t.id,
 		modelId: t.modelId,
 		modelName: t.modelName,
-		modelRouterName: t.modelRouterName ?? "",
+		modelRouterName: t.modelRouterName,
 		symbol: t.symbol,
-		side: t.side === "SHORT" ? "SHORT" : "LONG",
+		side: t.side,
 		quantity: t.quantity,
 		entryPrice: t.entryPrice,
 		exitPrice: t.exitPrice,
-		entryNotional: qty * entry,
-		exitNotional: qty * exit,
+		entryNotional,
+		exitNotional,
 		netPnl: t.netPnl,
 		openedAt: t.openedAt,
 		closedAt: t.closedAt,

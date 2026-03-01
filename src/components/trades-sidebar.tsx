@@ -16,7 +16,7 @@ import type {
 import { useTradingDashboardData } from "@/components/trades-sidebar/use-trading-dashboard-data";
 import { useVariant } from "@/components/variant-provider";
 import { normalizeIdentifier } from "@/core/shared/strings/normalizeIdentifier";
-import { getModelInfo } from "@/shared/models/modelConfig";
+import { findModelInfo } from "@/shared/models/modelConfig";
 
 let customEasePromise: Promise<void> | null = null;
 const ensureCustomEase = () => {
@@ -108,20 +108,24 @@ export default function TradesSidebar({
 		}
 		return lookup;
 	}, [filterOptions]);
+	const effectiveFilter: FilterValue =
+		filter === "all" || modelOptionsLookup.has(filter) ? filter : "all";
 
 	const selectedOption =
-		filter === "all" ? null : modelOptionsLookup.get(filter);
+		effectiveFilter === "all" ? null : modelOptionsLookup.get(effectiveFilter);
 	const selectedModelLabel =
-		filter === "all"
+		effectiveFilter === "all"
 			? "All Models"
-			: (selectedOption?.label ?? getModelInfo(filter).label);
+			: (selectedOption?.label ??
+				findModelInfo(effectiveFilter)?.label ??
+				effectiveFilter);
 	const filterMatchers = useMemo(
 		() =>
-			filter === "all"
+			effectiveFilter === "all"
 				? null
 				: (selectedOption?.matchers ??
-					[normalizeModelKey(filter)].filter(Boolean)),
-		[selectedOption?.matchers, filter],
+					[normalizeModelKey(effectiveFilter)].filter(Boolean)),
+		[selectedOption?.matchers, effectiveFilter],
 	);
 
 	// GSAP animation effect - only animate after first render
@@ -231,21 +235,13 @@ export default function TradesSidebar({
 		return result;
 	}, [filterMatchers, positions, selectedVariant]);
 
-	useEffect(() => {
-		if (filter === "all") return;
-		if (filterOptions.some((option) => option.id === filter)) {
-			return;
-		}
-		setFilter("all");
-	}, [filter, filterOptions]);
-
 	const effectiveLoading = loading;
 	const isInitialLoading = loading && modelOptions.length === 0;
 
 	const renderFilterMenu = (metaLabel?: string) => (
 		<ModelFilterMenu
 			selectedLabel={selectedModelLabel}
-			filter={filter}
+			filter={effectiveFilter}
 			onFilterChange={setFilter}
 			options={filterOptions}
 			metaLabel={metaLabel}

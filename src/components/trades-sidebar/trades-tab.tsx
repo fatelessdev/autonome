@@ -1,6 +1,6 @@
-import { useVirtualizer } from "@tanstack/react-virtual";
+"use no memo";
+
 import { ArrowRight } from "lucide-react";
-import { useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/shared/formatting/numberFormat";
 import { TradesListSkeleton } from "./loading-skeletons";
@@ -16,8 +16,6 @@ type TradesTabProps = {
 	loading: boolean;
 	filterMenu: React.ReactNode;
 };
-
-const ESTIMATED_ITEM_HEIGHT = 220; // px
 
 function TradeItem({ trade, isLast }: { trade: Trade; isLast: boolean }) {
 	const modelInfo = resolveModelIdentity({
@@ -171,14 +169,7 @@ function TradeItem({ trade, isLast }: { trade: Trade; isLast: boolean }) {
 }
 
 export function TradesTab({ trades, loading, filterMenu }: TradesTabProps) {
-	const parentRef = useRef<HTMLDivElement>(null);
-
-	const virtualizer = useVirtualizer({
-		count: trades.length,
-		getScrollElement: () => parentRef.current,
-		estimateSize: () => ESTIMATED_ITEM_HEIGHT,
-		overscan: 5,
-	});
+	"use no memo";
 
 	return (
 		<div className="flex h-full min-h-0 flex-col">
@@ -193,40 +184,14 @@ export function TradesTab({ trades, loading, filterMenu }: TradesTabProps) {
 						</p>
 					</div>
 				) : (
-					<div ref={parentRef} className="h-full overflow-auto">
-						<div
-							style={{
-								height: `${virtualizer.getTotalSize()}px`,
-								width: "100%",
-								position: "relative",
-							}}
-						>
-							{virtualizer.getVirtualItems().map((virtualRow) => {
-								const trade = trades[virtualRow.index];
-								if (!trade) {
-									return null;
-								}
-								return (
-									<div
-										key={trade.id}
-										style={{
-											position: "absolute",
-											top: 0,
-											left: 0,
-											width: "100%",
-											transform: `translateY(${virtualRow.start}px)`,
-										}}
-										data-index={virtualRow.index}
-										ref={virtualizer.measureElement}
-									>
-										<TradeItem
-											trade={trade}
-											isLast={virtualRow.index === trades.length - 1}
-										/>
-									</div>
-								);
-							})}
-						</div>
+					<div className="h-full overflow-auto">
+						{trades.map((trade, index) => (
+							<TradeItem
+								key={trade.id}
+								trade={trade}
+								isLast={index === trades.length - 1}
+							/>
+						))}
 					</div>
 				)}
 			</div>

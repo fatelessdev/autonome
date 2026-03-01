@@ -166,6 +166,8 @@ Answer YES or NO:`;
 		return isFailedToolCall;
 	} catch (error) {
 		console.error("[ToolCallAnalyzer] Analysis failed:", error);
-		return false;
+		throw new Error(
+			`Tool call intent analysis failed for invocation ${invocationId}: ${error instanceof Error ? error.message : String(error)}`,
+		);
 	}
 }

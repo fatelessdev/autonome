@@ -21,7 +21,7 @@ type VariantSelectorProps = BaseProps & {
 	layout?: "desktop" | "mobile";
 };
 
-const resolveHandlers = (
+const useResolvedHandlers = (
 	value: VariantId | undefined,
 	onChange: ((variant: VariantId) => void) | undefined,
 ) => {
@@ -38,7 +38,7 @@ export function VariantSelector({
 	onChange,
 	className,
 }: VariantSelectorProps) {
-	const handlers = resolveHandlers(value, onChange);
+	const handlers = useResolvedHandlers(value, onChange);
 
 	if (layout === "mobile") {
 		return <VariantSelectorMobile {...handlers} className={className} />;

@@ -8,7 +8,27 @@ import {
 	type TradingDecision,
 	type TradingDecisionResult,
 } from "@/server/features/trading/contracts/tradingDecisions";
-import { safeJsonParse } from "@/utils/json";
+
+function parseToolCallMetadata(
+	raw: string,
+	toolCallId: string,
+): Record<string, unknown> {
+	try {
+		const parsed = JSON.parse(raw) as unknown;
+		if (
+			typeof parsed !== "object" ||
+			parsed === null ||
+			Array.isArray(parsed)
+		) {
+			throw new Error("metadata must be a JSON object");
+		}
+		return parsed as Record<string, unknown>;
+	} catch (error) {
+		throw new Error(
+			`Invalid tool call metadata JSON for ${toolCallId}: ${error instanceof Error ? error.message : String(error)}`,
+		);
+	}
+}
 
 export type ConversationSnapshot = {
 	id: string;
@@ -47,13 +67,13 @@ function isAutoTriggeredClose(metadata: Record<string, unknown>): boolean {
  * If so, it should be filtered out from the conversation view entirely.
  */
 function isAutoTriggeredInvocation(
-	toolCalls: Array<{ metadata: string }>,
+	toolCalls: Array<{ id: string; metadata: string }>,
 ): boolean {
 	if (toolCalls.length === 0) return false;
 
 	// If ALL tool calls are auto-triggered closes, hide the entire invocation
 	return toolCalls.every((call) => {
-		const metadata = safeJsonParse<Record<string, unknown>>(call.metadata, {});
+		const metadata = parseToolCallMetadata(call.metadata, call.id);
 		return isAutoTriggeredClose(metadata);
 	});
 }
@@ -110,30 +130,46 @@ export async function fetchConversationSnapshots(
 		(invocation) => !isAutoTriggeredInvocation(invocation.toolCalls),
 	);
 
-	return filtered.map((invocation) => ({
-		id: invocation.id,
-		modelId: invocation.modelId,
-		modelName: invocation.model?.name ?? "Unknown Model",
-		modelVariant: invocation.model?.variant ?? undefined,
-		modelLogo: invocation.model?.openRouterModelName ?? "unknown-model",
-		response: invocation.response,
-		responsePayload: invocation.responsePayload,
-		timestamp: invocation.createdAt.toISOString(),
-		toolCalls: invocation.toolCalls.map((toolCall) => {
-			const rawMetadata = safeJsonParse(toolCall.metadata, {});
-			const parsed = parseTradingToolCallMetadata(rawMetadata);
-			return {
-				id: toolCall.id,
-				type: toolCall.toolCallType,
-				metadata: {
-					raw: rawMetadata,
-					decisions: parsed.decisions,
-					results: parsed.results,
-				},
-				timestamp: toolCall.createdAt.toISOString(),
-			};
-		}),
-	}));
+	return filtered.map((invocation) => {
+		if (!invocation.model) {
+			throw new Error(
+				`Invocation ${invocation.id} is missing required model relation`,
+			);
+		}
+		if (!invocation.model.openRouterModelName) {
+			throw new Error(
+				`Invocation ${invocation.id} is missing required model logo/router name`,
+			);
+		}
+
+		return {
+			id: invocation.id,
+			modelId: invocation.modelId,
+			modelName: invocation.model.name,
+			modelVariant: invocation.model.variant,
+			modelLogo: invocation.model.openRouterModelName,
+			response: invocation.response,
+			responsePayload: invocation.responsePayload,
+			timestamp: invocation.createdAt.toISOString(),
+			toolCalls: invocation.toolCalls.map((toolCall) => {
+				const rawMetadata = parseToolCallMetadata(
+					toolCall.metadata,
+					toolCall.id,
+				);
+				const parsed = parseTradingToolCallMetadata(rawMetadata);
+				return {
+					id: toolCall.id,
+					type: toolCall.toolCallType,
+					metadata: {
+						raw: rawMetadata,
+						decisions: parsed.decisions,
+						results: parsed.results,
+					},
+					timestamp: toolCall.createdAt.toISOString(),
+				};
+			}),
+		};
+	});
 }
 
 export async function refreshConversationEvents() {

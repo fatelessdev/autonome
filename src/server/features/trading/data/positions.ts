@@ -6,7 +6,6 @@
  * Single Alpaca code path.
  */
 
-import { getOpenOrdersByModel } from "@/server/db/ordersRepository.server";
 import type { Account } from "@/server/features/trading/contracts/accounts";
 import type { TradingSignal } from "@/server/features/trading/contracts/tradingDecisions";
 import { getTradingProvider } from "@/server/providers/alpaca";
@@ -55,46 +54,10 @@ export async function getOpenPositions(
 		account.alpacaApiSecret,
 	);
 
-	// Fetch positions from Alpaca and DB exit plans in parallel
-	const [alpacaPositions, dbOrders] = await Promise.all([
-		trading.getPositions(),
-		getOpenOrdersByModel(account.id),
-	]);
-
-	// Build exit plan lookup from DB orders (keyed by canonical symbol)
-	const exitPlanBySymbol = new Map<
-		string,
-		{ exitPlan: ExitPlanSummary | null; confidence: number | null }
-	>();
-	for (const order of dbOrders) {
-		const plan = order.exitPlan as {
-			stop?: number | null;
-			target?: number | null;
-			invalidation?: string | null;
-			invalidationPrice?: number | null;
-			timeExit?: string | null;
-			cooldownUntil?: string | null;
-			confidence?: number | null;
-		} | null;
-
-		exitPlanBySymbol.set(toCanonical(order.symbol).toUpperCase(), {
-			exitPlan: plan
-				? {
-						stop: plan.stop ?? null,
-						target: plan.target ?? null,
-						invalidation: plan.invalidation ?? null,
-						invalidationPrice: plan.invalidationPrice ?? null,
-						timeExit: plan.timeExit ?? null,
-						cooldownUntil: plan.cooldownUntil ?? null,
-					}
-				: null,
-			confidence: plan?.confidence ?? null,
-		});
-	}
+	const alpacaPositions = await trading.getPositions();
 
 	return alpacaPositions.map((pos) => {
 		const canonical = toCanonical(pos.symbol);
-		const dbInfo = exitPlanBySymbol.get(canonical.toUpperCase());
 
 		return {
 			symbol: canonical,
@@ -111,8 +74,9 @@ export async function getOpenPositions(
 			unrealizedIntradayPl: pos.unrealized_intraday_pl,
 			unrealizedIntradayPlpc: pos.unrealized_intraday_plpc,
 			changeToday: pos.change_today,
-			exitPlan: dbInfo?.exitPlan ?? null,
-			confidence: dbInfo?.confidence ?? null,
+			// Exit plan/confidence are merged later from latest tool-call decision metadata.
+			exitPlan: null,
+			confidence: null,
 			signal: pos.side === "long" ? "LONG" : "SHORT",
 			lastDecisionAt: null,
 			decisionStatus: null,

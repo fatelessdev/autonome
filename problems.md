@@ -6,30 +6,6 @@ This file lists issues that are currently reproducible in the codebase. Stale pa
 
 ---
 
-## Recently Fixed (2026-02-28)
-
-1. Recovery factor added to analytics and trading prompt context
-- **Files:** `src/core/shared/trading/calculations.ts`, `src/server/features/analytics/calculations.ts`, `src/server/features/analytics/types.ts`, `src/server/orpc/router/analytics.ts`, `src/server/features/trading/analysis/performanceMetrics.ts`, `src/server/features/trading/prompting/promptSections.ts`, `src/routes/analytics.tsx`
-- **Resolution:** Added `recoveryFactor` (`net profit / max absolute drawdown`) and wired it through analytics + prompt outputs.
-
-2. Retry fallback chain and kill-switch behavior implemented
-- **Files:** `src/server/features/trading/execution/tradeWorkflow.ts`, `src/env.ts`, `src/server/features/trading/agent/tradeAgentFactory.ts`
-- **Resolution:** Added 2 primary attempts, leaderboard fallback reasoning-model chain, single-model env fallback (`FALLBACK_MODEL`), and kill-switch close-all after fallback failure threshold.
-
-3. Prompt rendering and safety hardened
-- **Files:** `src/server/features/trading/prompting/promptBuilder.ts`, `src/server/features/trading/prompting/promptSections.ts`
-- **Resolution:** Added strict placeholder rendering (fail-fast on missing tokens) and quote sanitization for injected text fields.
-
-4. Cooldown/perf and indicator-threshold cleanup completed
-- **Files:** `src/server/features/trading/execution/cooldown.ts`, `src/server/features/trading/agent/tools/createPositionTool.ts`, `src/core/shared/trading/indicatorThresholds.ts`, `src/server/features/trading/data/taapiIndicators.ts`
-- **Resolution:** Extracted cooldown helpers, improved symbol lookup efficiency, and centralized ADX/Bollinger threshold constants.
-
-5. Unused create-position wrapper removed
-- **Files:** `src/server/features/trading/execution/createPosition.server.ts`
-- **Resolution:** Deleted unused wrapper after reference verification.
-
----
-
 ## High Issues
 
 ### 1. Bracket-Close DB Reconciliation Still Missing (HIGH)

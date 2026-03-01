@@ -1,10 +1,13 @@
 ﻿import NumberFlow from "@number-flow/react";
-import { useMemo, useRef } from "react";
+import { useMemo } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { useVariant } from "@/components/variant-provider";
 import { VariantSelector } from "@/components/variant-selector";
-import { SUPPORTED_MARKETS } from "@/core/shared/markets/marketMetadata";
+import {
+	MARKETS,
+	SUPPORTED_MARKETS,
+} from "@/core/shared/markets/marketMetadata";
 import {
 	type MarketPrice,
 	useMarketPrices,
@@ -22,19 +25,7 @@ type CryptoTicker = {
 	source: MarketPrice["source"];
 };
 
-const COIN_STYLES: Record<
-	CoinSymbol,
-	{ badge: string; logo: string; decimals: number }
-> = {
-	BTC: { badge: "BTC", logo: "/coins/btc.svg", decimals: 2 },
-	ETH: { badge: "ETH", logo: "/coins/eth.svg", decimals: 2 },
-	SOL: { badge: "SOL", logo: "/coins/sol.svg", decimals: 3 },
-	XRP: { badge: "XRP", logo: "/coins/xrp.svg", decimals: 4 },
-	HYPE: { badge: "HYPE", logo: "/coins/hype.webp", decimals: 4 },
-};
-
 export default function CryptoTracker() {
-	const previousTickersRef = useRef<CryptoTicker[]>([]);
 	const { selectedVariant, setSelectedVariant } = useVariant();
 
 	const {
@@ -52,35 +43,23 @@ export default function CryptoTracker() {
 	const displayTickers = useMemo(() => {
 		const prices = sanitizedPrices ?? [];
 		if (prices.length === 0) {
-			return previousTickersRef.current;
+			return [];
 		}
 
-		const previous = previousTickersRef.current;
-		const previousBySymbol = new Map(
-			previous.map((entry) => [entry.symbol, entry]),
-		);
-
+		const bySymbol = new Map(prices.map((price) => [price.symbol, price]));
 		const next: CryptoTicker[] = [];
 
-		TRACKED_SYMBOLS.forEach((symbol) => {
-			const latest = prices.find((price) => price.symbol === symbol);
-			if (!latest) {
-				const fallback = previousBySymbol.get(symbol);
-				if (fallback) {
-					next.push(fallback);
-				}
-				return;
-			}
-
+		for (const symbol of TRACKED_SYMBOLS) {
+			const latest = bySymbol.get(symbol);
+			if (!latest) continue;
 			next.push({
 				symbol,
 				price: latest.price,
 				change24h: latest.change24h,
 				source: latest.source,
 			});
-		});
+		}
 
-		previousTickersRef.current = next;
 		return next;
 	}, [sanitizedPrices]);
 
@@ -107,7 +86,7 @@ export default function CryptoTracker() {
 				) : (
 					<div className="flex items-center gap-2 sm:gap-4 flex-nowrap">
 						{displayTickers.map((ticker) => {
-							const style = COIN_STYLES[ticker.symbol];
+							const style = MARKETS[ticker.symbol];
 							return (
 								<div
 									key={ticker.symbol}
@@ -151,7 +130,6 @@ export default function CryptoTracker() {
 
 function PriceWithChange({
 	value,
-	change,
 	decimals,
 }: {
 	value: number;
@@ -159,8 +137,6 @@ function PriceWithChange({
 	decimals: number;
 }) {
 	const hasValidPrice = Number.isFinite(value);
-	const formattedChange =
-		typeof change === "number" && Number.isFinite(change) ? change : null;
 
 	return (
 		<div className="flex flex-col items-center gap-1 max-w-full">
@@ -179,21 +155,6 @@ function PriceWithChange({
 			) : (
 				<span className="text-xs text-muted-foreground">No data</span>
 			)}
-			<div className="flex items-center gap-1 text-xs">
-				<span
-					className={
-						formattedChange == null
-							? "text-muted-foreground"
-							: formattedChange >= 0
-								? "text-emerald-400"
-								: "text-rose-400"
-					}
-				>
-					{/* {formattedChange == null
-						? "â€“"
-						: `${formattedChange >= 0 ? "+" : ""}${formattedChange.toFixed(2)}%`} */}
-				</span>
-			</div>
 		</div>
 	);
 }

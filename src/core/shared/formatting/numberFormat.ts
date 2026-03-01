@@ -1,4 +1,7 @@
-import { SUPPORTED_MARKETS } from "@/core/shared/markets/marketMetadata";
+import {
+	SUPPORTED_MARKETS,
+	toCanonical,
+} from "@/core/shared/markets/marketMetadata";
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
 	style: "currency",
@@ -65,6 +68,25 @@ export const formatConfidenceValue = (value: unknown): string => {
 	return `${percentage.toFixed(1)}%`;
 };
 
+export const formatPercentValue = (
+	value: unknown,
+	options?: {
+		decimals?: number;
+		includeSign?: boolean;
+		fallback?: string;
+	},
+): string => {
+	const numeric = normalizeNumber(value);
+	if (numeric == null) {
+		return options?.fallback ?? "N/A";
+	}
+
+	const decimals = options?.decimals ?? 2;
+	const includeSign = options?.includeSign ?? false;
+	const sign = includeSign && numeric >= 0 ? "+" : "";
+	return `${sign}${numeric.toFixed(decimals)}%`;
+};
+
 export const formatPriceLabel = (value: unknown): string => {
 	const numeric = normalizeNumber(value);
 	if (numeric == null) return "—";
@@ -82,7 +104,7 @@ export const parseSymbols = (raw: string | null): string[] => {
 		.map((symbol) => symbol.trim().toUpperCase())
 		.filter(Boolean)
 		.forEach((symbol) => {
-			deduped.add(symbol);
+			deduped.add(toCanonical(symbol));
 		});
 
 	return deduped.size > 0 ? Array.from(deduped) : [...DEFAULT_SYMBOLS];

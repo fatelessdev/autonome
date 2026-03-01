@@ -29,7 +29,6 @@ export type PositionExitPlan = {
 	target: number | null;
 	stop: number | null;
 	invalidation: string | null;
-	confidence?: number | null;
 };
 
 export type Position = {

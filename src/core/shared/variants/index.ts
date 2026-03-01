@@ -176,8 +176,8 @@ export function toVariantId(value: unknown): VariantId | undefined {
  * Returns combined bg + text classes.
  *
  * @example
- * <span className={cn("px-2 py-0.5 rounded text-xs font-medium", getVariantBadgeClasses("Guardian"))}>
- *   Guardian
+ * <span className={cn("px-2 py-0.5 rounded text-xs font-medium", getVariantBadgeClasses("Trendsurfer"))}>
+ *   Trendsurfer
  * </span>
  */
 export function getVariantBadgeClasses(

@@ -64,6 +64,16 @@ export type DownsampleResolution = keyof typeof DOWNSAMPLE_CONFIG.RESOLUTIONS;
 // Resolution for aggregation export
 export type Resolution = "raw" | "hourly" | "daily";
 
+function requireString(
+	value: string | null | undefined,
+	context: string,
+): string {
+	if (!value) {
+		throw new Error(`Missing required value for ${context}`);
+	}
+	return value;
+}
+
 /**
  * Run the full retention policy:
  * 1. Aggregate raw data older than 7 days into hourly buckets
@@ -409,18 +419,29 @@ export async function getPortfolioHistoryWithResolution(options?: {
 
 		const entries = maxPoints ? await query.limit(maxPoints) : await query;
 
-		return entries.map((entry) => ({
-			id: entry.id,
-			modelId: entry.modelId,
-			netPortfolio: String(entry.netPortfolio),
-			createdAt: entry.createdAt.toISOString(),
-			updatedAt: entry.updatedAt.toISOString(),
-			model: {
-				name: entry.modelName ?? "Unknown Model",
-				variant: entry.modelVariant ?? undefined,
-				openRouterModelName: entry.modelOpenRouterName ?? "unknown-model",
-			},
-		}));
+		return entries.map((entry) => {
+			const modelName = requireString(
+				entry.modelName,
+				`portfolio entry ${entry.id}.modelName (variant history)`,
+			);
+			const openRouterModelName = requireString(
+				entry.modelOpenRouterName,
+				`portfolio entry ${entry.id}.modelOpenRouterName (variant history)`,
+			);
+
+			return {
+				id: entry.id,
+				modelId: entry.modelId,
+				netPortfolio: String(entry.netPortfolio),
+				createdAt: entry.createdAt.toISOString(),
+				updatedAt: entry.updatedAt.toISOString(),
+				model: {
+					name: modelName,
+					variant: entry.modelVariant ?? undefined,
+					openRouterModelName,
+				},
+			};
+		});
 	}
 
 	// No variant filter - use simpler query with model relation
@@ -439,18 +460,35 @@ export async function getPortfolioHistoryWithResolution(options?: {
 		...(maxPoints ? { limit: maxPoints } : {}),
 	});
 
-	return entries.map((entry) => ({
-		id: entry.id,
-		modelId: entry.modelId,
-		netPortfolio: String(entry.netPortfolio),
-		createdAt: entry.createdAt.toISOString(),
-		updatedAt: entry.updatedAt.toISOString(),
-		model: {
-			name: entry.model?.name ?? "Unknown Model",
-			variant: entry.model?.variant ?? undefined,
-			openRouterModelName: entry.model?.openRouterModelName ?? "unknown-model",
-		},
-	}));
+	return entries.map((entry) => {
+		if (!entry.model) {
+			throw new Error(
+				`Portfolio entry ${entry.id} is missing required model relation`,
+			);
+		}
+
+		const modelName = requireString(
+			entry.model.name,
+			`portfolio entry ${entry.id}.model.name`,
+		);
+		const openRouterModelName = requireString(
+			entry.model.openRouterModelName,
+			`portfolio entry ${entry.id}.model.openRouterModelName`,
+		);
+
+		return {
+			id: entry.id,
+			modelId: entry.modelId,
+			netPortfolio: String(entry.netPortfolio),
+			createdAt: entry.createdAt.toISOString(),
+			updatedAt: entry.updatedAt.toISOString(),
+			model: {
+				name: modelName,
+				variant: entry.model.variant ?? undefined,
+				openRouterModelName,
+			},
+		};
+	});
 }
 
 /**
@@ -683,9 +721,13 @@ export function downsampleForChart(
 			);
 			latestValue = values.reduce((sum, v) => sum + v, 0) / values.length;
 		} else {
-			latestValue =
-				latest.variantValues.values().next().value?.value ??
-				Number(latest.representative.netPortfolio);
+			const firstVariantValue = latest.variantValues.values().next();
+			if (firstVariantValue.done) {
+				throw new Error(
+					`Missing latest variant value for model ${modelKey} during downsampling`,
+				);
+			}
+			latestValue = firstVariantValue.value.value;
 		}
 
 		result.push({

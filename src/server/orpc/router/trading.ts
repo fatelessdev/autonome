@@ -105,14 +105,9 @@ export const getPositions = os
 							: undefined,
 						exitPlan: pos.exitPlan
 							? {
-									target: pos.exitPlan.target ?? undefined,
-									stop: pos.exitPlan.stop ?? undefined,
-									invalidation: pos.exitPlan.invalidation
-										? {
-												enabled: true,
-												message: pos.exitPlan.invalidation,
-											}
-										: undefined,
+									target: pos.exitPlan.target ?? null,
+									stop: pos.exitPlan.stop ?? null,
+									invalidation: pos.exitPlan.invalidation ?? null,
 								}
 							: undefined,
 						signal: pos.signal ?? undefined,
@@ -138,22 +133,32 @@ export const getCryptoPrices = os
 	.output(CryptoPricesResponseSchema)
 	.handler(async ({ input }) => {
 		return Sentry.startSpan({ name: "getCryptoPrices" }, async () => {
-			const symbols = input.symbols || [];
-			const normalizedSymbols = parseSymbols(symbols.join(","));
-
 			try {
+				const symbols = input.symbols ?? [];
+				const normalizedSymbols = parseSymbols(symbols.join(","));
+
 				const result = await fetchCryptoPrices(normalizedSymbols);
-				const prices = result
-					.filter((price) => price.symbol)
-					.map((price) => ({
+				const prices = result.map((price) => {
+					if (!price.symbol) {
+						throw new Error("Received crypto price with missing symbol");
+					}
+					if (price.price == null || !Number.isFinite(price.price)) {
+						throw new Error(
+							`Received invalid crypto price for ${price.symbol}`,
+						);
+					}
+
+					return {
 						symbol: price.symbol,
-						price: price.price ?? 0,
+						price: price.price,
 						message: undefined as string | undefined,
-					}));
+					};
+				});
+
 				return { prices };
 			} catch (error) {
 				Sentry.captureException(error);
-				return { prices: [] };
+				throw new Error("Failed to fetch crypto prices");
 			}
 		});
 	});

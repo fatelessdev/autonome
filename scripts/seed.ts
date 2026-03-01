@@ -32,22 +32,9 @@ if (!DATABASE_URL) {
 const pool = new Pool({ connectionString: DATABASE_URL });
 const db = drizzle(pool);
 
-// Model definitions - openRouterModelName
+// Active model definitions — openRouter model identifiers
 const MODEL_DEFINITIONS = [
-	//working models
-	// "stepfun-ai/step-3.5-flash",
-	// "minimaxai/minimax-m2.1",
-	// "z-ai/glm4.7",
 	"deepseek-ai/deepseek-v3.1-terminus",
-	// not working models
-	// "xiaomi/mimo-v2-flash:free",
-	// "kwaipilot/kat-coder-pro:free",
-	// "deepseek-ai/deepseek-v3.2",
-	// "mistralai/mistral-large-3-675b-instruct-2512"
-	// "kimi-for-coding-free",
-	// "coding-minimax-m2.1-free",
-	// "coding-glm-4.7-free",
-
 ];
 
 /**

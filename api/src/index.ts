@@ -5,6 +5,9 @@
  * The frontend (TanStack Start) communicates with this via oRPC over HTTP.
  */
 
+import { existsSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { RPCHandler } from "@orpc/server/fetch";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -121,23 +124,73 @@ app.all("/api/rpc/*", async (c) => {
 // server can process workflow and step executions.
 
 // Dynamic imports for compiled workflow handlers.
-// These MUST be lazy (not top-level) to avoid a race condition:
-// the API starts before Vite finishes recompiling the .mjs bundles,
-// so static imports would load the stale version from the previous run.
-const loadWorkflowFlowHandler = () =>
-	// @ts-expect-error — generated .mjs files have no type declarations
-	import("../../node_modules/.nitro/workflow/workflows.mjs").then(
-		(m) => m.POST,
+// Root cause note:
+// Bun caches ESM modules by import specifier. When workflow bundles are rebuilt
+// after file renames/refactors, a static specifier can keep serving stale code.
+// We resolve by loading from file URL with mtime cache-busting and waiting for
+// bundles to exist before first use/startup.
+const WORKFLOW_DIR = join(process.cwd(), "node_modules", ".nitro", "workflow");
+const WORKFLOW_FLOW_FILE = join(WORKFLOW_DIR, "workflows.mjs");
+const WORKFLOW_STEP_FILE = join(WORKFLOW_DIR, "steps.mjs");
+const WORKFLOW_WEBHOOK_FILE = join(WORKFLOW_DIR, "webhook.mjs");
+
+async function sleep(ms: number): Promise<void> {
+	await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForWorkflowBundles(timeoutMs = 20_000): Promise<void> {
+	const start = Date.now();
+	while (true) {
+		if (
+			existsSync(WORKFLOW_FLOW_FILE) &&
+			existsSync(WORKFLOW_STEP_FILE) &&
+			existsSync(WORKFLOW_WEBHOOK_FILE)
+		) {
+			return;
+		}
+
+		if (Date.now() - start > timeoutMs) {
+			throw new Error(
+				`Workflow bundles not ready in ${timeoutMs}ms at ${WORKFLOW_DIR}`,
+			);
+		}
+
+		await sleep(200);
+	}
+}
+
+async function importFreshWorkflowModule<T>(filePath: string): Promise<T> {
+	const mtimeMs = statSync(filePath).mtimeMs;
+	const fileUrl = pathToFileURL(filePath).href;
+	const specifier = `${fileUrl}?t=${mtimeMs}`;
+
+	return import(specifier) as Promise<T>;
+}
+
+const loadWorkflowFlowHandler = async () => {
+	await waitForWorkflowBundles();
+	const module = await importFreshWorkflowModule<{ POST: typeof fetch }>(
+		WORKFLOW_FLOW_FILE,
 	);
-const loadWorkflowStepHandler = () =>
-	// @ts-expect-error — generated .mjs files have no type declarations
-	import("../../node_modules/.nitro/workflow/steps.mjs").then((m) => m.POST);
-const loadWebhookHandlers = () =>
-	// @ts-expect-error — generated .mjs files have no type declarations
-	import("../../node_modules/.nitro/workflow/webhook.mjs").then((m) => ({
-		POST: m.POST,
-		GET: m.GET,
-	}));
+	return module.POST;
+};
+
+const loadWorkflowStepHandler = async () => {
+	await waitForWorkflowBundles();
+	const module = await importFreshWorkflowModule<{ POST: typeof fetch }>(
+		WORKFLOW_STEP_FILE,
+	);
+	return module.POST;
+};
+
+const loadWebhookHandlers = async () => {
+	await waitForWorkflowBundles();
+	const module = await importFreshWorkflowModule<{
+		POST: typeof fetch;
+		GET: typeof fetch;
+	}>(WORKFLOW_WEBHOOK_FILE);
+	return { POST: module.POST, GET: module.GET };
+};
 
 // GET handler for health checks — Hono auto-handles HEAD for GET routes,
 // so the local world's HEAD ?__health probes will return 200.
@@ -234,6 +287,8 @@ const TRADE_CYCLE_WORKFLOW = {
 
 async function main() {
 	console.log("🚀 Starting Autonome API server...");
+
+	await waitForWorkflowBundles();
 
 	// Start the Workflow DevKit world (connects to queue backend, begins processing)
 	const world = getWorld();

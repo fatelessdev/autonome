@@ -13,7 +13,7 @@ TABLES:
    id TEXT PK, name TEXT UNIQUE NOT NULL, "openRoutermodelName" TEXT,
    "invocationCount" INT, "totalMinutes" INT, "alpacaApiKey" TEXT, "alpacaApiSecret" TEXT
 
-2. "Orders" (positions & trades - single source of truth)
+2. "Orders" (trade lifecycle ledger)
    id TEXT PK, "modelId" TEXT FK→Models, symbol TEXT, side "OrderSide",
    quantity NUMERIC(18,8), leverage NUMERIC(10,2), "entryPrice" NUMERIC(18,8),
    "exitPlan" JSONB {stop, target, invalidation, confidence},
@@ -30,7 +30,8 @@ TABLES:
 INDEXES: "modelId", status, "modelId"+status composite on Orders
 
 KEY NOTES:
-- OPEN orders = live positions; CLOSED orders = completed trades
+- OPEN orders = ledger open positions; CLOSED orders = completed trades
+- Live position state shown in the trading UI is broker-authoritative (Alpaca)
 - Quote all table/column names: "Orders", "modelId"
 - "netPortfolio" is TEXT → CAST AS NUMERIC for math
 - "exitPlan" has confidence (0-1 scale)
@@ -40,7 +41,7 @@ KEY NOTES:
 const QUERY_EXAMPLES = `
 EXAMPLES:
 
--- Active positions per model
+-- Ledger-open positions per model
 SELECT m.name, COUNT(*) AS positions
 FROM "Orders" o JOIN "Models" m ON o."modelId" = m.id
 WHERE o.status = 'OPEN'

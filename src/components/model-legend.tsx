@@ -1,9 +1,9 @@
 import NumberFlow from "@number-flow/react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { ChartConfig } from "@/components/ui/chart";
 import { cn } from "@/core/lib/utils";
 import { formatCurrencyValue } from "@/shared/formatting/numberFormat";
-import { getModelInfo } from "@/shared/models/modelConfig";
+import { findModelInfo } from "@/shared/models/modelConfig";
 
 type ModelLegendProps = {
 	chartData: Array<{
@@ -28,8 +28,6 @@ export default function ModelLegend({
 	onHoverLine,
 	compact = false,
 }: ModelLegendProps) {
-	const [imagesLoaded, setImagesLoaded] = useState(false);
-
 	// Derive latest values from chartData (last row with valid values per model)
 	// Server now includes latest entries, so chart data ends at current value
 	const latestBySeriesKey = useMemo(() => {
@@ -77,53 +75,6 @@ export default function ModelLegend({
 		return base;
 	})();
 
-	// Preload all model logos
-	useEffect(() => {
-		if (typeof window === "undefined") {
-			return;
-		}
-
-		if (compact) {
-			setImagesLoaded(true);
-			return () => undefined;
-		}
-
-		const modelLogos = modelKeys
-			.map((key) => getModelInfo(seriesMeta[key]?.originalKey ?? key).logo)
-			.filter(
-				(logo): logo is string => typeof logo === "string" && logo.length > 0,
-			);
-
-		if (modelLogos.length === 0) {
-			setImagesLoaded(true);
-			return;
-		}
-
-		setImagesLoaded(false);
-		const uniqueLogos = Array.from(new Set(modelLogos));
-
-		let cancelled = false;
-
-		const imagePromises = uniqueLogos.map((url) => {
-			return new Promise((resolve, reject) => {
-				const img = new window.Image();
-				img.onload = resolve;
-				img.onerror = reject;
-				img.src = url;
-			});
-		});
-
-		Promise.allSettled(imagePromises).finally(() => {
-			if (!cancelled) {
-				setImagesLoaded(true);
-			}
-		});
-
-		return () => {
-			cancelled = true;
-		};
-	}, [modelKeys, seriesMeta, compact]);
-
 	const formatValue = (v?: number): string => {
 		if (typeof v !== "number" || Number.isNaN(v)) {
 			return "";
@@ -160,7 +111,7 @@ export default function ModelLegend({
 			>
 				{sortedModelKeys.map((key) => {
 					const originalKey = seriesMeta[key]?.originalKey ?? key;
-					const modelInfo = getModelInfo(originalKey);
+					const modelInfo = findModelInfo(originalKey);
 					const color =
 						modelInfo?.color ||
 						chartConfig[key]?.color ||
@@ -229,10 +180,7 @@ export default function ModelLegend({
 											height={16}
 											className="h-4 w-4 object-contain"
 											loading="lazy"
-											style={{
-												display: imagesLoaded ? "block" : "none",
-												objectFit: "contain",
-											}}
+											style={{ objectFit: "contain" }}
 										/>
 									</div>
 								) : (

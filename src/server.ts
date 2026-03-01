@@ -5,13 +5,14 @@ import {
 	createStartHandler,
 	defaultStreamHandler,
 } from "@tanstack/react-start/server";
+import { env } from "@/env";
 
 // Port configuration for TanStack Start SSR server
 // FRONTEND_PORT: server-side only, read from process.env
 // VITE_API_URL: client-exposed, read from import.meta.env
-const API_PORT = Number(process.env.API_PORT) || 8081;
-const FRONTEND_PORT = Number(process.env.FRONTEND_PORT) || 5173;
-const API_URL = import.meta.env.VITE_API_URL || `http://localhost:${API_PORT}`;
+const API_PORT = env.API_PORT;
+const FRONTEND_PORT = env.FRONTEND_PORT;
+const API_URL = env.VITE_API_URL ?? `http://localhost:${API_PORT}`;
 
 declare const Bun: {
 	file: (path: string) => Blob;
@@ -72,7 +73,7 @@ export default {
 
 		// When running on Vercel (Nitro), static assets are handled by the platform/CDN.
 		// We can skip the potentially fragile Bun.file() logic.
-		if (!process.env.VERCEL) {
+		if (!env.VERCEL) {
 			const staticResponse = await serveStatic(request);
 			if (staticResponse) return staticResponse;
 		}

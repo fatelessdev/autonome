@@ -130,14 +130,27 @@ function normalizeModelName(name: string): string {
 /**
  * Get model info by name.
  * Attempts exact match first, then normalized match.
+ * Throws if model is not registered in MODEL_INFO.
  */
 export function getModelInfo(modelName: string): ModelInfo {
-	// Exact match
+	const info = findModelInfo(modelName);
+	if (!info) {
+		throw new Error(
+			`Unknown model "${modelName}". Register it in MODEL_INFO before use.`,
+		);
+	}
+	return info;
+}
+
+/**
+ * Look up model info by name, returning null if not found.
+ * Use for exploratory lookups where the model may not be registered.
+ */
+export function findModelInfo(modelName: string): ModelInfo | null {
 	if (MODEL_INFO[modelName]) {
 		return MODEL_INFO[modelName];
 	}
 
-	// Normalized match
 	const normalizedInput = normalizeModelName(modelName);
 	for (const [key, value] of Object.entries(MODEL_INFO)) {
 		if (normalizeModelName(key) === normalizedInput) {
@@ -145,28 +158,15 @@ export function getModelInfo(modelName: string): ModelInfo {
 		}
 	}
 
-	return {
-		logo: "",
-		color: "#888888",
-		label: modelName,
-		provider: "nim",
-	};
+	return null;
 }
 
 export function getModelProvider(modelName: string): ModelProvider {
-	// Exact match first for the hot path
-	const entry = MODEL_INFO[modelName];
-	if (entry?.provider) {
-		return entry.provider;
+	const info = getModelInfo(modelName);
+	if (!info.provider) {
+		throw new Error(
+			`Model "${modelName}" has no provider configured in MODEL_INFO.`,
+		);
 	}
-
-	// Fallback to normalized matching for names with minor formatting differences
-	const normalizedInput = normalizeModelName(modelName);
-	for (const [key, value] of Object.entries(MODEL_INFO)) {
-		if (normalizeModelName(key) === normalizedInput && value.provider) {
-			return value.provider;
-		}
-	}
-
-	return "nim";
+	return info.provider;
 }

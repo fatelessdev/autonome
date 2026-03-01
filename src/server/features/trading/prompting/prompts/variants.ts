@@ -6,10 +6,9 @@
  * can be tested in parallel.
  *
  * Variants:
- * 1. Apex (The Kelly Engine) - Aggressive, VWAP momentum validation
- * 2. Trendsurfer (Momentum) - Trend following, ADX filter
- * 3. Contrarian (Mean Reversion) - Fade extremes in ranging markets
- * 4. Sovereign (Adaptive) - Flexible regime-adaptive allocator
+ * 1. Trendsurfer (Momentum) - Trend following, ADX filter
+ * 2. Contrarian (Mean Reversion) - Fade extremes in ranging markets
+ * 3. Sovereign (Adaptive) - Flexible regime-adaptive allocator
  */
 
 import {

@@ -34,12 +34,10 @@ async function handleChat({ request }: { request: Request }) {
 		});
 
 		const sqlAgent = new ToolLoopAgent({
-			// model: primaryModel,
 			model: openrouter(
 				"xiaomi/mimo-v2-flash:free",
 			) as unknown as LanguageModel,
 			instructions: SQL_ASSISTANT_PROMPT,
-			// instructions: "You are an helpful assistant",
 			providerOptions: {
 				google: {
 					thinkingConfig: {

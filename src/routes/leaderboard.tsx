@@ -1,7 +1,7 @@
 ﻿import { useQueries, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { Download, Loader2 } from "lucide-react";
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { useCallback, useId, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -23,7 +23,8 @@ import {
 import { useVariant, type VariantId } from "@/components/variant-provider";
 import { VariantSelector } from "@/components/variant-selector";
 import { cn } from "@/core/lib/utils";
-import { getModelInfo } from "@/core/shared/models/modelConfig";
+import { formatPercentValue } from "@/core/shared/formatting/numberFormat";
+import { findModelInfo } from "@/core/shared/models/modelConfig";
 import { getVariantBadgeClasses, VARIANT_IDS } from "@/core/shared/variants";
 import {
 	exportLeaderboardToExcel,
@@ -45,8 +46,6 @@ const formatUsd = (value: number) =>
 		currencyDisplay: "narrowSymbol",
 		maximumFractionDigits: 2,
 	}).format(value);
-
-const formatPercent = (value: number) => `${value.toFixed(2)}%`;
 
 function LeaderboardRoute() {
 	const [window, setWindow] = useState<WindowKey>("7d");
@@ -71,12 +70,8 @@ function LeaderboardRoute() {
 			}),
 		),
 	});
-
-	useEffect(() => {
-		if (selectedVariant !== "all" && showAverage) {
-			setShowAverage(false);
-		}
-	}, [selectedVariant, showAverage]);
+	const canShowAverage = selectedVariant === "all";
+	const showAverageForView = canShowAverage && showAverage;
 
 	// Export handler
 	const handleExport = useCallback(async () => {
@@ -99,18 +94,17 @@ function LeaderboardRoute() {
 			);
 
 			exportLeaderboardToExcel(variantData, window);
-		} catch (err) {
-			console.error("Export failed:", err);
-		} finally {
-			setIsExporting(false);
+		} catch (error) {
+			console.error("Leaderboard export failed", error);
 		}
+		setIsExporting(false);
 	}, [variantQueries, window]);
 
 	// Calculate averaged entries when "Average" is checked (only in Aggregate mode)
-	const displayEntries = useMemo(() => {
+	const displayEntries = (() => {
 		if (!data?.entries) return [];
 
-		if (selectedVariant !== "all" || !showAverage) {
+		if (!showAverageForView) {
 			return data.entries;
 		}
 
@@ -152,7 +146,7 @@ function LeaderboardRoute() {
 				if (sortBy === "pnlAbsolute") return b.pnlAbsolute - a.pnlAbsolute;
 				return b.maxDrawdown - a.maxDrawdown;
 			});
-	}, [data?.entries, selectedVariant, showAverage, sortBy]);
+	})();
 
 	return (
 		<div className="flex-1 min-h-0 overflow-hidden">
@@ -192,7 +186,7 @@ function LeaderboardRoute() {
 						<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 							{/* Left side: Average checkbox + Export button */}
 							<div className="flex items-center gap-3">
-								{selectedVariant === "all" && (
+								{canShowAverage && (
 									<div className="flex items-center gap-2">
 										<Checkbox
 											id={averageId}
@@ -287,7 +281,7 @@ function LeaderboardRoute() {
 									<TableHeader>
 										<TableRow className="border-b">
 											<TableHead className="px-4 py-3">Model</TableHead>
-											{selectedVariant === "all" && !showAverage && (
+											{canShowAverage && !showAverageForView && (
 												<TableHead className="px-4 py-3">Variant</TableHead>
 											)}
 											<TableHead className="px-4 py-3 text-right">
@@ -303,7 +297,7 @@ function LeaderboardRoute() {
 									</TableHeader>
 									<TableBody>
 										{displayEntries.map((entry, idx) => {
-											const modelInfo = getModelInfo(entry.modelName);
+											const modelInfo = findModelInfo(entry.modelName);
 											return (
 												<TableRow
 													key={`${entry.modelId}-${entry.variant}-${idx}`}
@@ -311,7 +305,7 @@ function LeaderboardRoute() {
 												>
 													<TableCell className="px-4 py-3 font-semibold">
 														<div className="flex items-center gap-3">
-															{modelInfo.logo ? (
+															{modelInfo?.logo ? (
 																<div
 																	className="h-6 w-6 rounded-full flex items-center justify-center overflow-hidden"
 																	style={{ backgroundColor: modelInfo.color }}
@@ -326,7 +320,7 @@ function LeaderboardRoute() {
 																<div
 																	className="h-6 w-6 rounded flex items-center justify-center text-[10px] font-bold text-white"
 																	style={{
-																		backgroundColor: modelInfo.color,
+																		backgroundColor: modelInfo?.color,
 																	}}
 																>
 																	{entry.modelName.slice(0, 2).toUpperCase()}
@@ -335,7 +329,7 @@ function LeaderboardRoute() {
 															<span>{entry.modelName}</span>
 														</div>
 													</TableCell>
-													{selectedVariant === "all" && !showAverage && (
+													{canShowAverage && !showAverageForView && (
 														<TableCell className="px-4 py-3">
 															<span
 																className={cn(
@@ -355,7 +349,7 @@ function LeaderboardRoute() {
 																	: "text-red-500",
 															)}
 														>
-															{formatPercent(entry.pnlPercent)}
+															{formatPercentValue(entry.pnlPercent)}
 														</span>
 													</TableCell>
 													<TableCell className="px-4 py-3 text-right">
@@ -379,7 +373,7 @@ function LeaderboardRoute() {
 																		: "text-muted-foreground",
 															)}
 														>
-															{formatPercent(entry.maxDrawdown)}
+															{formatPercentValue(entry.maxDrawdown)}
 														</span>
 													</TableCell>
 												</TableRow>

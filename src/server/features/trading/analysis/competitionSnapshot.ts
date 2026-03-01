@@ -63,9 +63,16 @@ function formatOpenPositionsSummary(params: {
 				: positions
 						.slice(0, 2)
 						.map((p) => {
-							const lev = p.leverage
-								? `${parseFloat(p.leverage).toFixed(1)}x`
-								: "1.0x";
+							let lev = "1.0x";
+							if (p.leverage != null) {
+								const parsed = Number.parseFloat(p.leverage);
+								if (!Number.isFinite(parsed)) {
+									throw new Error(
+										`Invalid leverage for model ${entry.modelId}: ${p.leverage}`,
+									);
+								}
+								lev = `${parsed.toFixed(1)}x`;
+							}
 							return `${p.symbol} ${p.side} ${lev}`;
 						})
 						.join(", ");
@@ -137,7 +144,7 @@ export async function buildCompetitionSnapshot(params: {
 		return {
 			standings,
 			openPositionsSummary,
-			pnlDeltaToLeader: "N/A",
+			pnlDeltaToLeader: "Leaderboard gap unavailable",
 			rank: self ? selfIndex + 1 : null,
 			leaderPnlPercent: leader?.pnlPercent ?? null,
 			selfPnlPercent: self?.pnlPercent ?? null,

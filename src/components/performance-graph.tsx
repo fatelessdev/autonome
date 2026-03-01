@@ -19,7 +19,7 @@ import {
 import type { DashboardSseEvent } from "@/core/shared/trading/dashboardEvents";
 import type { VariantId } from "@/core/shared/variants";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-import { getModelInfo } from "@/shared/models/modelConfig";
+import { findModelInfo } from "@/shared/models/modelConfig";
 
 type DataPoint = {
 	month: string;
@@ -321,10 +321,10 @@ function buildChartArtifacts(
 
 	const chartConfig: ChartConfig = {};
 	for (const [originalName, safeKey] of nameToSeriesKey.entries()) {
-		const modelInfo = getModelInfo(originalName);
+		const modelInfo = findModelInfo(originalName);
 		chartConfig[safeKey] = {
-			label: modelInfo.label,
-			color: modelInfo.color,
+			label: modelInfo?.label ?? originalName,
+			color: modelInfo?.color ?? "hsl(var(--chart-1))",
 		};
 	}
 

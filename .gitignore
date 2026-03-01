@@ -23,3 +23,7 @@ lighter-ts/
 
 # Alpaca credentials (per-variant API keys)
 scripts/alpacaKeys.ts
+
+# Local workflow run artifacts and agent metadata
+.workflow-data/
+.agents/

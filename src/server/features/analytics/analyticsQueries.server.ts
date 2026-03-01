@@ -3,6 +3,13 @@
  */
 
 import { and, asc, desc, eq, gte, inArray, isNotNull } from "drizzle-orm";
+import {
+	calculateMaxDrawdown,
+	INITIAL_CAPITAL,
+	requireFiniteNumber,
+	requirePresent,
+	toFiniteNumber,
+} from "@/core/shared/trading/calculations";
 import type { VariantId } from "@/core/shared/variants";
 import { db } from "@/db";
 import {
@@ -12,7 +19,6 @@ import {
 	portfolioSize,
 	toolCalls,
 } from "@/db/schema";
-import { INITIAL_CAPITAL } from "./calculations";
 import type {
 	ClosedTradeData,
 	FailureEntry,
@@ -30,21 +36,6 @@ const WINDOW_MS: Record<LeaderboardWindow, number> = {
 };
 
 type VariantFilter = VariantId;
-
-function toFiniteNumber(value: unknown): number | undefined {
-	if (typeof value === "number" && Number.isFinite(value)) {
-		return value;
-	}
-
-	if (typeof value === "string" && value.trim().length > 0) {
-		const parsed = Number(value);
-		if (Number.isFinite(parsed)) {
-			return parsed;
-		}
-	}
-
-	return undefined;
-}
 
 function toNullableString(value: unknown): string | null {
 	return typeof value === "string" ? value : null;
@@ -64,7 +55,7 @@ function normalizeTimestamp(value: unknown): string {
 		return new Date(numericTime).toISOString();
 	}
 
-	return new Date().toISOString();
+	throw new Error(`Invalid telemetry timestamp: ${String(value)}`);
 }
 
 function normalizeStepTelemetry(
@@ -75,34 +66,44 @@ function normalizeStepTelemetry(
 		return undefined;
 	}
 
-	const normalized = rawTelemetry
-		.map((step, index) => {
-			if (!step || typeof step !== "object") {
-				return null;
-			}
+	const normalized = rawTelemetry.map((step, index) => {
+		if (!step || typeof step !== "object") {
+			throw new Error(`Invalid telemetry step at index ${index}`);
+		}
 
-			const typedStep = step as Record<string, unknown>;
-			const stepNumber = toFiniteNumber(typedStep.stepNumber) ?? index + 1;
-			const inputTokens = toFiniteNumber(typedStep.inputTokens) ?? 0;
-			const outputTokens = toFiniteNumber(typedStep.outputTokens) ?? 0;
-			const totalTokens =
-				toFiniteNumber(typedStep.totalTokens) ?? inputTokens + outputTokens;
-			const toolNames = Array.isArray(typedStep.toolNames)
-				? typedStep.toolNames.filter(
-						(name): name is string => typeof name === "string",
-					)
-				: [];
+		const typedStep = step as Record<string, unknown>;
+		const stepNumber = requireFiniteNumber(
+			typedStep.stepNumber,
+			`stepTelemetry[${index}].stepNumber`,
+		);
+		const inputTokens = requireFiniteNumber(
+			typedStep.inputTokens,
+			`stepTelemetry[${index}].inputTokens`,
+		);
+		const outputTokens = requireFiniteNumber(
+			typedStep.outputTokens,
+			`stepTelemetry[${index}].outputTokens`,
+		);
+		const totalTokens =
+			toFiniteNumber(typedStep.totalTokens) ?? inputTokens + outputTokens;
+		if (!Number.isFinite(totalTokens)) {
+			throw new Error(`Invalid totalTokens in telemetry step ${index}`);
+		}
+		const toolNames = Array.isArray(typedStep.toolNames)
+			? typedStep.toolNames.filter(
+					(name): name is string => typeof name === "string",
+				)
+			: [];
 
-			return {
-				stepNumber,
-				toolNames,
-				inputTokens,
-				outputTokens,
-				totalTokens,
-				timestamp: normalizeTimestamp(typedStep.timestamp),
-			};
-		})
-		.filter((step): step is StepTelemetry => step !== null);
+		return {
+			stepNumber,
+			toolNames,
+			inputTokens,
+			outputTokens,
+			totalTokens,
+			timestamp: normalizeTimestamp(typedStep.timestamp),
+		};
+	});
 
 	return normalized.length > 0 ? normalized : undefined;
 }
@@ -144,18 +145,39 @@ export async function getClosedTradesForModels(
 		.orderBy(desc(orders.closedAt));
 
 	for (const row of rows) {
+		const quantity = requireFiniteNumber(
+			row.quantity,
+			`closed order ${row.id}.quantity`,
+		);
+		const entryPrice = requireFiniteNumber(
+			row.entryPrice,
+			`closed order ${row.id}.entryPrice`,
+		);
+		const exitPrice = requireFiniteNumber(
+			requirePresent(row.exitPrice, `closed order ${row.id}.exitPrice`),
+			`closed order ${row.id}.exitPrice`,
+		);
+		const realizedPnl = requireFiniteNumber(
+			requirePresent(row.realizedPnl, `closed order ${row.id}.realizedPnl`),
+			`closed order ${row.id}.realizedPnl`,
+		);
+		const closedAt = requirePresent(
+			row.closedAt,
+			`closed order ${row.id}.closedAt`,
+		);
+
 		const trade: ClosedTradeData = {
 			modelId: row.modelId,
 			symbol: row.symbol,
 			side: row.side,
-			quantity: Number(row.quantity),
+			quantity,
 			leverage: row.leverage ? Number(row.leverage) : null,
-			entryPrice: Number(row.entryPrice),
-			exitPrice: row.exitPrice ? Number(row.exitPrice) : 0,
-			realizedPnl: row.realizedPnl ? Number(row.realizedPnl) : 0,
+			entryPrice,
+			exitPrice,
+			realizedPnl,
 			confidence: row.exitPlan?.confidence ?? null,
 			openedAt: row.openedAt,
-			closedAt: row.closedAt ?? row.openedAt,
+			closedAt,
 		};
 		const bucket = grouped.get(row.modelId);
 		if (bucket) {
@@ -271,22 +293,6 @@ export async function getAllModelsWithFailureCounts(
 }
 
 /**
- * Compute max drawdown from a series of portfolio values
- * Returns as a positive fraction (e.g., 0.32 = 32% drawdown)
- */
-function computeMaxDrawdown(values: number[]): number {
-	if (values.length < 2) return 0;
-	let peak = values[0];
-	let maxDd = 0;
-	for (const v of values) {
-		if (v > peak) peak = v;
-		const dd = (peak - v) / peak; // positive when below peak
-		if (dd > maxDd) maxDd = dd;
-	}
-	return maxDd;
-}
-
-/**
  * Get leaderboard data for all models within a time window
  * @param window - Time window to calculate stats for
  * @param variantFilter - Optional variant to filter by (e.g., "Guardian", "Apex", "Contrarian")
@@ -361,7 +367,7 @@ export async function getLeaderboardData(
 		const endValue = points[points.length - 1].v;
 		const pnlAbsolute = endValue - startValue;
 		const pnlPercent = startValue !== 0 ? (pnlAbsolute / startValue) * 100 : 0;
-		const maxDrawdown = computeMaxDrawdown(points.map((p) => p.v)) * 100;
+		const maxDrawdown = calculateMaxDrawdown(points.map((p) => p.v));
 
 		entries.push({
 			modelId: model.id,
@@ -429,8 +435,10 @@ function isInvocationFailure(
 				isToolCallFailure = true;
 				break;
 			}
-		} catch {
-			// Ignore parse errors
+		} catch (error) {
+			throw new Error(
+				`Invalid tool call metadata JSON while computing failures: ${error instanceof Error ? error.message : String(error)}`,
+			);
 		}
 	}
 

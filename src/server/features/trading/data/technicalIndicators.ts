@@ -10,7 +10,16 @@ export interface Candlestick {
 	volume1?: number; // quote token volume in new SDK
 }
 
+const assertValidPeriod = (period: number) => {
+	if (!Number.isInteger(period) || period <= 0) {
+		throw new Error(
+			`Indicator period must be a positive integer, received: ${period}`,
+		);
+	}
+};
+
 export function getEma(prices: number[], period: number): number[] {
+	assertValidPeriod(period);
 	if (prices.length < period) {
 		return [];
 	}
@@ -18,14 +27,14 @@ export function getEma(prices: number[], period: number): number[] {
 	const multiplier = 2 / (period + 1);
 	let sma = 0;
 	for (let i = 0; i < period; i++) {
-		sma += prices[i] ?? 0;
+		sma += prices[i];
 	}
 	sma /= period;
 
 	const values = [sma];
 	for (let i = period; i < prices.length; i++) {
-		const prev = values[values.length - 1] ?? 0;
-		const ema = prev * (1 - multiplier) + (prices[i] ?? 0) * multiplier;
+		const prev = values[values.length - 1];
+		const ema = prev * (1 - multiplier) + prices[i] * multiplier;
 		values.push(ema);
 	}
 
@@ -33,6 +42,7 @@ export function getEma(prices: number[], period: number): number[] {
 }
 
 export function getSma(prices: number[], period: number): number[] {
+	assertValidPeriod(period);
 	if (prices.length < period) {
 		return [];
 	}
@@ -41,9 +51,9 @@ export function getSma(prices: number[], period: number): number[] {
 	let windowSum = 0;
 
 	for (let i = 0; i < prices.length; i++) {
-		windowSum += prices[i] ?? 0;
+		windowSum += prices[i];
 		if (i >= period) {
-			windowSum -= prices[i - period] ?? 0;
+			windowSum -= prices[i - period];
 		}
 		if (i >= period - 1) {
 			values.push(windowSum / period);
@@ -63,17 +73,26 @@ export function getCloses(candlesticks: Candlestick[]): number[] {
 
 export function getVolumes(candlesticks: Candlestick[]): number[] {
 	// volume0 is base token volume in the new SDK (volume1 is quote token volume)
-	return candlesticks.map((candle) => candle.volume0 ?? candle.volume ?? 0);
+	return candlesticks.map((candle, index) => {
+		const volume = candle.volume0 ?? candle.volume;
+		if (volume == null || !Number.isFinite(volume)) {
+			throw new Error(
+				`Missing or invalid volume for candlestick at index ${index}`,
+			);
+		}
+		return volume;
+	});
 }
 
 export function getMacd(prices: number[]): number[] {
 	const ema26 = getEma(prices, 26);
 	let ema12 = getEma(prices, 12);
 	ema12 = ema12.slice(-ema26.length);
-	return ema12.map((value, idx) => (value ?? 0) - (ema26[idx] ?? 0));
+	return ema12.map((value, idx) => value - ema26[idx]);
 }
 
 export function getRsi(prices: number[], period: number): number[] {
+	assertValidPeriod(period);
 	if (prices.length < period + 1) {
 		return [];
 	}
@@ -81,7 +100,7 @@ export function getRsi(prices: number[], period: number): number[] {
 	let gains = 0;
 	let losses = 0;
 	for (let i = 1; i <= period; i++) {
-		const delta = (prices[i] ?? 0) - (prices[i - 1] ?? 0);
+		const delta = prices[i] - prices[i - 1];
 		if (delta >= 0) {
 			gains += delta;
 		} else {
@@ -104,7 +123,7 @@ export function getRsi(prices: number[], period: number): number[] {
 	rsis.push(computeRsi());
 
 	for (let i = period + 1; i < prices.length; i++) {
-		const delta = (prices[i] ?? 0) - (prices[i - 1] ?? 0);
+		const delta = prices[i] - prices[i - 1];
 		const gain = Math.max(delta, 0);
 		const loss = Math.max(-delta, 0);
 		avgGain = (avgGain * (period - 1) + gain) / period;
@@ -116,6 +135,7 @@ export function getRsi(prices: number[], period: number): number[] {
 }
 
 export function getAtr(candlesticks: Candlestick[], period: number): number[] {
+	assertValidPeriod(period);
 	if (candlesticks.length < period) {
 		return [];
 	}
@@ -123,8 +143,7 @@ export function getAtr(candlesticks: Candlestick[], period: number): number[] {
 	const trueRanges: number[] = [];
 	for (let i = 0; i < candlesticks.length; i++) {
 		const current = candlesticks[i];
-		const prevClose =
-			i > 0 ? (candlesticks[i - 1]?.close ?? current.close) : current.close;
+		const prevClose = i > 0 ? candlesticks[i - 1].close : current.close;
 		const highLow = current.high - current.low;
 		const highPrev = Math.abs(current.high - prevClose);
 		const lowPrev = Math.abs(current.low - prevClose);
@@ -143,6 +162,7 @@ export function getAtr(candlesticks: Candlestick[], period: number): number[] {
 }
 
 export function getRollingAverage(values: number[], period: number): number[] {
+	assertValidPeriod(period);
 	if (values.length < period) {
 		return [];
 	}
@@ -151,9 +171,9 @@ export function getRollingAverage(values: number[], period: number): number[] {
 	let windowSum = 0;
 
 	for (let i = 0; i < values.length; i++) {
-		windowSum += values[i] ?? 0;
+		windowSum += values[i];
 		if (i >= period) {
-			windowSum -= values[i - period] ?? 0;
+			windowSum -= values[i - period];
 		}
 		if (i >= period - 1) {
 			result.push(windowSum / period);
@@ -164,6 +184,7 @@ export function getRollingAverage(values: number[], period: number): number[] {
 }
 
 export function getRollingStdDev(values: number[], period: number): number[] {
+	assertValidPeriod(period);
 	if (values.length < period) {
 		return [];
 	}
@@ -173,12 +194,16 @@ export function getRollingStdDev(values: number[], period: number): number[] {
 	let sum = 0;
 
 	for (let i = 0; i < values.length; i++) {
-		const value = values[i] ?? 0;
+		const value = values[i];
 		queue.push(value);
 		sum += value;
 
 		if (queue.length > period) {
-			sum -= queue.shift() ?? 0;
+			const shifted = queue.shift();
+			if (shifted == null) {
+				throw new Error("Rolling stddev queue underflow");
+			}
+			sum -= shifted;
 		}
 
 		if (queue.length === period) {
@@ -202,18 +227,18 @@ export const roundValue = (
 	value: number | null | undefined,
 	digits = 3,
 ): number | null => {
-	if (!Number.isFinite(value ?? NaN)) {
+	if (value == null || !Number.isFinite(value)) {
 		return null;
 	}
-	return Number((value as number).toFixed(digits));
+	return Number(value.toFixed(digits));
 };
 
 export const toPercent = (
 	value: number | null | undefined,
 	digits = 3,
 ): number | null => {
-	if (!Number.isFinite(value ?? NaN)) {
+	if (value == null || !Number.isFinite(value)) {
 		return null;
 	}
-	return Number(((value as number) * 100).toFixed(digits));
+	return Number((value * 100).toFixed(digits));
 };

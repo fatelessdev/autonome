@@ -1,4 +1,5 @@
 import { normalizeNumber } from "@/shared/formatting/numberFormat";
+import { toCanonical } from "@/shared/markets/marketMetadata";
 
 export type TradingSignal = "LONG" | "SHORT" | "HOLD";
 
@@ -63,7 +64,7 @@ const toStringValue = (value: unknown): string | null => {
 const normalizeSymbol = (value: unknown): string | null => {
 	const str = toStringValue(value);
 	if (!str) return null;
-	return str.toUpperCase();
+	return toCanonical(str).toUpperCase();
 };
 
 const normalizeSignal = (value: unknown): TradingSignal | null => {
@@ -200,7 +201,9 @@ export const parseTradingToolCallMetadata = (
 	raw: unknown,
 ): TradingToolCallMetadata => {
 	if (typeof raw !== "object" || raw === null) {
-		return { decisions: [], results: [], raw };
+		throw new Error(
+			`Invalid trading tool metadata shape: expected object, received ${typeof raw}`,
+		);
 	}
 
 	const record = raw as Record<string, unknown>;
@@ -221,6 +224,10 @@ export const parseTradingToolCallMetadata = (
 		if (fallbackDecision) {
 			decisions.push(fallbackDecision);
 		}
+	}
+
+	if (decisions.length === 0) {
+		throw new Error("No valid trading decisions found in tool call metadata");
 	}
 
 	const results: TradingDecisionResult[] = [];

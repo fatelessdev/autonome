@@ -37,14 +37,9 @@ export const TradesResponseSchema = z.object({
 // ==================== Position Schemas ====================
 
 export const ExitPlanSchema = z.object({
-	target: z.number().optional(),
-	stop: z.number().optional(),
-	invalidation: z
-		.object({
-			enabled: z.boolean(),
-			message: z.string().optional(),
-		})
-		.optional(),
+	target: z.number().nullable().optional(),
+	stop: z.number().nullable().optional(),
+	invalidation: z.string().nullable().optional(),
 });
 
 export const PositionSchema = z.object({

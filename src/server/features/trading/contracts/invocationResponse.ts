@@ -68,6 +68,31 @@ export interface InvocationResponsePayload {
 	totalOutputTokens?: number;
 }
 
+type InvocationResultShape = {
+	finishReason?: unknown;
+	usage?: unknown;
+	warnings?: unknown;
+	response?: {
+		id?: unknown;
+		modelId?: unknown;
+		timestamp?: unknown;
+	};
+};
+
+const toInvocationResultShape = (
+	result: unknown,
+): InvocationResultShape | null => {
+	if (result == null) {
+		return null;
+	}
+	if (typeof result !== "object" || Array.isArray(result)) {
+		throw new Error(
+			`Invalid invocation result payload shape: expected object, received ${typeof result}`,
+		);
+	}
+	return result as InvocationResultShape;
+};
+
 export function buildInvocationResponsePayload({
 	prompt,
 	result,
@@ -83,18 +108,9 @@ export function buildInvocationResponsePayload({
 	closedPositions: InvocationClosedPositionSummary[];
 	stepTelemetry?: StepTelemetry[];
 }): InvocationResponsePayload {
-	const base = (result ?? {}) as {
-		finishReason?: unknown;
-		usage?: unknown;
-		warnings?: unknown;
-		response?: {
-			id?: unknown;
-			modelId?: unknown;
-			timestamp?: unknown;
-		};
-	};
+	const base = toInvocationResultShape(result);
 
-	const provider = base.response;
+	const provider = base?.response;
 	let timestamp: string | null = null;
 	if (provider?.timestamp instanceof Date) {
 		timestamp = provider.timestamp.toISOString();
@@ -103,20 +119,24 @@ export function buildInvocationResponsePayload({
 	}
 
 	// Aggregate step telemetry
-	const totalSteps = stepTelemetry?.length ?? 0;
-	const totalInputTokens =
-		stepTelemetry?.reduce((acc, s) => acc + s.inputTokens, 0) ?? 0;
-	const totalOutputTokens =
-		stepTelemetry?.reduce((acc, s) => acc + s.outputTokens, 0) ?? 0;
+	const totalSteps = stepTelemetry?.length;
+	const totalInputTokens = stepTelemetry?.reduce(
+		(acc, s) => acc + s.inputTokens,
+		0,
+	);
+	const totalOutputTokens = stepTelemetry?.reduce(
+		(acc, s) => acc + s.outputTokens,
+		0,
+	);
 
 	return {
 		prompt,
 		decisions,
 		executionResults,
 		closedPositions,
-		finishReason: base.finishReason ?? null,
-		usage: base.usage ?? null,
-		warnings: base.warnings ?? null,
+		finishReason: base?.finishReason ?? null,
+		usage: base?.usage ?? null,
+		warnings: base?.warnings ?? null,
 		providerResponse: provider
 			? {
 					id: typeof provider.id === "string" ? provider.id : null,

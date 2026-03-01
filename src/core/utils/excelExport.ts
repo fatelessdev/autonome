@@ -264,14 +264,10 @@ function calculateAverageEntries(
 }
 
 /**
- * Export leaderboard data to Excel with separate sheets for each variant:
- * 1. Situational
- * 2. Minimal
- * 3. Guardian
- * 4. Max
- * 5. Sovereign
- * 6. All Models - All models across all variants
- * 7. Average - Averaged stats per model across variants
+ * Export leaderboard data to Excel with separate sheets for each current variant,
+ * plus aggregate sheets:
+ * - All Models: all models across all variants
+ * - Average: averaged stats per model across variants
  *
  * Filename format: YYYY-MM-DD_Leaderboard_{window}.xlsx
  */

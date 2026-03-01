@@ -122,16 +122,15 @@ export const portfolioSize = pgTable(
 );
 
 /**
- * Orders table - single source of truth for positions
+ * Orders table - lifecycle metadata for executed trades.
  *
- * OPEN orders = active positions (shown in Positions tab)
- * CLOSED orders = completed trades (shown in Trades tab)
+ * OPEN/CLOSED statuses track order lifecycle in our ledger.
+ * Current live positions shown in the UI come from Alpaca.
  *
- * Unrealized P&L is calculated live from current prices, not stored.
+ * Unrealized P&L is calculated live from broker prices, not stored.
  * When an order is closed, exitPrice and realizedPnl are populated.
  *
  * Note: entryNotional and exitNotional are derived (qty * price) - not stored.
- * Note: confidence is stored inside exitPlan JSONB (confidence in the plan).
  */
 export const orders = pgTable(
 	"Orders",

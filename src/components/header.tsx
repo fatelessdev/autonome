@@ -56,20 +56,6 @@ export default function Header({
 					)}
 				</button>
 				<ThemeToggleButton2 className=" cursor-pointer text-muted-foreground hover:text-foreground" />
-				{/* {isMobile ? null : (
-				<Link
-					to="/chat"
-					className="text-sm font-light text-muted-foreground hover:text-foreground transition-colors"
-				>
-					AI
-				</Link>	
-				)} */}
-				{/* <Link
-					to="/chat"
-					className="text-sm font-light text-muted-foreground hover:text-foreground transition-colors"
-				>
-					AI
-				</Link>	 */}
 			</div>
 		</div>
 	);

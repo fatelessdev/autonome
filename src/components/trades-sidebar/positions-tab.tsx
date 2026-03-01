@@ -1,6 +1,10 @@
 import NumberFlow from "@number-flow/react";
 import { useMemo } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+	isSupportedMarketSymbol,
+	MARKETS,
+} from "@/core/shared/markets/marketMetadata";
 import { formatCurrencyValue } from "@/shared/formatting/numberFormat";
 import { PositionsListSkeleton } from "./loading-skeletons";
 import type { ExitPlanSelection, ModelPositions } from "./types";
@@ -183,9 +187,8 @@ export function PositionsTab({
 												<div>SIDE</div>
 												<div>COIN</div>
 												<div className="text-right">ENTRY</div>
-												{/* <div className="text-center">LEVERAGE</div> */}
 												<div className="text-right">NOTIONAL</div>
-												<div className="text-center">EXIT PLAN</div>
+												<div className="text-center">ACTION</div>
 											</div>
 
 											{modelPos.positions.map((position, idx) => {
@@ -222,11 +225,7 @@ export function PositionsTab({
 																	: "—"}
 															</span>
 														</div>
-														{/* <div className="flex items-center justify-center whitespace-nowrap">
-															<span className="font-bold tabular-nums">
-																{formatLeverageValue(position.leverage)}
-															</span>
-														</div> */}
+
 														<div className="flex items-center justify-end whitespace-nowrap">
 															<span className="font-bold tabular-nums text-green-500">
 																{formatCurrencyValue(position.notional)}
@@ -247,7 +246,6 @@ export function PositionsTab({
 																VIEW
 															</button>
 														</div>
-														{/* Row-level Unreal P&L intentionally hidden; model totals already show Unreal + Real */}
 													</div>
 												);
 											})}
@@ -265,26 +263,17 @@ export function PositionsTab({
 		</div>
 	);
 }
-
-const SYMBOL_ICON_MAP: Record<string, { src: string; alt: string }> = {
-	BTC: { src: "/coins/btc.svg", alt: "BTC" },
-	ETH: { src: "/coins/eth.svg", alt: "ETH" },
-	SOL: { src: "/coins/sol.svg", alt: "SOL" },
-	XRP: { src: "/coins/xrp.svg", alt: "XRP" },
-	HYPE: { src: "/coins/hype.webp", alt: "HYPE" },
-	BNB: { src: "/coins/bnb.svg", alt: "BNB" },
-	ZEC: { src: "/coins/zec.webp", alt: "ZEC" },
-};
-
 function renderSymbolIcon(symbol: string) {
-	const icon = SYMBOL_ICON_MAP[symbol];
-	if (!icon) {
+	const normalized = symbol.toUpperCase();
+	if (!isSupportedMarketSymbol(normalized)) {
 		return <span className="text-lg">●</span>;
 	}
+
+	const market = MARKETS[normalized];
 	return (
 		<img
-			src={icon.src}
-			alt={icon.alt}
+			src={market.logo}
+			alt={market.badge}
 			width={16}
 			height={16}
 			className="h-4 w-4"
