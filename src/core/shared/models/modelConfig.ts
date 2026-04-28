@@ -80,10 +80,10 @@ export const MODEL_INFO: Record<string, ModelInfoEntry> = {
 		label: "GLM 4.5 Air",
 		provider: "openrouter",
 	},
-	"minimax-m2.1": {
+	"minimax-m2.5": {
 		logo: "/models/minimax.png",
 		color: "#E62176",
-		label: "Minimax M2.1",
+		label: "Minimax M2.5",
 		provider: "nim",
 	},
 	"gpt-oss-120b": {
@@ -97,6 +97,12 @@ export const MODEL_INFO: Record<string, ModelInfoEntry> = {
 		color: "#343333",
 		label: "Coding Kimi K2.5",
 		provider: "aihubmix",
+	},
+	"kimi-k2-thinking": {
+		logo: "/models/kimi.png",
+		color: "#343333",
+		label: "Kimi K2 Thinking",
+		provider: "nim",
 	},
 	"mistral-large-3-675b-instruct-2512": {
 		logo: "/models/mistral.png",
