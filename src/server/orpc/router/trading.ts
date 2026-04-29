@@ -14,7 +14,7 @@ import {
 	fetchPositions,
 	fetchTrades,
 } from "@/server/features/trading/data/tradingQueries.server";
-import { parseSymbols } from "@/shared/formatting/numberFormat";
+import { parseSymbols } from "@/core/shared/formatting/numberFormat";
 import {
 	CryptoPricesInputSchema,
 	CryptoPricesResponseSchema,
@@ -68,7 +68,11 @@ export const getTrades = os
 				return { trades };
 			} catch (error) {
 				Sentry.captureException(error);
-				throw new Error("Failed to fetch trades");
+				throw new Error(
+					error instanceof Error
+						? `Failed to fetch trades: ${error.message}`
+						: "Failed to fetch trades",
+				);
 			}
 		});
 	});
@@ -93,15 +97,15 @@ export const getPositions = os
 					modelLogo: modelPos.modelLogo ?? undefined,
 					positions: modelPos.positions.map((pos) => ({
 						symbol: pos.symbol,
-						side: (pos.sign === "SHORT" ? "short" : "long") as "short" | "long",
+						side: (pos.side === "SHORT" ? "short" : "long") as "short" | "long",
 						quantity: pos.quantity,
 						entryPrice: pos.entryPrice,
 						notional: Number.isFinite(Number(pos.notional))
 							? Number(pos.notional)
 							: undefined,
 						currentPrice: pos.currentPrice ?? pos.markPrice ?? undefined,
-						unrealizedPnl: Number.isFinite(Number(pos.unrealizedPnl))
-							? Number(pos.unrealizedPnl)
+						unrealizedPnl: Number.isFinite(pos.unrealizedPnl)
+							? pos.unrealizedPnl
 							: undefined,
 						exitPlan: pos.exitPlan
 							? {
@@ -110,7 +114,6 @@ export const getPositions = os
 									invalidation: pos.exitPlan.invalidation ?? null,
 								}
 							: undefined,
-						signal: pos.signal ?? undefined,
 						leverage: pos.leverage ?? undefined,
 						confidence: pos.confidence ?? undefined,
 						lastDecisionAt: pos.lastDecisionAt ?? undefined,
@@ -121,7 +124,11 @@ export const getPositions = os
 				return { positions };
 			} catch (error) {
 				Sentry.captureException(error);
-				throw new Error("Failed to fetch positions");
+				throw new Error(
+					error instanceof Error
+						? `Failed to fetch positions: ${error.message}`
+						: "Failed to fetch positions",
+				);
 			}
 		});
 	});
@@ -158,7 +165,11 @@ export const getCryptoPrices = os
 				return { prices };
 			} catch (error) {
 				Sentry.captureException(error);
-				throw new Error("Failed to fetch crypto prices");
+				throw new Error(
+					error instanceof Error
+						? `Failed to fetch crypto prices: ${error.message}`
+						: "Failed to fetch crypto prices",
+				);
 			}
 		});
 	});

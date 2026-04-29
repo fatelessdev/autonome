@@ -7,8 +7,8 @@ import type { DashboardSseEvent } from "@/core/shared/trading/dashboardEvents";
 import {
 	DASHBOARD_QUERIES,
 	DASHBOARD_QUERY_KEYS,
-} from "@/core/shared/trading/dashboardQueries";
-import type { VariantId } from "../variant-provider";
+} from "@/server/orpc/dashboardQueries";
+import type { VariantIdWithAll } from "../variant-provider";
 import type {
 	Conversation,
 	ModelOption,
@@ -20,7 +20,7 @@ import { resolveModelIdentity } from "./utils";
 
 type UseTradingDashboardDataOptions = {
 	enabled?: boolean;
-	variant?: VariantId;
+	variant?: VariantIdWithAll;
 };
 
 export function useTradingDashboardData({

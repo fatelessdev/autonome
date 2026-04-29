@@ -140,6 +140,7 @@ export function ThemeToggleButton2({ className }: ThemeToggleButton2Props) {
 			>
 				<clipPath id={clipPathId}>
 					<motion.path
+						initial={false}
 						animate={{ y: isDark ? 10 : 0, x: isDark ? -12 : 0 }}
 						transition={{ ease: "easeInOut", duration: 0.35 }}
 						d="M0-5h30a1 1 0 0 0 9 13v24H0Z"
@@ -147,12 +148,14 @@ export function ThemeToggleButton2({ className }: ThemeToggleButton2Props) {
 				</clipPath>
 				<g clipPath={`url(#${clipPathId})`}>
 					<motion.circle
+						initial={false}
 						animate={{ r: isDark ? 10 : 8 }}
 						transition={{ ease: "easeInOut", duration: 0.35 }}
 						cx="16"
 						cy="16"
 					/>
 					<motion.g
+						initial={false}
 						animate={{
 							rotate: isDark ? -100 : 0,
 							scale: isDark ? 0.5 : 1,

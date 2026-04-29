@@ -15,11 +15,11 @@ import {
 	type DownsampleResolution,
 	PORTFOLIO_QUERIES,
 	type PortfolioHistoryEntry,
-} from "@/core/shared/markets/marketQueries";
+} from "@/server/orpc/marketQueries";
 import type { DashboardSseEvent } from "@/core/shared/trading/dashboardEvents";
 import type { VariantId } from "@/core/shared/variants";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-import { findModelInfo } from "@/shared/models/modelConfig";
+import { findModelInfo } from "@/core/shared/models/modelConfig";
 
 type DataPoint = {
 	month: string;

@@ -2,7 +2,7 @@ import { and, desc, eq, isNull, ne, or } from "drizzle-orm";
 import { requireFiniteNumber } from "@/core/shared/trading/calculations";
 import { db } from "@/db";
 import { type Order, OrderStatus, orders } from "@/db/schema";
-import { toCanonical } from "@/shared/markets/marketMetadata";
+import { toCanonical } from "@/core/shared/markets/marketMetadata";
 
 // ==========================================
 // Types

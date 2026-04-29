@@ -29,7 +29,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { useVariant, type VariantId } from "@/components/variant-provider";
+import { useVariant } from "@/components/variant-provider";
 import { VariantSelector } from "@/components/variant-selector";
 import { cn } from "@/core/lib/utils";
 import { formatPercentValue } from "@/core/shared/formatting/numberFormat";
@@ -37,7 +37,7 @@ import { findModelInfo } from "@/core/shared/models/modelConfig";
 import { normalizeIdentifier } from "@/core/shared/strings/normalizeIdentifier";
 import { formatHoldTime } from "@/core/shared/trading/calculations";
 import { getVariantBadgeClasses } from "@/core/shared/variants";
-import { exportAnalyticsToExcel } from "@/core/utils/excelExport";
+import { exportAnalyticsToExcel } from "@/core/lib/excelExport";
 import type {
 	AdvancedStats,
 	OverallStats,
@@ -700,13 +700,13 @@ function AnalyticsRoute() {
 							COMPETITION:
 						</span>
 						<VariantSelector
-							value={selectedVariant as VariantId}
+							value={selectedVariant}
 							onChange={setSelectedVariant}
 							className="hidden sm:inline-flex"
 						/>
 						<VariantSelector
 							layout="mobile"
-							value={selectedVariant as VariantId}
+							value={selectedVariant}
 							onChange={setSelectedVariant}
 							className="sm:hidden"
 						/>

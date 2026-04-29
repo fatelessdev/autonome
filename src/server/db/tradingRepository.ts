@@ -89,25 +89,19 @@ export async function incrementModelUsage(
 ): Promise<void> {
 	const updates: Record<string, unknown> = {};
 
-	if (deltas.invocationCountDelta && deltas.invocationCountDelta !== 0) {
+	if (deltas.invocationCountDelta) {
 		updates.invocationCount = sql`${models.invocationCount} + ${deltas.invocationCountDelta}`;
 	}
 
-	if (deltas.totalMinutesDelta && deltas.totalMinutesDelta !== 0) {
+	if (deltas.totalMinutesDelta) {
 		updates.totalMinutes = sql`${models.totalMinutes} + ${deltas.totalMinutesDelta}`;
 	}
 
-	if (
-		deltas.failedWorkflowCountDelta &&
-		deltas.failedWorkflowCountDelta !== 0
-	) {
+	if (deltas.failedWorkflowCountDelta) {
 		updates.failedWorkflowCount = sql`${models.failedWorkflowCount} + ${deltas.failedWorkflowCountDelta}`;
 	}
 
-	if (
-		deltas.failedToolCallCountDelta &&
-		deltas.failedToolCallCountDelta !== 0
-	) {
+	if (deltas.failedToolCallCountDelta) {
 		updates.failedToolCallCount = sql`${models.failedToolCallCount} + ${deltas.failedToolCallCountDelta}`;
 	}
 
@@ -133,15 +127,15 @@ export async function updateInvocationRecord(params: {
 		.where(eq(invocations.id, params.id));
 }
 
-export async function listModels(): Promise<Model[]> {
+export function listModels(): Promise<Model[]> {
 	return db.select().from(models);
 }
 
-export async function listModelsOrderedAsc(): Promise<Model[]> {
+export function listModelsOrderedAsc(): Promise<Model[]> {
 	return db.select().from(models).orderBy(asc(models.name));
 }
 
-export async function getPortfolioHistory(
+export function getPortfolioHistory(
 	modelId: string,
 ): Promise<PortfolioSnapshot[]> {
 	return db
@@ -151,7 +145,7 @@ export async function getPortfolioHistory(
 		.orderBy(asc(portfolioSize.createdAt));
 }
 
-export async function getRecentToolCallsForModel(params: {
+export function getRecentToolCallsForModel(params: {
 	modelId: string;
 	type: ToolCallTypeValue;
 	limit?: number;
@@ -177,7 +171,7 @@ export async function getRecentToolCallsForModel(params: {
 		.limit(limit);
 }
 
-export async function getRecentToolCallsWithModel(params: {
+export function getRecentToolCallsWithModel(params: {
 	type: ToolCallTypeValue;
 	modelName?: string;
 	limit?: number;
@@ -208,7 +202,7 @@ export async function getRecentToolCallsWithModel(params: {
 		.limit(limit);
 }
 
-export async function searchModels(params: {
+export function searchModels(params: {
 	search?: string;
 	limit?: number;
 }): Promise<Model[]> {

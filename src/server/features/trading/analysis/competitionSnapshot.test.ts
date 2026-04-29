@@ -1,0 +1,8 @@
+import { describe, it, expect } from "vitest";
+
+describe("competitionSnapshot", () => {
+	it("can be imported", async () => {
+		const mod = await import("./competitionSnapshot");
+		expect(mod).toBeDefined();
+	});
+});

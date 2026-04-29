@@ -16,7 +16,7 @@ import {
 } from "@/env";
 import type { Account } from "@/server/features/trading/contracts/accounts";
 import type { StepTelemetry } from "@/server/features/trading/contracts/invocationResponse";
-import { getModelProvider } from "@/shared/models/modelConfig";
+import { getModelProvider } from "@/core/shared/models/modelConfig";
 
 import { callOptionsSchema } from "./schemas";
 import { createTradingTools, type ToolContext } from "./tools";

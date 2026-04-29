@@ -5,7 +5,7 @@ import {
 	isSupportedMarketSymbol,
 	MARKETS,
 } from "@/core/shared/markets/marketMetadata";
-import { formatCurrencyValue } from "@/shared/formatting/numberFormat";
+import { formatCurrencyValue } from "@/core/shared/formatting/numberFormat";
 import { PositionsListSkeleton } from "./loading-skeletons";
 import type { ExitPlanSelection, ModelPositions } from "./types";
 import { resolveModelIdentity } from "./utils";
@@ -32,12 +32,12 @@ export function PositionsTab({
 				typeof modelPos.totalUnrealizedPnl === "number"
 					? modelPos.totalUnrealizedPnl
 					: enrichedModelPositions.reduce(
-							(sum, pos) => sum + (Number.parseFloat(pos.unrealizedPnl) || 0),
+							(sum, pos) => sum + (pos.unrealizedPnl || 0),
 							0,
 						);
 
 			const totalRealizedPnl = enrichedModelPositions.reduce(
-				(sum, pos) => sum + (Number.parseFloat(pos.realizedPnl) || 0),
+				(sum, pos) => sum + (pos.realizedPnl || 0),
 				0,
 			);
 
@@ -192,8 +192,6 @@ export function PositionsTab({
 											</div>
 
 											{modelPos.positions.map((position, idx) => {
-												const signal = position.signal ?? position.sign;
-
 												return (
 													<div
 														key={`${modelPos.modelId}-${position.symbol}-${idx}`}
@@ -205,9 +203,9 @@ export function PositionsTab({
 													>
 														<div className="flex items-center whitespace-nowrap">
 															<span
-																className={`font-bold uppercase ${signal === "LONG" ? "text-green-500" : "text-red-500"}`}
+																className={`font-bold uppercase ${position.side === "LONG" ? "text-green-500" : "text-red-500"}`}
 															>
-																{signal}
+																{position.side}
 															</span>
 														</div>
 														<div className="flex items-center gap-1.5 whitespace-nowrap">

@@ -4,13 +4,13 @@ import rehypeRaw from "rehype-raw";
 import remarkGfm from "remark-gfm";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { toCanonical } from "@/shared/markets/marketMetadata";
 import { ModelChatSkeleton } from "./loading-skeletons";
 import type { Conversation } from "./types";
 import {
 	extractMarkdownPreview,
 	extractTradingDecisions,
 	formatDecisionDetails,
+	formatDecisionSymbol,
 	formatTimestamp,
 	resolveModelIdentity,
 } from "./utils";
@@ -257,17 +257,17 @@ export function ModelChatTab({
 																		const isCloseCall =
 																			action === "CLOSE_POSITION";
 																		const isHoldingCall = action === "HOLDING";
-																		const isHoldSignal =
-																			decision.signal === "HOLD";
+																		const isHoldSide =
+																			decision.side === "HOLD";
 																		const signalLabel = isHoldingCall
 																			? "Holding"
 																			: isUpdateCall
 																				? "Exit Plan Update"
 																				: isCloseCall
-																					? `Close ${decision.signal}`
-																					: decision.signal;
+																					? `Close ${decision.side}`
+																					: decision.side;
 																		const badgeVariant =
-																			(isHoldSignal || isHoldingCall) &&
+																			(isHoldSide || isHoldingCall) &&
 																			!isUpdateCall &&
 																			!isCloseCall
 																				? "secondary"
@@ -282,10 +282,10 @@ export function ModelChatTab({
 																			if (isCloseCall) {
 																				return "border-amber-500/30 bg-amber-500/12 text-amber-600";
 																			}
-																			if (decision.signal === "SHORT") {
+																			if (decision.side === "SHORT") {
 																				return "border-red-500/20 bg-red-500/10 text-red-500";
 																			}
-																			if (decision.signal === "LONG") {
+																			if (decision.side === "LONG") {
 																				return "border-green-500/20 bg-green-500/10 text-green-500";
 																			}
 																			return "border-muted text-foreground";
@@ -306,7 +306,7 @@ export function ModelChatTab({
 																				return "EXECUTED";
 																			if (decision.result?.success === false)
 																				return "REJECTED";
-																			if (isHoldSignal) return "HOLD";
+																			if (isHoldSide) return "HOLD";
 																			return null;
 																		})();
 
@@ -331,7 +331,7 @@ export function ModelChatTab({
 																					<div className="flex flex-col gap-1">
 																						<div className="flex flex-wrap items-center gap-2">
 																							<span className="text-sm font-semibold uppercase tracking-wide">
-																								{toCanonical(decision.symbol)}
+																									{formatDecisionSymbol(decision.symbol)}
 																							</span>
 																							<Badge
 																								variant={badgeVariant}

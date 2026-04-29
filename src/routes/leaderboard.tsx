@@ -20,7 +20,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { useVariant, type VariantId } from "@/components/variant-provider";
+import { useVariant } from "@/components/variant-provider";
 import { VariantSelector } from "@/components/variant-selector";
 import { cn } from "@/core/lib/utils";
 import { formatPercentValue } from "@/core/shared/formatting/numberFormat";
@@ -29,7 +29,7 @@ import { getVariantBadgeClasses, VARIANT_IDS } from "@/core/shared/variants";
 import {
 	exportLeaderboardToExcel,
 	type LeaderboardVariantData,
-} from "@/core/utils/excelExport";
+} from "@/core/lib/excelExport";
 import { orpc } from "@/server/orpc/client";
 
 export const Route = createFileRoute("/leaderboard")({
@@ -166,13 +166,13 @@ function LeaderboardRoute() {
 							COMPETITION:
 						</span>
 						<VariantSelector
-							value={selectedVariant as VariantId}
+							value={selectedVariant}
 							onChange={setSelectedVariant}
 							className="hidden sm:inline-flex"
 						/>
 						<VariantSelector
 							layout="mobile"
-							value={selectedVariant as VariantId}
+							value={selectedVariant}
 							onChange={setSelectedVariant}
 							className="sm:hidden"
 						/>

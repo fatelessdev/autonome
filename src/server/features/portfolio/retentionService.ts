@@ -97,13 +97,11 @@ export async function runRetentionPolicy(): Promise<{
 	const hourlyAggregatesCreated = await aggregateToHourly(
 		sevenDaysAgo,
 		thirtyDaysAgo,
-		preservedIds,
 	);
 
 	// Step 3: Aggregate 30+ day old data into daily buckets
 	const dailyAggregatesCreated = await aggregateToDaily(
 		thirtyDaysAgo,
-		preservedIds,
 	);
 
 	// Step 4: Delete aggregated raw records (except preserved first snapshots)
@@ -167,48 +165,47 @@ async function getFirstSnapshotPerModel(): Promise<
 }
 
 /**
- * Aggregate raw snapshots from 7-30 days ago into hourly buckets.
- * Creates one aggregate record per model per hour.
+ * Aggregate raw snapshots into time-based buckets.
+ * Creates one aggregate record per model per bucket.
+ *
+ * @param truncUnit - SQL date_trunc unit ('hour' or 'day')
+ * @param filter - Drizzle WHERE condition for selecting records to aggregate
+ * @param skipSingleRecords - If true, skip buckets with only 1 record (already "aggregated")
  */
-async function aggregateToHourly(
-	startDate: Date,
-	endDate: Date,
-	_preservedIds: Set<string>,
+async function aggregateSnapshots(
+	truncUnit: "hour" | "day",
+	filter: ReturnType<typeof and>,
+	skipSingleRecords: boolean,
 ): Promise<number> {
-	// Get hourly aggregates using database-level grouping
-	const hourlyAggregates = await db
+	const bucketCol = sql<string>`date_trunc(${sql.raw(`'${truncUnit}'`)}, ${portfolioSize.createdAt})`.as(
+		"bucket",
+	);
+
+	const aggregates = await db
 		.select({
 			modelId: portfolioSize.modelId,
-			hourBucket:
-				sql<string>`date_trunc('hour', ${portfolioSize.createdAt})`.as(
-					"hourBucket",
-				),
+			bucket: bucketCol,
 			avgPortfolio: avg(portfolioSize.netPortfolio).as("avgPortfolio"),
 			recordCount: count().as("recordCount"),
 		})
 		.from(portfolioSize)
-		.where(
-			and(
-				gte(portfolioSize.createdAt, endDate),
-				lt(portfolioSize.createdAt, startDate),
-			),
-		)
+		.where(filter)
 		.groupBy(
 			portfolioSize.modelId,
-			sql`date_trunc('hour', ${portfolioSize.createdAt})`,
+			sql`date_trunc(${sql.raw(`'${truncUnit}'`)}, ${portfolioSize.createdAt})`,
 		);
 
-	if (hourlyAggregates.length === 0) return 0;
+	if (aggregates.length === 0) return 0;
 
-	// Check which hourly buckets already have aggregated records
-	// (to avoid duplicate aggregation on repeated runs)
 	let created = 0;
-	for (const agg of hourlyAggregates) {
-		if (!agg.avgPortfolio || !agg.hourBucket) continue;
+	for (const agg of aggregates) {
+		if (!agg.avgPortfolio || !agg.bucket) continue;
 
-		const bucketTime = new Date(agg.hourBucket);
+		const bucketTime = new Date(agg.bucket);
 
-		// Check if aggregate already exists for this hour
+		if (skipSingleRecords && Number(agg.recordCount) <= 1) continue;
+
+		// Check if aggregate already exists for this bucket
 		const existing = await db
 			.select({ id: portfolioSize.id })
 			.from(portfolioSize)
@@ -222,7 +219,6 @@ async function aggregateToHourly(
 
 		if (existing.length > 0) continue;
 
-		// Insert the hourly aggregate
 		await db.insert(portfolioSize).values({
 			id: randomUUID(),
 			modelId: agg.modelId,
@@ -237,64 +233,33 @@ async function aggregateToHourly(
 }
 
 /**
+ * Aggregate raw snapshots from 7-30 days ago into hourly buckets.
+ */
+function aggregateToHourly(
+	startDate: Date,
+	endDate: Date,
+): Promise<number> {
+	return aggregateSnapshots(
+		"hour",
+		and(
+			gte(portfolioSize.createdAt, endDate),
+			lt(portfolioSize.createdAt, startDate),
+		)!,
+		false,
+	);
+}
+
+/**
  * Aggregate data older than 30 days into daily buckets.
  */
-async function aggregateToDaily(
+function aggregateToDaily(
 	cutoffDate: Date,
-	_preservedIds: Set<string>,
 ): Promise<number> {
-	const dailyAggregates = await db
-		.select({
-			modelId: portfolioSize.modelId,
-			dayBucket: sql<string>`date_trunc('day', ${portfolioSize.createdAt})`.as(
-				"dayBucket",
-			),
-			avgPortfolio: avg(portfolioSize.netPortfolio).as("avgPortfolio"),
-			recordCount: count().as("recordCount"),
-		})
-		.from(portfolioSize)
-		.where(lt(portfolioSize.createdAt, cutoffDate))
-		.groupBy(
-			portfolioSize.modelId,
-			sql`date_trunc('day', ${portfolioSize.createdAt})`,
-		);
-
-	if (dailyAggregates.length === 0) return 0;
-
-	let created = 0;
-	for (const agg of dailyAggregates) {
-		if (!agg.avgPortfolio || !agg.dayBucket) continue;
-
-		const bucketTime = new Date(agg.dayBucket);
-
-		// Only create if we have multiple records to aggregate (skip if already aggregated to 1)
-		if (Number(agg.recordCount) <= 1) continue;
-
-		// Check if daily aggregate already exists
-		const existing = await db
-			.select({ id: portfolioSize.id })
-			.from(portfolioSize)
-			.where(
-				and(
-					eq(portfolioSize.modelId, agg.modelId),
-					eq(portfolioSize.createdAt, bucketTime),
-				),
-			)
-			.limit(1);
-
-		if (existing.length > 0) continue;
-
-		await db.insert(portfolioSize).values({
-			id: randomUUID(),
-			modelId: agg.modelId,
-			netPortfolio: String(Math.round(Number(agg.avgPortfolio) * 100) / 100),
-			createdAt: bucketTime,
-			updatedAt: new Date(),
-		});
-		created++;
-	}
-
-	return created;
+	return aggregateSnapshots(
+		"day",
+		lt(portfolioSize.createdAt, cutoffDate)!,
+		true,
+	);
 }
 
 /**

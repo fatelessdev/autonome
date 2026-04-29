@@ -51,6 +51,34 @@ export type ConversationSnapshot = {
 	}>;
 };
 
+type SnapshotToolCall = {
+	id: string;
+	metadata: string;
+	toolCallType: string;
+};
+
+export function parseConversationToolCallMetadata(
+	toolCall: SnapshotToolCall,
+): ConversationSnapshot["toolCalls"][number]["metadata"] {
+	const rawMetadata = parseToolCallMetadata(toolCall.metadata, toolCall.id);
+
+	if (toolCall.toolCallType !== "CREATE_POSITION") {
+		return {
+			raw: rawMetadata,
+			decisions: [],
+			results: [],
+		};
+	}
+
+	const parsed = parseTradingToolCallMetadata(rawMetadata);
+
+	return {
+		raw: rawMetadata,
+		decisions: parsed.decisions,
+		results: parsed.results,
+	};
+}
+
 /**
  * Check if a tool call is an auto-triggered close (stop-loss or take-profit).
  * These should not appear in the model chat as they're system-initiated.
@@ -152,18 +180,11 @@ export async function fetchConversationSnapshots(
 			responsePayload: invocation.responsePayload,
 			timestamp: invocation.createdAt.toISOString(),
 			toolCalls: invocation.toolCalls.map((toolCall) => {
-				const rawMetadata = parseToolCallMetadata(
-					toolCall.metadata,
-					toolCall.id,
-				);
-				const parsed = parseTradingToolCallMetadata(rawMetadata);
 				return {
 					id: toolCall.id,
 					type: toolCall.toolCallType,
 					metadata: {
-						raw: rawMetadata,
-						decisions: parsed.decisions,
-						results: parsed.results,
+						...parseConversationToolCallMetadata(toolCall),
 					},
 					timestamp: toolCall.createdAt.toISOString(),
 				};

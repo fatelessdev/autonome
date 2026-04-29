@@ -1,11 +1,12 @@
-import { formatIstTimestamp } from "@/shared/formatting/dateFormat";
+import { formatDuration, formatIstTimestamp } from "@/core/shared/formatting/dateFormat";
 import {
 	formatConfidenceValue,
 	formatLeverageValue,
 	formatPriceLabel,
 	formatQuantityValue,
-} from "@/shared/formatting/numberFormat";
-import { findModelInfo } from "@/shared/models/modelConfig";
+} from "@/core/shared/formatting/numberFormat";
+import { findModelInfo } from "@/core/shared/models/modelConfig";
+import { toCanonical } from "@/core/shared/markets/marketMetadata";
 import type { Conversation, TradingDecisionCard } from "./types";
 
 export const extractMarkdownPreview = (
@@ -45,7 +46,7 @@ export const extractTradingDecisions = (
 			decisions.push({
 				key: `${tc.id}-holding`,
 				symbol: "PORTFOLIO",
-				signal: "HOLD",
+				side: "HOLD",
 				action: "HOLDING",
 				quantity: null,
 				leverage: null,
@@ -65,6 +66,7 @@ export const extractTradingDecisions = (
 		type DecisionItem = Partial<{
 			symbol: string;
 			signal: string;
+			side: string;
 			quantity: number | null;
 			leverage: number | null;
 			profitTarget: number | null;
@@ -107,12 +109,16 @@ export const extractTradingDecisions = (
 		decisionList.forEach((decision, idx) => {
 			if (!decision || typeof decision.symbol !== "string") return;
 			const symbol = decision.symbol.toUpperCase();
-			const normalizedSignal =
-				decision.signal === "LONG" ||
-				decision.signal === "SHORT" ||
-				decision.signal === "HOLD"
-					? decision.signal
-					: "HOLD";
+			const normalizedSide =
+				decision.side === "LONG" ||
+				decision.side === "SHORT" ||
+				decision.side === "HOLD"
+					? decision.side
+					: decision.signal === "LONG" ||
+						  decision.signal === "SHORT" ||
+						  decision.signal === "HOLD"
+						? decision.signal
+						: "HOLD";
 			const baseResult = resultLookup.get(symbol) ?? null;
 			let effectiveResult = baseResult;
 			if (isCloseCall) {
@@ -137,7 +143,7 @@ export const extractTradingDecisions = (
 					status = "EXECUTED";
 				} else if (effectiveResult?.success === false) {
 					status = "REJECTED";
-				} else if (normalizedSignal === "HOLD") {
+				} else if (normalizedSide === "HOLD") {
 					status = "HOLD";
 				}
 			}
@@ -155,7 +161,7 @@ export const extractTradingDecisions = (
 			decisions.push({
 				key: `${tc.id}-${idx}`,
 				symbol,
-				signal: normalizedSignal,
+				side: normalizedSide,
 				action: normalizedAction,
 				quantity: decision.quantity ?? null,
 				leverage: decision.leverage ?? null,
@@ -173,6 +179,14 @@ export const extractTradingDecisions = (
 	});
 
 	return decisions;
+};
+
+export const formatDecisionSymbol = (symbol: string) => {
+	try {
+		return toCanonical(symbol);
+	} catch {
+		return symbol;
+	}
 };
 
 export const formatDecisionDetails = (decision: TradingDecisionCard) => ({
@@ -197,16 +211,7 @@ export const computeHoldingLabel = (
 	const diff = closeDate.getTime() - openDate.getTime();
 	if (!Number.isFinite(diff) || diff <= 0) return "<1M";
 
-	const totalMinutes = Math.floor(diff / 60_000);
-	const days = Math.floor(totalMinutes / (60 * 24));
-	const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
-	const minutes = totalMinutes % 60;
-
-	const parts: string[] = [];
-	if (days > 0) parts.push(`${days}D`);
-	if (hours > 0) parts.push(`${hours}H`);
-	parts.push(`${minutes}M`);
-	return parts.join(" ");
+	return formatDuration(openDate, closeDate);
 };
 
 type ModelIdentitySource = {

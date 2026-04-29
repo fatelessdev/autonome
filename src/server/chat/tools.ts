@@ -12,8 +12,8 @@ import {
 } from "@/server/db/tradingRepository.server";
 import { portfolioQuery } from "@/server/features/trading/data/portfolio.server";
 import { openPositionsQuery } from "@/server/features/trading/data/positions.server";
-import { normalizeNumber } from "@/shared/formatting/numberFormat";
-import { getArray, safeJsonParse } from "@/utils/json";
+import { normalizeNumber } from "@/core/shared/formatting/numberFormat";
+import { getArray, safeJsonParse } from "@/core/lib/json";
 
 const MAX_RESULT_ROWS = 100;
 
@@ -449,6 +449,7 @@ export const getOpenPositionsTool = createTool({
 							name: model.name,
 							invocationCount: model.invocationCount,
 							totalMinutes: model.totalMinutes,
+							variant: model.variant,
 						};
 						const [positions, portfolio] = await Promise.all([
 							queryClient.fetchQuery(openPositionsQuery(account)),

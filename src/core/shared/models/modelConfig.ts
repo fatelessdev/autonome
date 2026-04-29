@@ -133,6 +133,16 @@ function normalizeModelName(name: string): string {
 		.replace(/^-|-$/g, "");
 }
 
+function getModelNameCandidates(modelName: string): string[] {
+	const normalized = normalizeModelName(modelName);
+	const suffix = modelName.split("/").pop() ?? modelName;
+	const normalizedSuffix = normalizeModelName(suffix);
+
+	return normalizedSuffix === normalized
+		? [normalized]
+		: [normalized, normalizedSuffix];
+}
+
 /**
  * Get model info by name.
  * Attempts exact match first, then normalized match.
@@ -157,9 +167,9 @@ export function findModelInfo(modelName: string): ModelInfo | null {
 		return MODEL_INFO[modelName];
 	}
 
-	const normalizedInput = normalizeModelName(modelName);
+	const normalizedInputs = getModelNameCandidates(modelName);
 	for (const [key, value] of Object.entries(MODEL_INFO)) {
-		if (normalizeModelName(key) === normalizedInput) {
+		if (normalizedInputs.includes(normalizeModelName(key))) {
 			return value;
 		}
 	}

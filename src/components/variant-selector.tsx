@@ -7,13 +7,13 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/core/lib/utils";
-import { useVariant, VARIANT_TABS, type VariantId } from "./variant-provider";
+import { useVariant, VARIANT_TABS, type VariantIdWithAll } from "./variant-provider";
 
 const TEXT_COLOR_FALLBACK = "#0f172a";
 
 type BaseProps = {
-	value?: VariantId;
-	onChange?: (variant: VariantId) => void;
+	value?: VariantIdWithAll;
+	onChange?: (variant: VariantIdWithAll) => void;
 	className?: string;
 };
 
@@ -22,8 +22,8 @@ type VariantSelectorProps = BaseProps & {
 };
 
 const useResolvedHandlers = (
-	value: VariantId | undefined,
-	onChange: ((variant: VariantId) => void) | undefined,
+	value: VariantIdWithAll | undefined,
+	onChange: ((variant: VariantIdWithAll) => void) | undefined,
 ) => {
 	const { selectedVariant, setSelectedVariant } = useVariant();
 	return {

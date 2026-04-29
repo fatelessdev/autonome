@@ -17,7 +17,7 @@ import {
 	taapiClient,
 } from "@/server/integrations/taapi";
 import { TAAPI_FREE_PLAN_SYMBOLS } from "@/server/integrations/taapi/types";
-import { MARKETS } from "@/shared/markets/marketMetadata";
+import { MARKETS } from "@/core/shared/markets/marketMetadata";
 import {
 	formatMarketSnapshots,
 	getMarketSnapshots,

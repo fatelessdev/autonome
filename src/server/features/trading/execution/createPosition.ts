@@ -15,7 +15,7 @@ import {
 } from "@/server/db/ordersRepository.server";
 import type { Account } from "@/server/features/trading/contracts/accounts";
 import { getTradingProvider } from "@/server/providers/alpaca";
-import { toAlpacaSymbol, toCanonical } from "@/shared/markets/marketMetadata";
+import { toAlpacaSymbol, toCanonical } from "@/core/shared/markets/marketMetadata";
 
 // ==========================================
 // Constants
@@ -30,6 +30,12 @@ const FILL_POLL_DELAY_MS = 500;
 // Types
 // ==========================================
 
+// TODO: Collapse the 7 flat exit-plan fields (profitTarget, stopLoss, invalidationCondition,
+// invalidationPrice, timeExit, cooldownUntil, confidence) into an embedded `exitPlan: ExitPlan`.
+// Blocked on: field-name mismatch (stopLoss→stop, profitTarget→target, invalidationCondition→invalidation),
+// NormalizedDecision in agent/schemas.ts mirrors the flat shape (Zod tool schema), and
+// createPositionTool.ts passes NormalizedDecision[] directly as PositionRequest[].
+// Requires coordinated rename of ExitPlan fields or a mapping layer in the tool.
 export interface PositionRequest {
 	symbol: string;
 	side: "LONG" | "SHORT" | "HOLD";
@@ -118,7 +124,7 @@ function buildExitPlan(
 /**
  * Persist a new order to the database
  */
-async function persistNewOrder(params: {
+function persistNewOrder(params: {
 	modelId: string;
 	symbol: string;
 	side: "LONG" | "SHORT";
@@ -205,6 +211,9 @@ export async function createPosition(
 		} = request;
 
 		if (side === "HOLD") {
+			console.warn(
+				`[createPosition] Skipping ${symbol}: HOLD requested — no order placed`,
+			);
 			results.push({ symbol, side, quantity, success: true });
 			continue;
 		}

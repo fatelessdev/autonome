@@ -27,3 +27,6 @@ scripts/alpacaKeys.ts
 # Local workflow run artifacts and agent metadata
 .workflow-data/
 .agents/
+
+# Desloppify local state
+.desloppify/

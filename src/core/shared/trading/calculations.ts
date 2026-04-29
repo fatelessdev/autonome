@@ -59,7 +59,7 @@ export function requirePresent<T>(
 export interface PositionForPnL {
 	quantity?: number | null;
 	notional?: string | number | null;
-	sign?: "LONG" | "SHORT" | string | null;
+	side?: "LONG" | "SHORT" | string | null;
 	unrealizedPnl?: number | string | null;
 }
 
@@ -84,7 +84,7 @@ export function calculateUnrealizedPnl(
 
 	// Derive entry price from notional / quantity
 	const entryPrice = notional / quantity;
-	const isLong = position.sign === "LONG";
+	const isLong = position.side === "LONG";
 
 	return isLong
 		? (currentPrice - entryPrice) * quantity

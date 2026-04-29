@@ -9,8 +9,8 @@ import {
 import {
 	formatConfidenceValue,
 	formatPriceLabel,
-} from "@/shared/formatting/numberFormat";
-import { toCanonical } from "@/shared/markets/marketMetadata";
+} from "@/core/shared/formatting/numberFormat";
+import { toCanonical } from "@/core/shared/markets/marketMetadata";
 import type { ExitPlanSelection } from "./types";
 
 type ExitPlanDialogProps = {
@@ -38,14 +38,12 @@ export function ExitPlanDialog({ selection, onClose }: ExitPlanDialogProps) {
 							<Badge
 								variant="outline"
 								className={`font-semibold ${
-									selection.position.signal === "HOLD"
-										? "border-muted "
-										: selection.position.signal === "LONG"
-											? "border-green-500/20 bg-green-500/10 text-green-500"
-											: "border-red-500/20 bg-red-500/10 text-red-500"
+									selection.position.side === "LONG"
+										? "border-green-500/20 bg-green-500/10 text-green-500"
+										: "border-red-500/20 bg-red-500/10 text-red-500"
 								}`}
 							>
-								{selection.position.signal ?? selection.position.sign}
+								{selection.position.side}
 							</Badge>
 						</DialogDescription>
 					</DialogHeader>

@@ -1,0 +1,8 @@
+import { describe, it, expect } from "vitest";
+
+describe("schema", () => {
+	it("can be imported", async () => {
+		const mod = await import("./schema");
+		expect(mod).toBeDefined();
+	});
+});

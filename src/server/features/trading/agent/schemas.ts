@@ -4,7 +4,7 @@
  */
 
 import { z } from "zod";
-import { MARKETS } from "@/shared/markets/marketMetadata";
+import { MARKETS } from "@/core/shared/markets/marketMetadata";
 
 // Market symbols enum for validation
 export const marketSymbols = Object.keys(MARKETS) as [

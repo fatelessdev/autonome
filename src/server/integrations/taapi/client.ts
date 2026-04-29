@@ -1,9 +1,3 @@
-/**
- * TAAPI Client
- * Client for fetching technical indicators from TAAPI.io
- * Uses bulk endpoint for efficient fetching + retry logic
- */
-
 import { TAAPI_API_KEY } from "@/env";
 import { taapiCache } from "./cache";
 import type {
@@ -20,9 +14,8 @@ import type {
 import { TAAPI_FREE_PLAN_SYMBOLS } from "./types";
 
 const BULK_URL = "https://api.taapi.io/bulk";
-const FETCH_TIMEOUT_MS = 30_000; // 30 second timeout for API calls
+const FETCH_TIMEOUT_MS = 30_000;
 
-// Get API key from environment
 const getTaapiApiKey = (): string => {
 	if (!TAAPI_API_KEY) {
 		throw new Error("[TAAPI] TAAPI_API_KEY not configured");
@@ -31,10 +24,6 @@ const getTaapiApiKey = (): string => {
 };
 
 export class TaapiClient {
-	/**
-	 * POST request with exponential backoff retry logic
-	 * Free plan: 1 request per 15 seconds, so we use longer backoff
-	 */
 	private async postWithRetry(
 		payload: TaapiBulkPayload,
 		retries = 3,
@@ -42,7 +31,6 @@ export class TaapiClient {
 	): Promise<TaapiBulkResponse> {
 		for (let attempt = 0; attempt < retries; attempt++) {
 			try {
-				// Create abort controller for timeout
 				const controller = new AbortController();
 				const timeoutId = setTimeout(
 					() => controller.abort(),
@@ -121,17 +109,10 @@ export class TaapiClient {
 			cacheKey,
 		);
 		if (cached) {
-			console.log(
-				`[TAAPI] Cache hit for ${asset}:${interval}:${cacheKey ?? "default"}`,
-			);
 			return cached;
 		}
 
 		const apiKey = getTaapiApiKey();
-		if (!apiKey) {
-			console.error("[TAAPI] No API key configured");
-			return {};
-		}
 
 		const payload: TaapiBulkPayload = {
 			secret: apiKey,
@@ -143,16 +124,11 @@ export class TaapiClient {
 			},
 		};
 
-		console.log(
-			`[TAAPI] Fetching ${indicators.length} indicators for ${symbol} @ ${interval}`,
-		);
 		const response = await this.postWithRetry(payload);
 
-		// Parse results by ID
 		const results: Record<string, unknown> = {};
 		for (const item of response.data) {
 			if (item.errors && item.errors.length > 0) {
-				console.warn(`[TAAPI] Error for ${item.id}:`, item.errors);
 				results[item.id] = null;
 			} else {
 				results[item.id] = item.result;
@@ -182,7 +158,6 @@ export class TaapiClient {
 			"prefetch",
 		);
 		if (cached) {
-			console.log(`[TAAPI] Pre-fetch cache hit for ${asset}:${interval}`);
 			return cached;
 		}
 
@@ -227,9 +202,6 @@ export class TaapiClient {
 		}
 	}
 
-	/**
-	 * Check if TAAPI is configured and available
-	 */
 	isConfigured(): boolean {
 		return !!TAAPI_API_KEY;
 	}
@@ -254,25 +226,10 @@ export class TaapiClient {
 				),
 			);
 
-		const skippedAssets = assets.filter(
-			(a) =>
-				!TAAPI_FREE_PLAN_SYMBOLS.includes(
-					a.toUpperCase() as (typeof TAAPI_FREE_PLAN_SYMBOLS)[number],
-				),
-		);
-
-		if (skippedAssets.length > 0) {
-			console.log(
-				`[TAAPI] Skipping ${skippedAssets.join(", ")} (free plan only supports BTC, ETH)`,
-			);
-		}
-
 		if (validAssets.length === 0) {
-			console.log("[TAAPI] No valid assets to fetch (free plan: BTC/ETH only)");
 			return results;
 		}
 
-		// Check cache for all assets first
 		const uncachedAssets: string[] = [];
 		for (const asset of validAssets) {
 			const cached = taapiCache.get<TaapiPreFetchResult>(
@@ -281,23 +238,15 @@ export class TaapiClient {
 				"prefetch",
 			);
 			if (cached) {
-				console.log(`[TAAPI] Cache hit for ${asset}:${interval}`);
 				results.set(asset, cached);
 			} else {
 				uncachedAssets.push(asset);
 			}
 		}
 
-		// If all cached, return early
 		if (uncachedAssets.length === 0) {
-			console.log("[TAAPI] All assets served from cache");
 			return results;
 		}
-
-		// Free plan only allows 1 construct per request, so fetch sequentially
-		console.log(
-			`[TAAPI] Fetching indicators for ${uncachedAssets.join(", ")} (sequential, free plan)`,
-		);
 
 		for (const asset of uncachedAssets) {
 			try {
@@ -319,10 +268,8 @@ export class TaapiClient {
 			}
 		}
 
-		console.log(`[TAAPI] Completed fetching for ${uncachedAssets.join(", ")}`);
 		return results;
 	}
 }
 
-// Singleton instance
 export const taapiClient = new TaapiClient();

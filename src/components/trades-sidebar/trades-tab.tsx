@@ -2,7 +2,7 @@
 
 import { ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency } from "@/shared/formatting/numberFormat";
+import { formatCurrency } from "@/core/shared/formatting/numberFormat";
 import { TradesListSkeleton } from "./loading-skeletons";
 import type { Trade } from "./types";
 import {

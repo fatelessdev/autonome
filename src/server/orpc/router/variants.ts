@@ -241,7 +241,7 @@ export const getVariantHistory = os
 				}
 
 				const aggregate = Array.from(allTimestamps)
-					.sort()
+					.sort((a, b) => a.localeCompare(b))
 					.map((timestamp) => {
 						const values = variants
 							.map(

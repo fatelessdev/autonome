@@ -11,11 +11,7 @@ import { getTradingProvider } from "@/server/providers/alpaca";
 export type PortfolioSnapshot = {
 	totalValue: number;
 	availableCash: number;
-	total: string;
-	available: string;
 };
-
-const formatCurrencyString = (value: number): string => value.toFixed(2);
 
 export async function getPortfolio(
 	account: Account,
@@ -33,7 +29,5 @@ export async function getPortfolio(
 	return {
 		totalValue,
 		availableCash,
-		total: formatCurrencyString(totalValue),
-		available: formatCurrencyString(availableCash),
 	};
 }

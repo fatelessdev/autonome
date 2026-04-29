@@ -18,27 +18,13 @@ import { refreshConversationEvents } from "@/server/features/trading/data/conver
 import { enrichOpenPositions } from "@/server/features/trading/data/openPositionEnrichment";
 import { getOpenPositions } from "@/server/features/trading/data/positions";
 import { getMarketDataProvider } from "@/server/providers/alpaca";
-import { formatIstTimestamp } from "@/shared/formatting/dateFormat";
-import { toAlpacaSymbol, toCanonical } from "@/shared/markets/marketMetadata";
+import { formatDuration, formatIstTimestamp } from "@/core/shared/formatting/dateFormat";
+import { toAlpacaSymbol, toCanonical } from "@/core/shared/markets/marketMetadata";
+import { requireFiniteNumber, requirePresent } from "@/core/shared/trading/calculations";
 
 // ==========================================
 // CRYPTO PRICES
 // ==========================================
-
-const formatDuration = (openedAt: Date, closedAt: Date) => {
-	const diffMs = closedAt.getTime() - openedAt.getTime();
-	if (diffMs <= 0) return "<1M";
-	const totalMinutes = Math.floor(diffMs / 60000);
-	const days = Math.floor(totalMinutes / (60 * 24));
-	const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
-	const minutes = totalMinutes % 60;
-
-	const parts: string[] = [];
-	if (days > 0) parts.push(`${days}D`);
-	if (hours > 0) parts.push(`${hours}H`);
-	parts.push(`${minutes}M`);
-	return parts.join(" ");
-};
 
 const parseRequiredFiniteNumber = (
 	value: string | null | undefined,
@@ -53,17 +39,6 @@ const parseRequiredFiniteNumber = (
 		throw new Error(`Invalid numeric ${fieldName} in ${context}: ${value}`);
 	}
 	return parsed;
-};
-
-const requirePresent = <T>(
-	value: T | null | undefined,
-	fieldName: string,
-	context: string,
-): T => {
-	if (value == null) {
-		throw new Error(`Missing ${fieldName} in ${context}`);
-	}
-	return value;
 };
 
 const requireModelCredentials = (model: {
@@ -340,20 +315,17 @@ export async function fetchPositions(options?: FetchPositionsOptions) {
 			const positions = livePositions.map((pos) => {
 				const entryPrice = requirePresent(
 					pos.entryPrice,
-					"entryPrice",
-					`open position ${pos.symbol} on model ${model.id}`,
+					`open position ${pos.symbol} on model ${model.id}.entryPrice`,
 				);
 				const notional = requirePresent(
 					pos.notional,
-					"notional",
-					`open position ${pos.symbol} on model ${model.id}`,
+					`open position ${pos.symbol} on model ${model.id}.notional`,
 				);
 
 				return {
 					symbol: pos.symbol,
 					position: pos.position,
-					sign: pos.sign,
-					side: pos.sign,
+					side: pos.side,
 					quantity: pos.quantity,
 					entryPrice,
 					markPrice: pos.markPrice ?? null,
@@ -364,7 +336,6 @@ export async function fetchPositions(options?: FetchPositionsOptions) {
 					liquidationPrice: pos.liquidationPrice ?? null,
 					leverage: null,
 					confidence: pos.confidence ?? null,
-					signal: pos.signal ?? pos.sign,
 					exitPlan: pos.exitPlan ?? null,
 					lastDecisionAt: pos.lastDecisionAt ?? null,
 					decisionStatus: pos.decisionStatus ?? null,
@@ -372,10 +343,9 @@ export async function fetchPositions(options?: FetchPositionsOptions) {
 			});
 
 			const totalUnrealizedPnl = positions.reduce((sum, position) => {
-				const pnl = parseRequiredFiniteNumber(
+				const pnl = requireFiniteNumber(
 					position.unrealizedPnl,
-					"unrealizedPnl",
-					`model:${model.id}:${position.symbol}`,
+					`model:${model.id}:${position.symbol}.unrealizedPnl`,
 				);
 				return sum + pnl;
 			}, 0);
@@ -449,7 +419,7 @@ export async function fetchPortfolioHistory(
 export const cryptoPricesQuery = (symbols: string[]) => {
 	const normalized = symbols
 		.map((symbol) => toCanonical(symbol).toUpperCase())
-		.sort();
+		.sort((a, b) => a.localeCompare(b));
 
 	return queryOptions({
 		queryKey: ["crypto-prices", ...normalized],
@@ -491,13 +461,11 @@ export const invocationsQuery = () =>
 // MODELS LIST
 // ==========================================
 
-export async function fetchModelsList() {
-	const rows = await db
+export function fetchModelsList() {
+	return db
 		.select({ id: models.id, name: models.name })
 		.from(models)
 		.orderBy(asc(models.name));
-
-	return rows;
 }
 
 /**

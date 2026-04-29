@@ -1,4 +1,4 @@
-import type { VariantId } from "@/server/features/trading/prompting/prompts/variants";
+import type { VariantId } from "@/core/shared/variants";
 
 export interface Account {
 	alpacaApiKey: string;
@@ -9,5 +9,5 @@ export interface Account {
 	id: string;
 	totalMinutes: number;
 	/** Strategy variant - determines which prompt set to use */
-	variant?: VariantId;
+	variant: VariantId;
 }

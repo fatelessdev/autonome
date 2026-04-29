@@ -34,7 +34,7 @@ const db = drizzle(pool);
 
 // Active model definitions — openRouter model identifiers
 const MODEL_DEFINITIONS = [
-	"deepseek-ai/deepseek-v3.1-terminus",
+	"minimaxai/minimax-m2.5",
 ];
 
 /**

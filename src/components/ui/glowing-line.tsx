@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { type ChartConfig, ChartContainer } from "@/components/ui/chart";
 import { useVariant, VARIANT_TABS } from "@/components/variant-provider";
 import { cn } from "@/core/lib/utils";
-import { findModelInfo } from "@/shared/models/modelConfig";
+import { findModelInfo } from "@/core/shared/models/modelConfig";
 
 type ChartDatum = {
 	month: string;

@@ -21,6 +21,9 @@ export default defineConfig({
     }),
     tailwindcss(),
     tanstackStart({
+      router: {
+        routeFileIgnorePattern: "\\.(test|spec)\\.(t|j)sx?$",
+      },
       prerender: {
         autoSubfolderIndex: true,
         concurrency: 14,
@@ -63,9 +66,7 @@ export default defineConfig({
         advancedChunks: {
           groups: [
             { name: "react-vendor", test: /node_modules\/react/, priority: 10 },
-            { name: "three-vendor", test: /node_modules\/three|@react-three/, priority: 10 },
             { name: "ui-vendor", test: /node_modules\/(@radix-ui|framer-motion|motion|lucide-react)/, priority: 10 },
-            { name: "shiki-vendor", test: /node_modules\/shiki/, priority: 10 },
           ],
         },
       },

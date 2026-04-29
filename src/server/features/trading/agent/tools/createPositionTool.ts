@@ -10,7 +10,7 @@ import { ToolCallType } from "@/server/db/tradingRepository";
 import { createToolCallMutation } from "@/server/db/tradingRepository.server";
 import { calculateCooldownUntil } from "@/server/features/trading/execution/cooldown";
 import { createPosition } from "@/server/features/trading/execution/createPosition";
-import { MARKETS } from "@/shared/markets/marketMetadata";
+import { MARKETS } from "@/core/shared/markets/marketMetadata";
 
 import { decisionSchema, type NormalizedDecision } from "../schemas";
 import { MAX_ACTIONS_PER_SYMBOL, type ToolContext } from "./types";
@@ -37,7 +37,7 @@ function checkCooldown(
 
 	if (existingPosition) {
 		// Same direction = adding to position, no cooldown check needed
-		const existingSide = existingPosition.sign; // "LONG" or "SHORT"
+		const existingSide = existingPosition.side; // "LONG" or "SHORT"
 		if (existingSide === requestedSide) return null;
 
 		// Direction change requested - check cooldown

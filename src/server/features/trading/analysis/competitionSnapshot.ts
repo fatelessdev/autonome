@@ -6,7 +6,7 @@ import type {
 	LeaderboardWindow,
 } from "@/server/features/analytics";
 import { getLeaderboardData } from "@/server/features/analytics";
-import type { VariantId } from "@/server/features/trading/prompting/prompts/variants";
+import type { VariantId } from "@/core/shared/variants";
 
 export interface CompetitionSnapshot {
 	standings: string;

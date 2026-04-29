@@ -1,0 +1,8 @@
+import { describe, it, expect } from "vitest";
+
+describe("analyticsQueries.server", () => {
+	it("can be imported", async () => {
+		const mod = await import("./analyticsQueries.server");
+		expect(mod).toBeDefined();
+	});
+});

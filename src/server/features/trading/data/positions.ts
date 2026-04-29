@@ -7,9 +7,8 @@
  */
 
 import type { Account } from "@/server/features/trading/contracts/accounts";
-import type { TradingSignal } from "@/server/features/trading/contracts/tradingDecisions";
 import { getTradingProvider } from "@/server/providers/alpaca";
-import { toCanonical } from "@/shared/markets/marketMetadata";
+import { toCanonical } from "@/core/shared/markets/marketMetadata";
 
 export interface ExitPlanSummary {
 	target: number | null;
@@ -24,9 +23,9 @@ export interface OpenPositionSummary {
 	symbol: string;
 	position: string;
 	quantity: number;
-	sign: "LONG" | "SHORT";
-	unrealizedPnl: string;
-	realizedPnl: string;
+	side: "LONG" | "SHORT";
+	unrealizedPnl: number;
+	realizedPnl: number;
 	liquidationPrice: string | null;
 	notional?: string;
 	entryPrice?: number | null;
@@ -41,7 +40,6 @@ export interface OpenPositionSummary {
 	changeToday?: number | null;
 	exitPlan?: ExitPlanSummary | null;
 	confidence?: number | null;
-	signal?: TradingSignal;
 	lastDecisionAt?: string | null;
 	decisionStatus?: string | null;
 }
@@ -63,9 +61,9 @@ export async function getOpenPositions(
 			symbol: canonical,
 			position: pos.qty.toFixed(4),
 			quantity: pos.qty,
-			sign: pos.side === "long" ? "LONG" : "SHORT",
-			unrealizedPnl: pos.unrealized_pl.toFixed(2),
-			realizedPnl: "0.00", // Alpaca doesn't return realized P&L on positions
+			side: pos.side === "long" ? "LONG" : "SHORT",
+			unrealizedPnl: pos.unrealized_pl,
+			realizedPnl: 0, // Alpaca doesn't return realized P&L on positions
 			liquidationPrice: null, // Alpaca paper trading has no liquidation
 			notional: pos.market_value.toFixed(2),
 			entryPrice: pos.avg_entry_price,
@@ -77,7 +75,6 @@ export async function getOpenPositions(
 			// Exit plan/confidence are merged later from latest tool-call decision metadata.
 			exitPlan: null,
 			confidence: null,
-			signal: pos.side === "long" ? "LONG" : "SHORT",
 			lastDecisionAt: null,
 			decisionStatus: null,
 		};

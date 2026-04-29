@@ -5,7 +5,7 @@ import type {
 	ExposureSummary,
 } from "@/server/features/trading/data/openPositionEnrichment";
 import type { PortfolioSnapshot } from "@/server/features/trading/data/portfolio";
-import { formatPercentValue } from "@/shared/formatting/numberFormat";
+import { formatPercentValue } from "@/core/shared/formatting/numberFormat";
 
 /**
  * Calculate exposure to equity as the percentage of equity that is actually deployed.
@@ -67,7 +67,7 @@ export function buildOpenPositionsSection(
 		// Line 1: Core position info (always include all fields, omit only if N/A)
 		const mainParts = [
 			`symbol ${position.symbol}`,
-			`side ${position.sign}`,
+			`side ${position.side}`,
 			`qty ${formatNullableNumber(position.quantity, 4)}`,
 			`entry ${formatNullableNumber(position.entryPrice, 2)}`,
 			`mark ${formatNullableNumber(position.markPrice, 2)}`,
@@ -125,7 +125,7 @@ export function buildOpenPositionsSection(
 		const exitPlanLine = `exit_plan: target ${formatNullableNumber(position.exitPlan?.target, 2)} | stop ${formatNullableNumber(position.exitPlan?.stop, 2)} | invalidation "${sanitizeQuotedPromptField(position.exitPlan?.invalidation)}" | time_exit "${sanitizeQuotedPromptField(position.exitPlan?.timeExit)}" | cooldown_until ${position.exitPlan?.cooldownUntil ?? "N/A"}`;
 
 		// Line 5: Intent context (explicit labels)
-		const intentLine = `intent: signal ${position.signal ?? position.sign} | confidence ${formatConfidence(position.confidence)} | decision_status ${position.decisionStatus ?? "N/A"} | last_decision_at ${position.lastDecisionAt ?? "N/A"}`;
+		const intentLine = `intent: side ${position.side} | confidence ${formatConfidence(position.confidence)} | decision_status ${position.decisionStatus ?? "N/A"} | last_decision_at ${position.lastDecisionAt ?? "N/A"}`;
 
 		const lines = [mainLine, pnlLine];
 		if (riskParts.length > 0) {

@@ -2,8 +2,8 @@ import NumberFlow from "@number-flow/react";
 import { useMemo } from "react";
 import type { ChartConfig } from "@/components/ui/chart";
 import { cn } from "@/core/lib/utils";
-import { formatCurrencyValue } from "@/shared/formatting/numberFormat";
-import { findModelInfo } from "@/shared/models/modelConfig";
+import { formatCurrencyValue } from "@/core/shared/formatting/numberFormat";
+import { findModelInfo } from "@/core/shared/models/modelConfig";
 
 type ModelLegendProps = {
 	chartData: Array<{

@@ -1,11 +1,7 @@
-import { config } from "dotenv";
-
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { env } from "@/env.ts";
 import * as schema from "./schema.ts";
-
-config({ path: ".env.local" });
 
 /**
  * Lazy database connection singleton.

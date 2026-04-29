@@ -29,9 +29,7 @@
       "@/db-collections": ["./src/db/collections"],
       "@/lighter/*": ["./lighter-sdk-ts/*"],
       "@/server/*": ["./src/server/*"],
-      "@/shared/*": ["./src/core/shared/*"],
       "@/lib/*": ["./src/core/lib/*"],
-      "@/utils/*": ["./src/core/utils/*"],
       "@/*": ["./src/*"]
     }
   }

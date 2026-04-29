@@ -16,7 +16,7 @@ import type {
 import { useTradingDashboardData } from "@/components/trades-sidebar/use-trading-dashboard-data";
 import { useVariant } from "@/components/variant-provider";
 import { normalizeIdentifier } from "@/core/shared/strings/normalizeIdentifier";
-import { findModelInfo } from "@/shared/models/modelConfig";
+import { findModelInfo } from "@/core/shared/models/modelConfig";
 
 let customEasePromise: Promise<void> | null = null;
 const ensureCustomEase = () => {

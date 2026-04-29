@@ -16,8 +16,10 @@ import {
 } from "@/server/features/trading/prompting/promptSections";
 import {
 	DEFAULT_VARIANT,
-	getVariantConfig,
 	type VariantId,
+} from "@/core/shared/variants";
+import {
+	getVariantConfig,
 } from "@/server/features/trading/prompting/prompts/variants";
 
 interface TradingPromptParams {
@@ -82,7 +84,7 @@ export function buildStateSummary(params: {
 				? "N/A"
 				: `${pnlValue >= 0 ? "+" : ""}$${pnlValue.toFixed(2)}`;
 		const entryLabel = entryValue === null ? "N/A" : entryValue.toFixed(2);
-		return `${pos.symbol} ${pos.sign} @ ${entryLabel} (${pnlLabel})`;
+		return `${pos.symbol} ${pos.side} @ ${entryLabel} (${pnlLabel})`;
 	});
 
 	const positionsLine =

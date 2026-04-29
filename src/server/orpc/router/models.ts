@@ -20,7 +20,11 @@ export const getModels = os
 				return { models };
 			} catch (error) {
 				Sentry.captureException(error);
-				throw new Error("Failed to fetch models");
+				throw new Error(
+					error instanceof Error
+						? `Failed to fetch models: ${error.message}`
+						: "Failed to fetch models",
+				);
 			}
 		});
 	});
@@ -38,7 +42,11 @@ export const getInvocations = os
 			} catch (error) {
 				console.error("Error fetching invocations", error);
 				Sentry.captureException(error);
-				throw new Error("Failed to fetch invocations");
+				throw new Error(
+					error instanceof Error
+						? `Failed to fetch invocations: ${error.message}`
+						: "Failed to fetch invocations",
+				);
 			}
 		});
 	});

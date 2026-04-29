@@ -7,7 +7,7 @@
 
 import { QueryClient } from "@tanstack/react-query";
 import { isValidVariantId } from "@/core/shared/variants";
-import { fallback_model } from "@/env";
+import { fallbackModel } from "@/env";
 
 import { listModels } from "@/server/db/tradingRepository";
 import {
@@ -49,12 +49,12 @@ import {
 	prepareConsensusWorkflowFromModels,
 } from "@/server/features/trading/execution/orchestrator";
 import { buildTradingPrompts } from "@/server/features/trading/prompting/promptBuilder";
-import type { VariantId } from "@/server/features/trading/prompting/prompts/variants";
+import type { VariantId } from "@/core/shared/variants";
 import {
 	getSharedNewsDigest,
 	invalidateNewsCache,
 } from "@/server/integrations/alpaca-news";
-import { TRADEABLE_VARIANT_IDS } from "@/shared/variants";
+import { TRADEABLE_VARIANT_IDS } from "@/core/shared/variants";
 
 import { createTradeAgent, type ToolContext } from "../agent";
 
@@ -169,10 +169,10 @@ const resolveFallbackCandidates = async (params: {
 		if (candidates.length === 2) break;
 	}
 
-	if (candidates.length === 0 && fallback_model) {
+	if (candidates.length === 0 && fallbackModel) {
 		candidates.push({
-			id: "env:fallback_model",
-			reasoningModel: fallback_model,
+			id: "env:fallbackModel",
+			reasoningModel: fallbackModel,
 			source: "env",
 		});
 	}
@@ -256,10 +256,10 @@ export async function runTradeWorkflow(account: Account): Promise<string> {
 	const modelInvocation = await createInvocationMutation(account.id);
 
 	// Calculate performance metrics
-	const currentPortfolioValue = Number.parseFloat(portfolio.total);
+	const currentPortfolioValue = portfolio.totalValue;
 	if (!Number.isFinite(currentPortfolioValue)) {
 		throw new Error(
-			`Invalid portfolio total for ${account.name}: ${portfolio.total}`,
+			`Invalid portfolio total for ${account.name}: ${portfolio.totalValue}`,
 		);
 	}
 	const performanceMetrics = await calculatePerformanceMetrics(

@@ -21,8 +21,7 @@ import {
 	type OpenPositionSummary,
 } from "@/server/features/trading/data/positions";
 import { getTradingProvider } from "@/server/providers/alpaca";
-import { normalizeNumber } from "@/shared/formatting/numberFormat";
-import { toAlpacaSymbol, toCanonical } from "@/shared/markets/marketMetadata";
+import { toAlpacaSymbol, toCanonical } from "@/core/shared/markets/marketMetadata";
 
 export interface ClosedPositionSummary {
 	symbol: string;
@@ -78,9 +77,9 @@ const buildSummary = (
 	// Prefer Alpaca's cost_basis (avg_entry_price × qty) over manual recomputation
 	const entryNotional = position.costBasis ?? entryPrice * absQuantity;
 	const exitNotional = resolvedExitPrice * absQuantity;
-	const realizedPnl = normalizeNumber(position.realizedPnl);
-	const unrealizedPnl = normalizeNumber(position.unrealizedPnl);
-	const isLong = position.sign === "LONG";
+	const realizedPnl = position.realizedPnl;
+	const unrealizedPnl = position.unrealizedPnl;
+	const isLong = position.side === "LONG";
 
 	const directionalPnl =
 		(isLong ? resolvedExitPrice - entryPrice : entryPrice - resolvedExitPrice) *
@@ -95,7 +94,7 @@ const buildSummary = (
 
 	return {
 		symbol: requestedSymbol,
-		side: position.sign,
+		side: position.side,
 		quantity: absQuantity,
 		entryPrice,
 		exitPrice: resolvedExitPrice,

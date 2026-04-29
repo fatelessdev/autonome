@@ -2,7 +2,7 @@ import type { VariantId } from "@/core/shared/variants";
 import type {
 	TradingDecision,
 	TradingDecisionResult,
-} from "@/server/features/trading/contracts/tradingDecisions";
+} from "@/core/shared/trading/tradingDecisionTypes";
 
 export type TradeSide = "LONG" | "SHORT" | "UNKNOWN";
 
@@ -34,18 +34,17 @@ export type PositionExitPlan = {
 export type Position = {
 	symbol: string;
 	position: string;
-	sign: "LONG" | "SHORT";
+	side: "LONG" | "SHORT";
 	quantity?: number | null;
 	entryPrice?: number | null;
 	currentPrice?: number | null;
-	unrealizedPnl: string;
-	realizedPnl: string;
+	unrealizedPnl: number;
+	realizedPnl: number;
 	liquidationPrice: string;
 	leverage?: number;
 	notional?: string;
 	exitPlan?: PositionExitPlan | null;
 	confidence?: number | null;
-	signal?: "LONG" | "SHORT" | "HOLD";
 	lastDecisionAt?: string | null;
 	decisionStatus?: string | null;
 };
@@ -84,7 +83,7 @@ export type Conversation = {
 export type TradingDecisionCard = {
 	key: string;
 	symbol: string;
-	signal: "LONG" | "SHORT" | "HOLD";
+	side: "LONG" | "SHORT" | "HOLD";
 	action: "CREATE_POSITION" | "CLOSE_POSITION" | "UPDATE_EXIT_PLAN" | string;
 	quantity: number | null;
 	leverage: number | null;

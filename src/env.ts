@@ -83,7 +83,7 @@ export const ALPACA_PAPER = env.ALPACA_PAPER;
 // TAAPI API key for supplementary indicators (optional)
 export const TAAPI_API_KEY = env.TAAPI_API_KEY;
 // Optional reasoning-model fallback when a competition has only one model.
-export const fallback_model = env.FALLBACK_MODEL;
+export const fallbackModel = env.FALLBACK_MODEL;
 
 type ApiKeyRotator = {
 	getNext: () => string;

@@ -51,7 +51,6 @@ export const PositionSchema = z.object({
 	currentPrice: z.number().optional(),
 	unrealizedPnl: z.number().optional(),
 	exitPlan: ExitPlanSchema.optional(),
-	signal: z.string().optional(),
 	leverage: z.number().optional(),
 	confidence: z.number().optional(),
 	lastDecisionAt: z.string().optional(),

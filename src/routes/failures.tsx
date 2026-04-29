@@ -30,7 +30,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { useVariant, type VariantId } from "@/components/variant-provider";
+import { useVariant, type VariantIdWithAll } from "@/components/variant-provider";
 import { VariantSelector } from "@/components/variant-selector";
 import { cn } from "@/core/lib/utils";
 import { formatPercentValue } from "@/core/shared/formatting/numberFormat";
@@ -43,7 +43,7 @@ export const Route = createFileRoute("/failures")({
 	component: FailuresRoute,
 });
 
-type VariantFilter = VariantId;
+type VariantFilter = VariantIdWithAll;
 
 const formatDate = (date: Date) =>
 	new Intl.DateTimeFormat("en-US", {
@@ -326,13 +326,13 @@ function FailuresRoute() {
 							COMPETITION:
 						</span>
 						<VariantSelector
-							value={selectedVariant as VariantId}
+							value={selectedVariant}
 							onChange={setSelectedVariant}
 							className="hidden sm:inline-flex"
 						/>
 						<VariantSelector
 							layout="mobile"
-							value={selectedVariant as VariantId}
+							value={selectedVariant}
 							onChange={setSelectedVariant}
 							className="sm:hidden"
 						/>

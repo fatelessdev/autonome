@@ -11,7 +11,7 @@ import {
 import {
 	type MarketPrice,
 	useMarketPrices,
-} from "@/core/shared/markets/marketQueries";
+} from "@/server/orpc/marketQueries";
 
 const TRACKED_SYMBOLS = SUPPORTED_MARKETS;
 const TRACKED_SYMBOL_SET = new Set(TRACKED_SYMBOLS);

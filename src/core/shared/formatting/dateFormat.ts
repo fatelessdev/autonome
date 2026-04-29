@@ -45,3 +45,22 @@ export function formatIstTimestamp(
 	const core = `${month}/${day}, ${hour}:${minute}`;
 	return dayPeriod ? `${core} ${dayPeriod}` : `${core}`;
 }
+
+/**
+ * Format a duration between two dates as a human-readable string (e.g. "2D 5H 30M").
+ * Returns "<1M" when the duration is zero or negative.
+ */
+export function formatDuration(openedAt: Date, closedAt: Date): string {
+	const diffMs = closedAt.getTime() - openedAt.getTime();
+	if (diffMs <= 0) return "<1M";
+	const totalMinutes = Math.floor(diffMs / 60000);
+	const days = Math.floor(totalMinutes / (60 * 24));
+	const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+	const minutes = totalMinutes % 60;
+
+	const parts: string[] = [];
+	if (days > 0) parts.push(`${days}D`);
+	if (hours > 0) parts.push(`${hours}H`);
+	parts.push(`${minutes}M`);
+	return parts.join(" ");
+}

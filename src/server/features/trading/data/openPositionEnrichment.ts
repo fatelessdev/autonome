@@ -1,7 +1,6 @@
 import { toFiniteNumber } from "@/core/shared/trading/calculations";
 import type {
 	TradingDecisionWithContext,
-	TradingSignal,
 } from "@/server/features/trading/contracts/tradingDecisions";
 import type {
 	ExitPlanSummary,
@@ -11,7 +10,6 @@ import type {
 export interface EnrichedOpenPosition extends OpenPositionSummary {
 	exitPlan: ExitPlanSummary | null;
 	confidence: number | null;
-	signal?: TradingSignal;
 	lastDecisionAt: string | null;
 	decisionStatus: string | null;
 	notionalUsd: number | null;
@@ -105,7 +103,7 @@ export const computeRiskMetrics = (
 	let riskPercent: number | null = null;
 	if (quantity !== null && entryPrice !== null && stop !== null) {
 		const diff =
-			position.sign === "LONG" ? entryPrice - stop : stop - entryPrice;
+			position.side === "LONG" ? entryPrice - stop : stop - entryPrice;
 		if (diff > 0) {
 			riskUsd = diff * quantity;
 			if (notionalUsd && notionalUsd > 0) {
@@ -118,7 +116,7 @@ export const computeRiskMetrics = (
 	let rewardPercent: number | null = null;
 	if (quantity !== null && entryPrice !== null && target !== null) {
 		const diff =
-			position.sign === "LONG" ? target - entryPrice : entryPrice - target;
+			position.side === "LONG" ? target - entryPrice : entryPrice - target;
 		if (diff > 0) {
 			rewardUsd = diff * quantity;
 			if (notionalUsd && notionalUsd > 0) {
@@ -161,7 +159,6 @@ export const enrichOpenPositions = (
 			...position,
 			exitPlan,
 			confidence: decision?.confidence ?? position.confidence ?? null,
-			signal: decision?.signal ?? position.signal ?? position.sign,
 			lastDecisionAt:
 				decision?.createdAt?.toISOString?.() ?? position.lastDecisionAt ?? null,
 			decisionStatus:
@@ -205,7 +202,7 @@ export const summarizePositionRisk = (positions: EnrichedOpenPosition[]) => {
 
 			if (notional != null) {
 				acc.totalNotional += notional;
-				if (position.sign === "LONG") {
+				if (position.side === "LONG") {
 					acc.longExposure += notional;
 				} else {
 					acc.shortExposure += notional;

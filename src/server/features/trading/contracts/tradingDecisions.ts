@@ -1,28 +1,13 @@
-import { normalizeNumber } from "@/shared/formatting/numberFormat";
-import { toCanonical } from "@/shared/markets/marketMetadata";
+import { normalizeNumber } from "@/core/shared/formatting/numberFormat";
+import { toCanonical } from "@/core/shared/markets/marketMetadata";
+import type {
+	TradingDecision,
+	TradingDecisionResult,
+	TradingSide,
+} from "@/core/shared/trading/tradingDecisionTypes";
 
-export type TradingSignal = "LONG" | "SHORT" | "HOLD";
-
-export interface TradingDecision {
-	symbol: string;
-	signal: TradingSignal;
-	quantity: number | null;
-	leverage: number | null;
-	profitTarget: number | null;
-	stopLoss: number | null;
-	invalidationCondition: string | null;
-	invalidationPrice: number | null;
-	timeExit: string | null;
-	cooldownUntil: string | null;
-	confidence: number | null;
-	status?: string | null;
-}
-
-export interface TradingDecisionResult {
-	symbol: string;
-	success: boolean;
-	error?: string | null;
-}
+// Re-export shared types for backward compatibility
+export type { TradingDecision, TradingDecisionResult } from "@/core/shared/trading/tradingDecisionTypes";
 
 export interface TradingToolCallMetadata {
 	decisions: TradingDecision[];
@@ -44,7 +29,7 @@ export interface TradingDecisionWithContext extends TradingDecision {
 	result?: TradingDecisionResult | null;
 }
 
-const SIGNAL_LOOKUP: Record<string, TradingSignal> = {
+const SIGNAL_LOOKUP: Record<string, TradingSide> = {
 	LONG: "LONG",
 	SHORT: "SHORT",
 	HOLD: "HOLD",
@@ -67,7 +52,7 @@ const normalizeSymbol = (value: unknown): string | null => {
 	return toCanonical(str).toUpperCase();
 };
 
-const normalizeSignal = (value: unknown): TradingSignal | null => {
+const normalizeSignal = (value: unknown): TradingSide | null => {
 	const str = toStringValue(value);
 	if (!str) return null;
 	const upper = str.toUpperCase();
@@ -84,8 +69,8 @@ const parseDecisionCandidate = (value: unknown): TradingDecision | null => {
 	const symbol = normalizeSymbol(record.symbol ?? record.market);
 	if (!symbol) return null;
 
-	const signal = normalizeSignal(record.signal ?? record.side ?? record.action);
-	if (!signal) return null;
+	const side = normalizeSignal(record.signal ?? record.side ?? record.action);
+	if (!side) return null;
 
 	// Only accept explicit base-asset size fields, NOT notional/amount (which may be USD)
 	const quantity = normalizeNumber(
@@ -124,7 +109,7 @@ const parseDecisionCandidate = (value: unknown): TradingDecision | null => {
 
 	return {
 		symbol,
-		signal,
+		side,
 		quantity,
 		leverage,
 		profitTarget,
@@ -250,7 +235,17 @@ export const buildDecisionIndex = (
 	const index = new Map<string, TradingDecisionWithContext>();
 
 	for (const toolCall of toolCalls) {
-		const parsed = parseTradingToolCallMetadata(toolCall.metadata);
+		let parsed: TradingToolCallMetadata;
+		try {
+			parsed = parseTradingToolCallMetadata(toolCall.metadata);
+		} catch (error) {
+			console.warn(
+				`[DecisionIndex] Skipping malformed tool call ${toolCall.id}: ${
+					error instanceof Error ? error.message : String(error)
+				}`,
+			);
+			continue;
+		}
 		if (!parsed.decisions.length) continue;
 
 		const resultLookup = new Map<string, TradingDecisionResult>();

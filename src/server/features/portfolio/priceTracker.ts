@@ -119,6 +119,7 @@ export async function recordPortfolios() {
 					invocationCount: model.invocationCount,
 					id: model.id,
 					totalMinutes: model.totalMinutes,
+					variant: model.variant,
 				};
 				const portfolio = await queryClient.fetchQuery(portfolioQuery(account));
 				return { model, portfolio };
@@ -126,18 +127,15 @@ export async function recordPortfolios() {
 	);
 
 	const validSnapshots = portfolioResults.map(({ model, portfolio }) => {
-		if (
-			typeof portfolio.total !== "string" ||
-			!Number.isFinite(Number.parseFloat(portfolio.total))
-		) {
+		if (!Number.isFinite(portfolio.totalValue)) {
 			throw new Error(
-				`Invalid portfolio total for model ${model.id}: ${String(portfolio.total)}`,
+				`Invalid portfolio total for model ${model.id}: ${portfolio.totalValue}`,
 			);
 		}
 
 		return {
 			modelId: model.id,
-			netPortfolio: portfolio.total,
+			netPortfolio: portfolio.totalValue.toFixed(2),
 		};
 	});
 

@@ -7,7 +7,7 @@ This document tracks planned features and improvements moved from known issues.
 ---
 
 ## Planned Improvements
-
+<!-- 
 ### 1. Tool Call Analyzer Disabled (CRITICAL)
 **File:** `src/server/features/trading/tradeExecutor.ts:346-356`  
 **Severity:** Critical  
@@ -20,7 +20,7 @@ This document tracks planned features and improvements moved from known issues.
 ```
 **Impact:** No detection of AI intent vs. execution mismatch. We're blind to tool call failures.
 
-**Fix:** Uncomment and ensure the rewritten deterministic analyzer is working.
+**Fix:** Uncomment and ensure the rewritten deterministic analyzer is working. -->
 
 ---
 
@@ -58,11 +58,11 @@ const consensusModel = models.find((m) => m.name === CONSENSUS_MODEL_NAME);
 ```
 **Impact:** `runConsensusWorkflow` exists but is never called. Dead code.
 
-**Fix:** Either implement the consensus trigger or remove the dead code.
+**Fix:** Implement the consensus trigger
 
 ---
 
-### 5. No Output Sanitization Fallback (HIGH)
+<!-- ### 5. No Output Sanitization Fallback (HIGH)
 **File:** `src/server/features/trading/tradeExecutor.ts`  
 **Severity:** High  
 **Description:** If LLM returns malformed JSON, the entire invocation fails. No recovery attempt.
@@ -73,7 +73,7 @@ def _sanitize_output(raw_content: str, assets_list):
     payload = {"model": self.sanitize_model, ...}  # gpt-4o-mini
 ```
 
-**Fix:** Add sanitization pass using a cheap model before giving up.
+**Fix:** Add sanitization pass using a cheap model before giving up. -->
 
 ---
 
@@ -92,7 +92,7 @@ def _sanitize_output(raw_content: str, assets_list):
 
 ---
 
-### 8. Confidence-Based Routing Not Implemented (MEDIUM)
+<!-- ### 8. Confidence-Based Routing Not Implemented (MEDIUM)
 **File:** `src/server/features/trading/tradeExecutor.ts`  
 **Severity:** Medium  
 **Description:** Per ultimate-plan.md:
@@ -104,11 +104,11 @@ Confidence < 4: Reject
 ```
 But `confidence` field is passed through schema and never used for routing.
 
-**Fix:** Add routing logic based on confidence thresholds.
+**Fix:** Add routing logic based on confidence thresholds. -->
 
 ---
 
-### 9. Circuit Breaker Missing (MEDIUM)
+<!-- ### 9. Circuit Breaker Missing (MEDIUM)
 **File:** Missing - needs to be created  
 **Severity:** Medium  
 **Description:** Per ultimate-plan.md:
@@ -117,7 +117,7 @@ But `confidence` field is passed through schema and never used for routing.
 
 `PortfolioSize` table exists but no circuit breaker logic.
 
-**Fix:** Create `circuitBreaker.ts`, check at start of `runTradeWorkflow`.
+**Fix:** Create `circuitBreaker.ts`, check at start of `runTradeWorkflow`. -->
 
 ---
 

@@ -1,7 +1,8 @@
 /**
  * Market Metadata for Alpaca Trading
  *
- * Crypto symbols use "X/USD" format on Alpaca (e.g. "BTC/USD").
+ * Crypto symbols use "X/USD" format on Alpaca (e.g. "BTC/USD"), but the
+ * resolver also accepts compact forms like "BTCUSD" from Alpaca position data.
  * The `symbol` key is the Alpaca-formatted symbol.
  * `canonical` is the short form used in our DB and UI (e.g. "BTC").
  */
@@ -61,9 +62,16 @@ export function isSupportedMarketSymbol(value: string): value is MarketSymbol {
 const normalizeRawSymbol = (value: string) =>
 	value.toUpperCase().trim().replace(/\s+/g, "");
 
+const normalizeComparableSymbol = (value: string) =>
+	normalizeRawSymbol(value).replace(/[^A-Z0-9]/g, "");
+
 function findMarketByAlpacaSymbol(normalizedSymbol: string) {
+	const comparableSymbol = normalizeComparableSymbol(normalizedSymbol);
+
 	return Object.values(MARKETS).find(
-		(market) => market.symbol === normalizedSymbol,
+		(market) =>
+			normalizeComparableSymbol(market.symbol) === comparableSymbol ||
+			normalizeComparableSymbol(`${market.canonical}USD`) === comparableSymbol,
 	);
 }
 

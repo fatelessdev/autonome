@@ -1,0 +1,8 @@
+import { describe, it, expect } from "vitest";
+
+describe("marketIntelligenceCache", () => {
+	it("can be imported", async () => {
+		const mod = await import("./marketIntelligenceCache");
+		expect(mod).toBeDefined();
+	});
+});

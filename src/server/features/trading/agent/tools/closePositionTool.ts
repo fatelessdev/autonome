@@ -51,9 +51,9 @@ export function closePositionTool(ctx: ToolContext) {
 					}
 					return p.symbol.toUpperCase() === upper;
 				});
-				if (position?.exitPlan?.cooldownUntil && position.sign) {
+				if (position?.exitPlan?.cooldownUntil && position.side) {
 					ctx.closedPositionCooldowns.set(upper, {
-						side: position.sign as "LONG" | "SHORT",
+						side: position.side as "LONG" | "SHORT",
 						cooldownUntil: position.exitPlan.cooldownUntil,
 					});
 				}
