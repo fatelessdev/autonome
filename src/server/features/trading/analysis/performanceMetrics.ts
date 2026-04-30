@@ -10,8 +10,8 @@ import {
 	getClosedOrdersByModel,
 	getTotalRealizedPnl,
 } from "@/server/db/ordersRepository.server";
-import type { Account } from "@/server/features/trading/contracts/accounts";
 import { getSharpeRatio } from "@/server/features/portfolio/welfordService";
+import type { Account } from "@/server/features/trading/contracts/accounts";
 import { getTradingProvider } from "@/server/providers/alpaca";
 
 export type PerformanceMetrics = {
@@ -126,7 +126,7 @@ export async function calculatePerformanceMetrics(
 	const welfordResult = getSharpeRatio(account.id);
 	const welfordSharpeRatio = welfordResult.isValid
 		? welfordResult.sharpeRatio.toFixed(3)
-		: welfordResult.reason ?? "N/A";
+		: (welfordResult.reason ?? "N/A");
 
 	if (portfolioValues.length < 2) {
 		if (alpacaHistory.base_value == null) {

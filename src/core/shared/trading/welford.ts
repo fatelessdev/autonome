@@ -63,7 +63,10 @@ export function createWelfordState(): WelfordState {
  * @param newValue New observation to incorporate
  * @returns Updated state (same reference as input)
  */
-export function welfordUpdate(state: WelfordState, newValue: number): WelfordState {
+export function welfordUpdate(
+	state: WelfordState,
+	newValue: number,
+): WelfordState {
 	state.count += 1;
 	const delta = newValue - state.mean;
 	state.mean += delta / state.count;
@@ -203,7 +206,12 @@ export function deserializeWelfordState(data: unknown): WelfordState {
 		const mean = Number(obj.mean);
 		const m2 = Number(obj.m2);
 		const count = Number(obj.count);
-		if (Number.isFinite(mean) && Number.isFinite(m2) && Number.isFinite(count) && count >= 0) {
+		if (
+			Number.isFinite(mean) &&
+			Number.isFinite(m2) &&
+			Number.isFinite(count) &&
+			count >= 0
+		) {
 			return { mean, m2, count };
 		}
 	}

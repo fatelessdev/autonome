@@ -189,7 +189,7 @@ describe("technicalIndicators", () => {
 
 	describe("roundValue", () => {
 		it("should round valid numbers", () => {
-			expect(roundValue(3.14159, 2)).toBe(3.14);
+			expect(roundValue(Math.PI, 2)).toBe(3.14);
 		});
 
 		it("should return null for null/undefined", () => {

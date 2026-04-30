@@ -14,13 +14,13 @@
 
 import { desc, eq } from "drizzle-orm";
 import {
-	type WelfordState,
-	type SharpeResult,
-	createWelfordState,
-	welfordUpdate,
-	computeSharpeFromWelford,
 	computePeriodReturn,
+	computeSharpeFromWelford,
+	createWelfordState,
+	type SharpeResult,
 	serializeWelfordState,
+	type WelfordState,
+	welfordUpdate,
 } from "@/core/shared/trading/welford";
 import { db } from "@/db";
 import { portfolioSize } from "@/db/schema";
@@ -77,10 +77,7 @@ async function initializeFromHistory(modelId: string): Promise<void> {
 		if (snapshots.length < 2) {
 			// Not enough history to bootstrap; start fresh
 			if (snapshots.length === 1) {
-				lastPortfolioValues.set(
-					modelId,
-					Number(snapshots[0].netPortfolio),
-				);
+				lastPortfolioValues.set(modelId, Number(snapshots[0].netPortfolio));
 			}
 			return;
 		}
@@ -109,10 +106,7 @@ async function initializeFromHistory(modelId: string): Promise<void> {
 			`[Welford] Bootstrapped ${modelId}: ${state.count} historical returns loaded`,
 		);
 	} catch (error) {
-		console.error(
-			`[Welford] Failed to bootstrap state for ${modelId}:`,
-			error,
-		);
+		console.error(`[Welford] Failed to bootstrap state for ${modelId}:`, error);
 		// Start fresh on error
 		welfordStates.set(modelId, createWelfordState());
 	}

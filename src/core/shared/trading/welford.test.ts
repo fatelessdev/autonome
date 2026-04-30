@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
 	ANNUALIZATION_FACTOR,
-	MIN_SHARPE_SAMPLES,
 	computePeriodReturn,
 	computeSharpeFromWelford,
 	createWelfordState,
 	deserializeWelfordState,
+	MIN_SHARPE_SAMPLES,
 	serializeWelfordState,
 	welfordStdDev,
 	welfordUpdate,
@@ -190,7 +190,8 @@ describe("Welford's Online Algorithm", () => {
 			for (let rep = 0; rep < 7; rep++) {
 				allReturns.push(...baseReturns);
 			}
-			const batchMean = allReturns.reduce((a, b) => a + b, 0) / allReturns.length;
+			const batchMean =
+				allReturns.reduce((a, b) => a + b, 0) / allReturns.length;
 			const batchVar =
 				allReturns.reduce((sum, r) => sum + (r - batchMean) ** 2, 0) /
 				(allReturns.length - 1);
@@ -270,8 +271,12 @@ describe("Welford's Online Algorithm", () => {
 			expect(deserializeWelfordState(null).count).toBe(0);
 			expect(deserializeWelfordState(undefined).count).toBe(0);
 			expect(deserializeWelfordState("garbage").count).toBe(0);
-			expect(deserializeWelfordState({ mean: "bad", m2: 0, count: 0 }).count).toBe(0);
-			expect(deserializeWelfordState({ mean: 0, m2: 0, count: -1 }).count).toBe(0);
+			expect(
+				deserializeWelfordState({ mean: "bad", m2: 0, count: 0 }).count,
+			).toBe(0);
+			expect(deserializeWelfordState({ mean: 0, m2: 0, count: -1 }).count).toBe(
+				0,
+			);
 		});
 
 		it("preserves state across simulated trade cycles", () => {
