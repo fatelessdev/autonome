@@ -1,8 +1,8 @@
 # Future Plan & Backlog
 
-**Last updated:** 2026-01-27
+**Last updated:** 2026-05-01
 
-This document tracks planned features and improvements moved from known issues.
+This document tracks planned features and improvements. All previously resolved items (minimum trade size, leverage caps, prompt deduplication, trade size auto-adjustment) have been implemented and removed.
 
 ---
 
@@ -24,41 +24,11 @@ This document tracks planned features and improvements moved from known issues.
 
 ---
 
-### 2. No Per-Symbol Leverage Caps (CRITICAL)
-**File:** Missing - needs to be created
-**Severity:** Critical
-**Description:** Autonome relies on a single `MAX_LEVERAGE` constant in prompts (often 50x+), but exchanges like Lighter/Binance have different limits per symbol (e.g., BTC 100x vs ALT 25x).
-**Impact:** AI may request 50x on an altcoin capped at 25x, causing order rejection and failed workflow.
-
-**Comparison:** Bonerbots has `leverageLimits.ts` mapping specific caps per symbol.
-
-**Fix:** Create `leverageLimits.ts` and validate in `createPositionTool.ts`.
-
----
-
-### 3. No Minimum Trade Size Validation (CRITICAL)
-**File:** `src/server/features/trading/agent/tools/createPositionTool.ts`
-**Severity:** Critical
-**Description:** No check for minimum order value.
-**Impact:** AI could open tiny $5 dust positions that are eaten by gas/fees or rejected by exchange.
-
-**Comparison:** Bonerbots enforces $50 minimum.
-
-**Fix:** Add `MINIMUM_TRADE_SIZE_USD = 50` constant and validation.
-
----
-
-### 4. Consensus Workflow Dead Code (HIGH)
-**File:** `src/server/features/trading/orchestrator.ts` + `tradeExecutor.ts:389-390`  
-**Severity:** High  
-**Description:** Consensus model is filtered out but never actually executed:
-```typescript
-const consensusModel = models.find((m) => m.name === CONSENSUS_MODEL_NAME);
-// ... consensusModel is never used after this
-```
-**Impact:** `runConsensusWorkflow` exists but is never called. Dead code.
-
-**Fix:** Implement the consensus trigger
+### Consensus Workflow (Future Implementation)
+**Status:** Removed from codebase (was dead code) — preserved here for future consideration.
+**Previous files:** `consensusOrchestrator.ts`, `consensusVoting.ts`
+**Description:** A full consensus orchestrator (720 lines) existed but was never called in production. The code has been removed to reduce maintenance burden. If revived, implement as a 2-stage pipeline (screen → decide) rather than parallel voting.
+**Effort:** 2-4 hours to re-implement from scratch
 
 ---
 
@@ -74,21 +44,6 @@ def _sanitize_output(raw_content: str, assets_list):
 ```
 
 **Fix:** Add sanitization pass using a cheap model before giving up. -->
-
----
-
-### 7. Prompt Files Repeat Identical Sections (MEDIUM)
-**Files:** `src/server/features/trading/prompts/prompt1.ts` through `prompt5.ts`  
-**Severity:** Medium  
-**Description:** Each file contains identical:
-- HYSTERESIS RULE section
-- COOLDOWN MECHANISM section  
-- EXIT PLAN REQUIREMENTS section
-- REASONING FRAMEWORK section
-
-**Impact:** Updates require changing 5+ files (already happened per implementation log).
-
-**Fix:** Create `promptBase.ts` with shared rules, compose into individual prompts.
 
 ---
 
@@ -118,14 +73,5 @@ But `confidence` field is passed through schema and never used for routing.
 `PortfolioSize` table exists but no circuit breaker logic.
 
 **Fix:** Create `circuitBreaker.ts`, check at start of `runTradeWorkflow`. -->
-
----
-
-### 10. No Trade Size Auto-Adjustment (MEDIUM)
-**File:** `src/server/features/trading/agent/tools/createPositionTool.ts`
-**Severity:** Medium
-**Description:** If AI requests trade size > available balance, it likely fails.
-**Comparison:** Bonerbots automatically adjusts size down to fit available margin.
-**Fix:** Add logic to cap trade size at `availableBalance`.
 
 ---

@@ -31,6 +31,24 @@ This is the single consolidated plan merging `ultimate-plan.md` (Gemini/GLM/Clau
 | News integration (Alpaca News API) | DONE | `integrations/alpaca-news/client.ts` |
 | Reasoning framework in prompts | DONE | All variant prompts mandate structured analysis |
 | First-Principles Reasoning Recipe | DONE | Active in sovereign, trendsurfer, contrarian prompts |
+| Minimum Trade Size Validation | DONE | `MINIMUM_TRADE_SIZE_USD = 50` in `createPosition.ts` |
+| Trade Size Auto-Adjustment | DONE | Capped to available balance in `createPosition.ts` |
+| Leverage Removal | DONE | All active surfaces clean (prompts, UI, analytics) |
+| Fee Awareness in Prompts | DONE | All 3 variants via `promptBase.ts` |
+| Prompt File Deduplication | DONE | `promptBase.ts` exports shared sections |
+| Tool Schema Documentation | DONE | `{{TOOL_REFERENCE}}` in all variants |
+| Cache Timing Consolidation | DONE | `CACHE_TIMING` from `cacheConfig.ts` |
+| 5-Minute Interval Constant | DONE | `TRADE_CYCLE_INTERVAL` shared constant |
+| WORKFLOW_POSTGRES_URL Removal | DONE | Removed from env.ts and .env.example |
+| Symbol Action Counts Cleanup | DONE | Plumbing removed; `MAX_ACTIONS_PER_SYMBOL` preserved in `types.ts` |
+| Consensus Dead Code Removal | DONE | Files deleted, references removed |
+| Position Reconciliation | DONE | `reconciliation.ts` with RECONCILE trigger |
+| Staleness Scoring | DONE | `stalenessAnalyzer.ts` (0-100 composite) |
+| Fill Verification with Exponential Backoff | DONE | 500ms → 1s → 2s → 4s in `createPosition.ts` |
+| Online Sharpe Ratio | DONE | Welford's algorithm in `welfordService.ts` + `welford.ts` |
+| Error Deduplication | DONE | `errorDeduplicator.ts` with 5-min sliding window |
+| Open Interest Data | DONE | Binance Futures OI via `binance-oi/` integration |
+| Correlation Matrix | DONE | `correlationMatrix.ts` with prompt warnings at r > 0.8 |
 
 ---
 
@@ -90,134 +108,7 @@ async function sell(symbol: string, reason: string): Promise<boolean> {
 
 ---
 
-### 1.3 Per-Symbol Leverage Caps
-
-**Problem:** Autonome relies on a single `MAX_LEVERAGE` constant in prompts (often 50x+), but exchanges have different limits per symbol (e.g., BTC 100x vs ALT 25x). AI may request 50x on an altcoin capped at 25x, causing order rejection.
-
-**Source:** Bonerbots `leverageLimits.ts` — 74 lines, 170+ symbols
-
-```typescript
-// bonerbots/leverageLimits.ts
-export const leverageLimits = new Map<string, number>([
-    ["BTCUSDT", 100], ["ETHUSDT", 100], ["SOLUSDT", 25],
-    ["DOGEUSDT", 25], ["BNBUSDT", 100], ["XRPUSDT", 25],
-    // ... 160+ more symbols with specific limits
-]);
-
-// bonerbots/hooks/useTradingBot.ts:231-239
-const maxLeverage = leverageLimits.get(decision.symbol) ?? 25;
-if (adjustedLeverage > maxLeverage) {
-    notes.push(`NOTE: Leverage for ${decision.symbol} adjusted from ${adjustedLeverage}x to exchange max of ${maxLeverage}x.`);
-    adjustedLeverage = maxLeverage;
-}
-```
-
-**Implementation:**
-- Create `leverageLimits.ts` mapping for Alpaca/exchange symbols
-- Validate and auto-cap in `createPositionTool.ts` before executing
-
-**Files to create:** `leverageLimits.ts`
-**Files to modify:** `createPositionTool.ts`
-**Effort:** 3 hours
-
----
-
-### 1.4 Minimum Trade Size Validation
-
-**Problem:** No check for minimum order value. AI could open tiny $5 dust positions that are eaten by gas/fees or rejected by exchange.
-
-**Source:** Bonerbots enforces $50 minimum:
-```typescript
-const MINIMUM_TRADE_SIZE_USD = 50;
-if (decision.size && decision.size < MINIMUM_TRADE_SIZE_USD) {
-    notes.push(`REJECTED ${decision.action} ${decision.symbol}: Margin $${decision.size.toFixed(2)} is below minimum of $${MINIMUM_TRADE_SIZE_USD}.`);
-    return;
-}
-```
-
-**Implementation:**
-- Add `MINIMUM_TRADE_SIZE_USD = 50` constant
-- Add validation in `createPositionTool.ts`
-
-**Files to modify:** `createPositionTool.ts`, `types.ts`
-**Effort:** 30 minutes
-
----
-
-### 1.5 Trade Size Auto-Adjustment
-
-**Problem:** If AI requests trade size > available balance, the trade fails entirely.
-
-**Source:** Bonerbots gracefully adjusts:
-```typescript
-if (tradeSize > availableBalance) {
-    notes.push(`NOTE: Trade size adjusted from $${tradeSize.toFixed(2)} to fit available margin of $${availableBalance.toFixed(2)}.`);
-    tradeSize = availableBalance;
-}
-```
-
-**Implementation:**
-- Add logic in `createPositionTool.ts` to cap trade size at `availableBalance`
-- Log the adjustment
-
-**Files to modify:** `createPositionTool.ts`
-**Effort:** 1 hour
-
----
-
 ## PART 2: AGENTIC INTELLIGENCE UPGRADES
-
-### 2.1 Staleness Scoring for Position Management
-
-**Problem:** Autonome has **no position aging or staleness detection**. Positions stay open until the LLM decides to close them. If the LLM forgets about a position (context window overflow, model change, prompt drift), the position can sit indefinitely. The `exitPlan` has a `timeExit` field but it's never enforced programmatically.
-
-**Source:** MAHORAGA `src/strategy/default/rules/staleness.ts` (74 lines)
-
-**How it works:** A 0-100 composite score across three dimensions:
-
-| Component | Max Points | Formula |
-|---|---|---|
-| Time Held | 40 | 40 at 3+ days; linear 0-20 between 2-3 days; 0 below 2 days |
-| Price Action | 30 | `min(30, |negative_pnl%| * 3)` for losses; 15 if held 2+ days with <3% gain |
-| Social Volume Decay | 30 | 30 if volume dropped to ≤30% of entry; 15 if ≤50% |
-
-**Stale trigger:** Score >= 70, OR (held >= 3 days AND gain < 5%).
-
-```typescript
-// Time-based scoring (max 40 pts)
-if (holdDays >= config.stale_max_hold_days) {        // 3+ days = full 40
-    stalenessScore += 40;
-} else if (holdDays >= config.stale_mid_hold_days) { // 2-3 days = linear 0-20
-    stalenessScore += (20 * (holdDays - config.stale_mid_hold_days))
-        / (config.stale_max_hold_days - config.stale_mid_hold_days);
-}
-
-// Price action scoring (max 30 pts)
-if (pnlPct < 0) {
-    stalenessScore += Math.min(30, Math.abs(pnlPct) * 3);  // -10% = 30 pts
-} else if (pnlPct < config.stale_mid_min_gain_pct && holdDays >= config.stale_mid_hold_days) {
-    stalenessScore += 15;  // Held 2+ days but under 3% gain
-}
-
-const isStale = stalenessScore >= 70 ||
-    (holdDays >= config.stale_max_hold_days && pnlPct < config.stale_min_gain_pct);
-```
-
-The 24-hour grace period (`stale_min_hold_hours`) prevents premature exits.
-
-**Adaptation for Autonome:** Replace "social volume decay" with "funding rate cost accumulation" as the third dimension — a position paying high funding for days is stale.
-
-**Implementation:**
-1. Create `src/server/features/trading/stalenessAnalyzer.ts`
-2. Port the 3-dimension formula with configurable thresholds per variant
-3. Compute staleness scores during `promptBuilder.ts` and inject into `{{OPEN_POSITIONS_TABLE}}` so the LLM sees `staleness: 72/100 (STALE - consider exit)`
-4. Add `entry_time` column to Orders table if not already tracked
-5. Hard circuit breaker: auto-close positions with staleness > 95 without waiting for LLM
-6. Add configurable thresholds per variant in `prompts/variants.ts`
-
-**Files to modify:** `promptSections.ts`, `promptBuilder.ts`, `schema.ts`
-**Files to create:** `stalenessAnalyzer.ts`
-**Effort:** 3 hours
 
 ---
 <!-- 
@@ -333,121 +224,13 @@ export async function sanitizeAgentOutput(
 
 ---
 
-### 2.5 Position Reconciliation
+### 2.5 Position Reconciliation (Future Enhancement)
 
-**Problem:** Autonome trusts internal DB state. No reconciliation with exchange. If a position closes externally (liquidation, manual close), the DB doesn't know.
-
-**Source:** AI-Trading-Agent reconciles every cycle:
-```python
-for tr in active_trades[:]:
-    asset = tr.get('asset')
-    if asset not in assets_with_positions and asset not in assets_with_orders:
-        add_event(f"Reconciling stale active trade for {asset}")
-        active_trades.remove(tr)
-```
-
-**Implementation:**
-```typescript
-// Add to autonome/src/server/features/trading/reconciliation.ts
-export async function reconcilePositions(account: Account): Promise<void> {
-  const exchangePositions = await getOpenPositions(account.apiKey, account.accountIndex, account.id);
-  const dbOrders = await getOpenOrdersByModel(account.id);
-  
-  const exchangeSymbols = new Set(exchangePositions.map(p => canonicalSymbol(p.symbol)));
-  
-  for (const dbOrder of dbOrders) {
-    const symbol = canonicalSymbol(dbOrder.symbol);
-    if (!exchangeSymbols.has(symbol)) {
-      console.warn(`[Reconcile] Orphaned DB order for ${symbol}, marking closed`);
-      await closeOrder({
-        orderId: dbOrder.id,
-        exitPrice: "0",
-        realizedPnl: "0",
-        closeTrigger: "RECONCILE",
-      });
-    }
-  }
-}
-```
-
-**Files to create:** `reconciliation.ts`
-**Files to modify:** `tradeWorkflow.ts` (add reconciliation step per cycle)
-**Effort:** 3 hours
-
----
-
-### 2.6 Structured Reasoning Field
-
-**Problem:** The `agentOutputSchema` has only `status`, `summary`, `actionsCount`. No structured `reasoning` field. Reasoning is mixed into response text, not structured or queryable.
-
-**Source:** AI-Trading-Agent forces reasoning extraction:
-```python
-reasoning_text = outputs.get("reasoning", "")
-if reasoning_text:
-    add_event(f"LLM reasoning summary: {reasoning_text}")
-```
-
-**Implementation:**
-- Add `reasoning` to `agentOutputSchema` in `schemas.ts`
-- Ensure reasoning is stored in invocation records for audit trail
-
-```typescript
-export const agentOutputSchema = z.object({
-  reasoning: z.string().describe("Step-by-step analysis before decisions"),
-  status: z.enum(["trading", "holding"]),
-  summary: z.string(),
-  actionsCount: z.number(),
-});
-```
-
-**Files to modify:** `schemas.ts`, invocation recording logic
-**Effort:** 1 hour
-
----
-
-### 2.7 Fill Verification with Exponential Backoff
-
-**Problem:** Fill polling exists (`createPosition.ts` lines 263-281) but uses simple linear polling (500ms x 5 attempts). No exponential backoff, no retry on failure, no alert on persistent failure.
-
-**Source:** AI-Trading-Agent waits and confirms fills:
-```python
-order = await hyperliquid.place_buy_order(asset, amount)
-await asyncio.sleep(1)
-fills_check = await hyperliquid.get_recent_fills(limit=10)
-filled = False
-for fc in reversed(fills_check):
-    if fc.get('coin') == asset:
-        filled = True
-        break
-```
-
-**Implementation:**
-- Upgrade fill polling to exponential backoff (500ms → 1s → 2s → 4s)
-- After 3 failures, alert and abort
-- Log all attempts for audit trail
-
-**Files to modify:** `createPosition.ts` (fill polling section)
-**Effort:** 2 hours
+The basic reconciliation has been implemented (`reconciliation.ts`). Future enhancement: add bracket SL/TP trigger awareness so reconciliation can log `closeTrigger: "bracket_sl"` / `"bracket_tp"` instead of generic "RECONCILE".
 
 ---
 
 ## PART 3: DATA & INTELLIGENCE ENRICHMENT
-
-### 3.1 Open Interest Data
-
-**Problem:** OI is marked as "done" in original plan but NOT actually implemented. OI confirms trend strength:
-- Rising price + Rising OI = Strong trend (institutions adding)
-- Rising price + Falling OI = Weak rally (short covering)
-
-**Implementation:**
-- Check if Alpaca API provides OI for crypto. If not, use CoinGlass or Coinalyze API
-- Add OI change % to market intelligence section
-- Inject into `{{MARKET_INTELLIGENCE}}` prompt section
-
-**Files to modify:** `marketData.ts`, `marketIntelligenceCache.ts`, `promptSections.ts`
-**Effort:** 2-4 hours
-
----
 
 ### 3.2 News/Sentiment Scoring Integration
 
@@ -492,70 +275,6 @@ Signals aggregated per symbol, weighted by source trust × flair multiplier × t
 
 **Files to create:** `intelligence/sentimentGatherer.ts`, `intelligence/signalAggregator.ts`
 **Effort:** Level 1: 2-3 hours, Level 2: 8-12 hours total
-
----
-
-### 3.3 Fee Awareness in Prompts
-
-**Problem:** Active prompts contain zero mentions of fees, commissions, or trading costs. AI doesn't factor in fee drag.
-
-**Source:** Bonerbots prominently warns:
-```
-"IMPORTANT: Every trade, both opening and closing, has a 3% fee."
-"Your profit must be significant to overcome these fees. DO NOT BE A PAPER-HANDED BITCH."
-```
-
-**Implementation:**
-- Add fee context to all variant prompts
-- Include: "Every round-trip trade (open + close) costs approximately X% in fees + slippage. Your profit target must exceed this."
-
-**Files to modify:** All variant prompt files in `prompts/`
-**Effort:** 30 minutes
-
----
-
-### 3.4 Tool Schema Documentation in System Prompt
-
-**Problem:** Prompts describe tools with brief one-liners. The LLM must infer tool behavior from Zod schema descriptions. This leads to parameter errors.
-
-**Source:** Vibetrading `agent/prompt.py` (501 lines) includes complete API reference with exact return type schemas, 18 constraint rules with correct/incorrect examples, and a full working strategy example.
-
-```python
-VIBETRADING_API_REFERENCE = """
-#### `get_perp_summary() -> dict`
-Return structure:
-{
-    "account_value": 10234.56,
-    "available_margin": 5789.12,
-    "positions": [{"asset": "BTC", "side": "long", ...}]
-}
-Usage:
-perp_summary = get_perp_summary()
-available_margin = perp_summary.get("available_margin", 0.0)
-"""
-```
-
-**Implementation:**
-- Add a `{{TOOL_REFERENCE}}` section to each variant's system prompt
-- Document each tool's parameters, return types, and usage examples
-- Include constraint rules like: "ALWAYS set stop loss below entry for longs", "NEVER request leverage above exchange maximum"
-
-**Files to modify:** All variant prompt files in `prompts/`
-**Effort:** 2 hours
-
----
-
-### 3.5 Correlation Matrix
-
-**Problem:** "Can't long BTC+ETH together" exists as prompt text but no visualization or dynamic tracking.
-
-**Solution:**
-- Calculate rolling 24h correlation between all asset pairs
-- Display as heatmap in UI
-- If correlation > 0.8, warn AI in prompt: "BTC-ETH correlation 0.85 - avoid stacking"
-
-**Files to create:** `correlationMatrix.ts`, frontend heatmap component
-**Effort:** 4-6 hours
 
 ---
 
@@ -643,73 +362,17 @@ def _should_execute_order(self, order, current_price, high=None, low=None):
 
 ---
 
-### 4.4 Consensus Workflow (Revive or Remove)
+### 4.4 Consensus Workflow (Future Implementation)
 
-**Problem:** Full consensus orchestrator exists at `consensusOrchestrator.ts` (720 lines) but is dead code — never called. The `tradeWorkflow.ts` filters it out.
-
-**Options:**
-1. **Revive:** Implement as 2-stage pipeline (screen → decide) rather than parallel voting
-2. **Remove:** Delete the dead code to reduce maintenance burden
-
-**Decision needed from user.** ALWAYS CHOOSE OPTION 1
-
-**Files:** `consensusOrchestrator.ts`, `tradeWorkflow.ts`
-**Effort:** 2-4 hours to revive, 30 min to remove
-
----
-
-### 4.5 Prompt File Deduplication
-
-**Problem:** Each prompt file contains identical HYSTERESIS, COOLDOWN, EXIT PLAN, REASONING sections. Updates require changing 5+ files.
-
-**Solution:** Create `promptBase.ts` with shared rules, compose into individual prompts.
-
-**Files to create:** `promptBase.ts`
-**Files to modify:** All variant prompt files
-**Effort:** 2 hours
+**Status:** Removed from codebase (was dead code) — preserved here for future consideration.
+**Previous files:** `consensusOrchestrator.ts`, `consensusVoting.ts`
+**Description:** A full consensus orchestrator (720 lines) existed but was never called in production. The code has been removed to reduce maintenance burden. If revived, implement as a 2-stage pipeline (screen → decide) rather than parallel voting.
+**Effort:** 2-4 hours to re-implement from scratch
 
 ---
 
 ## PART 5: ANALYTICS & MONITORING
 
-### 5.1 Online Sharpe Ratio Tracker
-
-**Problem:** Sharpe is calculated in batch mode (simple mean/stddev from stored data). Not real-time.
-
-**Source:** Vibetrading `core/backtest.py:284-298` — Welford's online algorithm:
-```python
-d1 = ret - tracker['mean']
-tracker['mean'] += d1 / n          # running mean
-d2 = ret - tracker['mean']
-tracker['m2'] += d1 * d2           # running M2 (Welford's)
-# variance = m2 / (n - 1)
-```
-
-**Implementation:**
-- Add online Sharpe tracker to portfolio snapshot scheduler
-- Store only `{mean, m2, count, last_value}` in scheduler state
-- Expose via health endpoint
-
-**Files to modify:** `priceTracker.ts`, scheduler state
-**Effort:** 1 hour
-
----
-
-### 5.2 Error Deduplication for Logging
-
-**Problem:** Repeated failures spam logs with identical error messages.
-
-**Source:** Both MAHORAGA and Vibetrading have notification deduplicators.
-
-**Implementation:**
-- Normalize error messages by stripping numbers/UUIDs
-- Dedup within a 5-minute window
-- Apply to agent loop's error logging
-
-**Files to create:** `lib/errorDeduplicator.ts`
-**Effort:** 1 hour
-
----
 <!-- 
 ## PART 6: FUTURE INNOVATIONS (Backlog)
 
@@ -840,11 +503,9 @@ Be calibrated — don't always output 85+. -->
 
 ### Where Autonome is Behind (Fix in Parts 1-4)
 - Risk management: No PolicyEngine (MAHORAGA has 11 checks)
-- Position aging: No staleness detection (MAHORAGA has 0-100 scoring)
-- Data richness: No OI, no sentiment scoring
 - Backtesting: Zero capability (Vibetrading has full simulator)
 - Validation: Tool call analyzer disabled
-- Safety: No circuit breaker, no per-symbol leverage caps
+- Safety: No circuit breaker
 
 ### Future Competitive Advantage (Part 6)
 - Regime-Marshal + Shadow Trading = Adaptive AI hierarchy
@@ -873,103 +534,72 @@ Be calibrated — don't always output 85+. -->
 
 All remaining features ranked by a composite score: **(Implementation Speed × Trading Gain Impact)**. Speed is scored 1-10 (10 = fastest). Gain is scored 1-10 (10 = highest % increase in trading P&L). The composite is `Speed + Gain` to find the best bang-for-buck.
 
+*Note: Many items from the original ranking have been implemented. See "What's Already Done" table above. The remaining items below represent future work.*
+
 | Rank | Feature | Effort | Speed (1-10) | Gain Impact | Gain % Est. | Composite | Why |
 |------|---------|--------|-------------|-------------|-------------|-----------|-----|
-| **1** | **Fee Awareness in Prompts** | 30 min | 10 | 5 | 3-8% | **15** | Trivial to add, immediately reduces overtrading and fee bleed |
-| **2** | **Minimum Trade Size Validation** | 30 min | 10 | 4 | 2-5% | **14** | Trivial guard, prevents dust positions eaten by fees |
-| **3** | **Confidence-Scaled Position Sizing** | 2 hrs | 9 | 7 | 8-20% | **16** | Quick win, mechanically ties conviction to risk — massive upside on sizing |
-| **4** | **Staleness Scoring** | 3 hrs | 8 | 7 | 8-15% | **15** | Moderate effort, prevents dead capital and forgotten losing positions |
-| **5** | **Re-enable Tool Call Validation** | 1 hr (uncomment) + 3 hrs (enhance) | 8 | 6 | 5-12% | **14** | Code already exists — just uncomment + add semantic checks |
-| **6** | **Trade Size Auto-Adjustment** | 1 hr | 10 | 3 | 1-3% | **13** | Trivial, prevents failed trades from oversizing |
-| **7** | **PolicyEngine** | 6-8 hrs | 5 | 10 | 15-35% (loss prevention) | **15** | Most critical safety feature — prevents catastrophic losses from hallucinating LLM |
-| **8** | **Structured Reasoning Field** | 1 hr | 10 | 3 | 2-5% | **13** | Quick schema change, improves decision quality and audit trail |
-| **9** | **Circuit Breaker** | 4 hrs | 7 | 8 | 10-30% (loss prevention) | **15** | Prevents portfolio wipeout scenarios |
-| **10** | **Per-Symbol Leverage Caps** | 3 hrs | 8 | 5 | 3-8% | **13** | Prevents order rejections and overleveraged alts |
-| **11** | **Fill Verification + Retry** | 2 hrs | 9 | 4 | 2-5% | **13** | Simple upgrade from linear to exponential backoff |
-| **12** | **Tool Schema Docs in Prompts** | 2 hrs | 9 | 4 | 3-7% | **13** | Reduces LLM tool errors → fewer wasted cycles |
-| **13** | **Position Reconciliation** | 3 hrs | 8 | 5 | 3-8% | **13** | Prevents orphaned positions and state drift |
-| **14** | **Open Interest Data** | 2-4 hrs | 8 | 5 | 4-10% | **13** | Confirms trend strength, filters weak setups |
-| **15** | **Prompt File Deduplication** | 2 hrs | 9 | 1 | 0% (DX only) | **10** | Zero trading impact, but saves dev time on all future prompt changes |
-| **16** | **Output Sanitizer** | 4 hrs | 7 | 4 | 3-6% | **11** | Recovers from malformed LLM output instead of wasting cycles |
-| **17** | **Dual-LLM Pre-Screening** | 4 hrs | 7 | 5 | 5-12% | **12** | Reduces token cost 40-60% AND improves signal quality via filtering |
-| **18** | **Sentiment Scoring (Level 1)** | 2-3 hrs | 8 | 4 | 3-8% | **12** | Quick Jina/CoinGecko integration, gives AI news context |
-| **19** | **Online Sharpe Tracker** | 1 hr | 10 | 1 | 0% (monitoring) | **11** | Analytics only — no direct trading impact |
-| **20** | **Error Deduplication** | 1 hr | 10 | 1 | 0% (DX only) | **11** | Ops improvement, no trading impact |
-| **21** | **Correlation Matrix** | 4-6 hrs | 6 | 4 | 3-8% | **10** | Prevents correlated position stacking |
-| **22** | **Manual Approval Mode** | 6-8 hrs | 5 | 3 | 2-5% | **8** | Safety net, but slows execution speed |
-| **23** | **Consensus Workflow (Revive)** | 2-4 hrs | 7 | 3 | 2-8% | **10** | Uncertain value — may improve or hurt |
-| **24** | **Sentiment (Level 2 — Multi-Source)** | 8-12 hrs | 4 | 5 | 5-15% | **9** | Significant data edge but heavy implementation |
-| **25** | **Backtesting Engine** | 3-5 days | 2 | 9 | 15-40% (indirect, enables optimization) | **11** | Highest long-term value, but slow to build. Every future improvement can be validated |
-| **26** | **Regime-Marshal Agent** | 1-2 days | 4 | 7 | 10-25% | **11** | Prevents counter-regime trades (no longs in bear market) |
-| **27** | **Dynamic Variant Switching** | 1-2 days | 4 | 6 | 10-20% | **10** | Auto-selects best strategy for conditions |
-| **28** | **Shadow Trading / Darwinism** | 2-3 days | 3 | 8 | 15-30% | **11** | Highest ceiling of any feature, but complex |
-| **29** | **Funding Rate Prediction** | 1-2 days | 5 | 4 | 3-8% | **9** | Niche but profitable for perpetual futures |
-| **30** | **Monte Carlo Simulation** | 1-2 days | 5 | 3 | 3-8% | **8** | Better risk sizing, indirect gain |
-| **31** | **A/B Testing Framework** | 2-3 days | 3 | 6 | 10-20% | **9** | Statistical variant selection |
-| **32** | **Arbitrage Scanner** | 2-3 days | 3 | 5 | 2-8% | **8** | Pure alpha but needs multiple exchange integrations |
-| **33** | **On-Chain Analytics** | 3-5 days | 2 | 5 | 5-15% | **7** | Information edge, heavy data engineering |
-| **34** | **Order Flow Footprint** | 3-5 days | 2 | 5 | 5-15% | **7** | Institutional flow tracking, complex data |
-| **35** | **Liquidity Pool Analysis** | 3-5 days | 2 | 4 | 5-10% | **6** | Order book depth, complex integration |
-| **36** | **DeFi Integration** | 3-5 days | 2 | 4 | 3-10% | **6** | Liquidation cascades, yield farming |
-| **37** | **Backtest Metrics Dashboard** | 2-3 days | 3 | 2 | 0% (analytics) | **5** | Only useful after backtester exists |
+| **1** | **Confidence-Scaled Position Sizing** | 2 hrs | 9 | 7 | 8-20% | **16** | Quick win, mechanically ties conviction to risk — massive upside on sizing |
+| **2** | **PolicyEngine** | 6-8 hrs | 5 | 10 | 15-35% (loss prevention) | **15** | Most critical safety feature — prevents catastrophic losses from hallucinating LLM |
+| **3** | **Circuit Breaker** | 4 hrs | 7 | 8 | 10-30% (loss prevention) | **15** | Prevents portfolio wipeout scenarios |
+| **4** | **Re-enable Tool Call Validation** | 1 hr (uncomment) + 3 hrs (enhance) | 8 | 6 | 5-12% | **14** | Code already exists — just uncomment + add semantic checks |
+| **5** | **Output Sanitizer** | 4 hrs | 7 | 4 | 3-6% | **11** | Recovers from malformed LLM output instead of wasting cycles |
+| **6** | **Dual-LLM Pre-Screening** | 4 hrs | 7 | 5 | 5-12% | **12** | Reduces token cost 40-60% AND improves signal quality via filtering |
+| **7** | **Sentiment Scoring (Level 1)** | 2-3 hrs | 8 | 4 | 3-8% | **12** | Quick Jina/CoinGecko integration, gives AI news context |
+| **8** | **Manual Approval Mode** | 6-8 hrs | 5 | 3 | 2-5% | **8** | Safety net, but slows execution speed |
+| **9** | **Consensus Workflow (Revive)** | 2-4 hrs | 7 | 3 | 2-8% | **10** | Uncertain value — may improve or hurt |
+| **10** | **Sentiment (Level 2 — Multi-Source)** | 8-12 hrs | 4 | 5 | 5-15% | **9** | Significant data edge but heavy implementation |
+| **11** | **Backtesting Engine** | 3-5 days | 2 | 9 | 15-40% (indirect, enables optimization) | **11** | Highest long-term value, but slow to build. Every future improvement can be validated |
+| **12** | **Regime-Marshal Agent** | 1-2 days | 4 | 7 | 10-25% | **11** | Prevents counter-regime trades (no longs in bear market) |
+| **13** | **Dynamic Variant Switching** | 1-2 days | 4 | 6 | 10-20% | **10** | Auto-selects best strategy for conditions |
+| **14** | **Shadow Trading / Darwinism** | 2-3 days | 3 | 8 | 15-30% | **11** | Highest ceiling of any feature, but complex |
+| **15** | **Funding Rate Prediction** | 1-2 days | 5 | 4 | 3-8% | **9** | Niche but profitable for perpetual futures |
+| **16** | **Monte Carlo Simulation** | 1-2 days | 5 | 3 | 3-8% | **8** | Better risk sizing, indirect gain |
+| **17** | **A/B Testing Framework** | 2-3 days | 3 | 6 | 10-20% | **9** | Statistical variant selection |
+| **18** | **Arbitrage Scanner** | 2-3 days | 3 | 5 | 2-8% | **8** | Pure alpha but needs multiple exchange integrations |
+| **19** | **On-Chain Analytics** | 3-5 days | 2 | 5 | 5-15% | **7** | Information edge, heavy data engineering |
+| **20** | **Order Flow Footprint** | 3-5 days | 2 | 5 | 5-15% | **7** | Institutional flow tracking, complex data |
+| **21** | **Liquidity Pool Analysis** | 3-5 days | 2 | 4 | 5-10% | **6** | Order book depth, complex integration |
+| **22** | **DeFi Integration** | 3-5 days | 2 | 4 | 3-10% | **6** | Liquidation cascades, yield farming |
+| **23** | **Backtest Metrics Dashboard** | 2-3 days | 3 | 2 | 0% (analytics) | **5** | Only useful after backtester exists |
 
 ### Recommended Implementation Order (Sprint Plan)
 
-**Sprint 0 — Quick Wins (1 day, ~4 hours):**
-Do these immediately. Tiny effort, outsized gain.
-1. Fee Awareness in Prompts (30 min)
-2. Minimum Trade Size Validation (30 min)
-3. Structured Reasoning Field (1 hr)
-4. Trade Size Auto-Adjustment (1 hr)
-5. Re-enable Tool Call Analyzer (uncomment — 1 hr)
+*Note: Sprint 0 items and most Sprint 2 items have been completed. Remaining items below.*
 
 **Sprint 1 — Core Safety (2-3 days):**
 Prevent the AI from blowing up the account.
-6. PolicyEngine (6-8 hrs)
-7. Circuit Breaker (4 hrs)
-8. Per-Symbol Leverage Caps (3 hrs)
-9. Confidence-Scaled Position Sizing (2 hrs)
+1. PolicyEngine (6-8 hrs)
+2. Circuit Breaker (4 hrs)
+3. Confidence-Scaled Position Sizing (2 hrs)
 
-**Sprint 2 — Intelligence Upgrades (2-3 days):**
-Make the AI smarter per trade.
-10. Staleness Scoring (3 hrs)
-11. Open Interest Data (2-4 hrs)
-12. Position Reconciliation (3 hrs)
-13. Tool Call Validation Enhancement (3 hrs — semantic checks)
-14. Fill Verification Upgrade (2 hrs)
-15. Tool Schema Docs in Prompts (2 hrs)
+**Sprint 2 — Remaining Intelligence (2-3 days):**
+4. Re-enable Tool Call Validation (1 hr uncomment + 3 hrs enhance)
+5. Output Sanitizer (4 hrs)
 
 **Sprint 3 — Efficiency & Data (3-4 days):**
-Reduce costs and expand data sources.
-16. Dual-LLM Pre-Screening (4 hrs)
-17. Sentiment Scoring Level 1 (2-3 hrs)
-18. Output Sanitizer (4 hrs)
-19. Prompt File Deduplication (2 hrs)
-20. Correlation Matrix (4-6 hrs)
+6. Dual-LLM Pre-Screening (4 hrs)
+7. Sentiment Scoring Level 1 (2-3 hrs)
 
 **Sprint 4 — Backtesting (1-2 weeks):**
-Enable strategy validation and optimization.
-21. Backtesting Engine Phase 1 (3-5 days)
-22. Backtest Metrics Dashboard (2-3 days)
+8. Backtesting Engine Phase 1 (3-5 days)
+9. Backtest Metrics Dashboard (2-3 days)
 
 **Sprint 5 — Adaptive Intelligence (1-2 weeks):**
-Autonomous regime adaptation.
-23. Regime-Marshal Agent (1-2 days)
-24. Dynamic Variant Switching (1-2 days)
-25. Shadow Trading / Darwinism (2-3 days)
+10. Regime-Marshal Agent (1-2 days)
+11. Dynamic Variant Switching (1-2 days)
+12. Shadow Trading / Darwinism (2-3 days)
 
 **Sprint 6 — Deep Data & Innovation (ongoing):**
-Information edge features.
-26. Sentiment Level 2 Multi-Source (8-12 hrs)
-27. On-Chain Analytics (3-5 days)
-28. Order Flow Footprint (3-5 days)
-29. Funding Rate Prediction (1-2 days)
-30. Everything else from backlog
+13. Sentiment Level 2 Multi-Source (8-12 hrs)
+14. On-Chain Analytics (3-5 days)
+15. Order Flow Footprint (3-5 days)
+16. Funding Rate Prediction (1-2 days)
+17. Everything else from backlog
 
 ---
 
-**Total estimated effort to reach feature parity + competitive advantage:**
-- Sprint 0-1 (critical): ~3-4 days
-- Sprint 0-3 (professional): ~2-3 weeks
-- Sprint 0-5 (adaptive AI): ~5-6 weeks
-- Full roadmap: ~3-4 months
+**Total estimated effort remaining:**
+- Sprint 1 (safety): ~2-3 days
+- Sprint 1-3 (professional): ~2 weeks
+- Sprint 1-5 (adaptive AI): ~4-5 weeks
+- Full roadmap: ~2-3 months
