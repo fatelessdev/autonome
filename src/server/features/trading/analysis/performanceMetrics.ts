@@ -6,10 +6,8 @@ import {
 	calculateSharpeRatioFromTrades,
 	calculateWinRate,
 } from "@/core/shared/trading/calculations";
-import {
-	getClosedOrdersByModel,
-	getTotalRealizedPnl,
-} from "@/server/db/ordersRepository.server";
+import type { Order } from "@/db/schema";
+import { getClosedOrdersByModel } from "@/server/db/ordersRepository.server";
 import { getSharpeRatio } from "@/server/features/portfolio/welfordService";
 import type { Account } from "@/server/features/trading/contracts/accounts";
 import { getTradingProvider } from "@/server/providers/alpaca";
@@ -50,33 +48,36 @@ const parseRequiredRealizedPnl = (
 };
 
 /**
- * Calculate Sharpe ratio from closed trades.
- * Uses the same trade-based approach as analytics for consistency.
- * This avoids the explosive per-minute compounding issue with portfolio-based Sharpe.
+ * Calculate trade-based Sharpe ratio and total realized P&L from the same
+ * closed-orders query. Avoids querying the orders table three separate times
+ * (getTotalRealizedPnl + getClosedOrdersByModel + calculateTradeSharpe).
  */
-async function calculateTradeSharpe(modelId: string): Promise<string> {
-	const closedOrders = await getClosedOrdersByModel(modelId);
+function calculateTradeStatsFromOrders(closedOrders: Order[]): {
+	sharpeRatio: string;
+	closedTradeRealizedPnl: number;
+	tradeCount: number;
+	winRate: string;
+} {
+	const pnls = closedOrders.map((order) =>
+		parseRequiredRealizedPnl(order.realizedPnl, order.id),
+	);
+	const closedTradeRealizedPnl = pnls.reduce((sum, pnl) => sum + pnl, 0);
+	const tradeCount = closedOrders.length;
+	const winRate =
+		tradeCount > 0 ? `${calculateWinRate(pnls).toFixed(1)}%` : "N/A";
 
-	if (closedOrders.length < 2) {
-		return "N/A (need more trades)";
-	}
-
-	const pnls = closedOrders
-		.map((order) => parseRequiredRealizedPnl(order.realizedPnl, order.id))
-		.filter((pnl) => Number.isFinite(pnl));
-
+	let sharpeRatio: string;
 	if (pnls.length < 2) {
-		return "N/A (need more trades)";
+		sharpeRatio = "N/A (need more trades)";
+	} else {
+		const sharpe = calculateSharpeRatioFromTrades(pnls);
+		sharpeRatio =
+			Number.isFinite(sharpe) && Math.abs(sharpe) <= 100
+				? sharpe.toFixed(2)
+				: "N/A (insufficient data)";
 	}
 
-	const sharpe = calculateSharpeRatioFromTrades(pnls);
-
-	// Guard against extreme values (shouldn't happen with trade-based, but be safe)
-	if (!Number.isFinite(sharpe) || Math.abs(sharpe) > 100) {
-		return "N/A (insufficient data)";
-	}
-
-	return sharpe.toFixed(2);
+	return { sharpeRatio, closedTradeRealizedPnl, tradeCount, winRate };
 }
 
 export async function calculatePerformanceMetrics(
@@ -88,24 +89,18 @@ export async function calculatePerformanceMetrics(
 		account.alpacaApiSecret,
 	);
 
-	const [alpacaHistory, closedTradeRealizedPnl, closedOrders] =
-		await Promise.all([
-			trading.getPortfolioHistory({
-				period: "1M",
-				timeframe: "1D",
-				intraday_reporting: "continuous",
-			}),
-			getTotalRealizedPnl(account.id),
-			getClosedOrdersByModel(account.id),
-		]);
+	// Single DB query for closed orders (replaces 2 separate queries: getTotalRealizedPnl + getClosedOrdersByModel)
+	const [alpacaHistory, closedOrders] = await Promise.all([
+		trading.getPortfolioHistory({
+			period: "1M",
+			timeframe: "1D",
+			intraday_reporting: "continuous",
+		}),
+		getClosedOrdersByModel(account.id),
+	]);
 
-	// Calculate trade stats
-	const tradeCount = closedOrders.length;
-	const pnls = closedOrders.map((order) =>
-		parseRequiredRealizedPnl(order.realizedPnl, order.id),
-	);
-	const winRate =
-		tradeCount > 0 ? `${calculateWinRate(pnls).toFixed(1)}%` : "N/A";
+	const { sharpeRatio, closedTradeRealizedPnl, tradeCount, winRate } =
+		calculateTradeStatsFromOrders(closedOrders);
 
 	// Calculate drawdown from portfolio history
 	const portfolioValues = alpacaHistory.equity.filter(Number.isFinite);
@@ -166,10 +161,6 @@ export async function calculatePerformanceMetrics(
 							})()
 						: alpacaHistory.base_value,
 				);
-
-	// Use trade-based Sharpe ratio (same as analytics) for consistency
-	// This avoids the explosive per-minute compounding issue
-	const sharpeRatio = await calculateTradeSharpe(account.id);
 
 	return {
 		sharpeRatio,

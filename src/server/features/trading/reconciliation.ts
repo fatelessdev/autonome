@@ -12,6 +12,7 @@ import { toCanonical } from "@/core/shared/markets/marketMetadata";
 import {
 	closeOrder,
 	getAllOpenOrders,
+	type OrderWithModel,
 } from "@/server/db/ordersRepository.server";
 import type { Account } from "@/server/features/trading/contracts/accounts";
 import { getOpenPositions } from "@/server/features/trading/data/positions";
@@ -31,9 +32,13 @@ export interface ReconciliationResult {
  * For each DB OPEN order belonging to this model, checks if a matching Alpaca
  * position exists (using canonical symbol comparison). Orders without a matching
  * Alpaca position are considered orphaned and closed with closeTrigger: "RECONCILE".
+ *
+ * @param account - The trading account to reconcile
+ * @param preloadedOrders - Optional pre-fetched open orders to avoid redundant DB query
  */
 export async function reconcilePositions(
 	account: Account,
+	preloadedOrders?: OrderWithModel[],
 ): Promise<ReconciliationResult> {
 	const result: ReconciliationResult = {
 		orphanedClosed: 0,
@@ -48,8 +53,8 @@ export async function reconcilePositions(
 		alpacaSymbolSet.add(toCanonical(pos.symbol).toUpperCase());
 	}
 
-	// Fetch all DB OPEN orders and filter to this model's orders
-	const allOpenOrders = await getAllOpenOrders();
+	// Reuse pre-loaded orders when available to avoid redundant DB query
+	const allOpenOrders = preloadedOrders ?? (await getAllOpenOrders());
 	const modelOpenOrders = allOpenOrders.filter(
 		(order) => order.modelId === account.id,
 	);

@@ -205,38 +205,45 @@ export async function getMarketSnapshots(
 		credentials.alpacaApiKey,
 		credentials.alpacaApiSecret,
 	);
-	const snapshots: MarketSnapshot[] = [];
 
-	for (const market of markets) {
-		const [intradayCandles, higherCandles] = await Promise.all([
-			fetchBars(provider, market.alpacaSymbol, "5Min", INTRADAY_LIMIT),
-			fetchBars(provider, market.alpacaSymbol, "4Hour", HIGHER_TIMEFRAME_LIMIT),
-		]);
+	// Fetch all markets in parallel — each market needs two timeframe requests
+	const snapshots = await Promise.all(
+		markets.map(async (market) => {
+			const [intradayCandles, higherCandles] = await Promise.all([
+				fetchBars(provider, market.alpacaSymbol, "5Min", INTRADAY_LIMIT),
+				fetchBars(
+					provider,
+					market.alpacaSymbol,
+					"4Hour",
+					HIGHER_TIMEFRAME_LIMIT,
+				),
+			]);
 
-		const intradaySeries = buildSeries(intradayCandles, "5Min");
-		const higherSeries = buildSeries(higherCandles, "4Hour");
-		const latest = buildLatestSnapshot(intradaySeries, higherSeries);
+			const intradaySeries = buildSeries(intradayCandles, "5Min");
+			const higherSeries = buildSeries(higherCandles, "4Hour");
+			const latest = buildLatestSnapshot(intradaySeries, higherSeries);
 
-		snapshots.push({
-			symbol: market.symbol,
-			latest: {
-				price: roundValue(latest.price),
-				ema20: roundValue(latest.ema20),
-				ema50: roundValue(latest.ema50),
-				macd: roundValue(latest.macd),
-				rsi7: roundValue(latest.rsi7),
-				rsi14: roundValue(latest.rsi14),
-				atr10: roundValue(latest.atr10),
-				atr14: roundValue(latest.atr14),
-				volume: roundValue(latest.volume, 6),
-				averageVolume: roundValue(latest.averageVolume, 6),
-			},
-			series: {
-				intraday: intradaySeries,
-				higherTimeframe: higherSeries,
-			},
-		});
-	}
+			return {
+				symbol: market.symbol,
+				latest: {
+					price: roundValue(latest.price),
+					ema20: roundValue(latest.ema20),
+					ema50: roundValue(latest.ema50),
+					macd: roundValue(latest.macd),
+					rsi7: roundValue(latest.rsi7),
+					rsi14: roundValue(latest.rsi14),
+					atr10: roundValue(latest.atr10),
+					atr14: roundValue(latest.atr14),
+					volume: roundValue(latest.volume, 6),
+					averageVolume: roundValue(latest.averageVolume, 6),
+				},
+				series: {
+					intraday: intradaySeries,
+					higherTimeframe: higherSeries,
+				},
+			};
+		}),
+	);
 
 	return snapshots;
 }
