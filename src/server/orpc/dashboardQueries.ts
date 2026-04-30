@@ -88,7 +88,6 @@ function toPosition(
 		unrealizedPnl: normalizeNumber(position.unrealizedPnl) ?? 0,
 		realizedPnl: 0,
 		liquidationPrice: "0",
-		leverage: normalizeNumber(position.leverage) ?? undefined,
 		notional:
 			normalizedNotional != null ? String(normalizedNotional) : undefined,
 		exitPlan: toExitPlan(position.exitPlan),

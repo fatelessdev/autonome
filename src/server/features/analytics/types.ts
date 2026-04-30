@@ -35,9 +35,6 @@ export interface AdvancedStats {
 	longPercent: number;
 	expectancy: number;
 	recoveryFactor: number;
-	avgLeverage: number;
-	medianLeverage: number;
-	maxLeverage: number;
 	avgConfidence: number;
 	medianConfidence: number;
 	maxConfidence: number;
@@ -58,7 +55,6 @@ export interface ClosedTradeData {
 	symbol: string;
 	side: "LONG" | "SHORT";
 	quantity: number;
-	leverage: number | null;
 	entryPrice: number;
 	exitPrice: number;
 	realizedPnl: number;

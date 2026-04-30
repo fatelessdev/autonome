@@ -4,7 +4,6 @@ import {
 	formatCurrency,
 	formatCurrencyValue,
 	formatSignedCurrencyValue,
-	formatLeverageValue,
 	formatQuantityValue,
 	formatConfidenceValue,
 	formatPercentValue,
@@ -92,23 +91,6 @@ describe("numberFormat", () => {
 		it("returns -- for null/undefined", () => {
 			expect(formatSignedCurrencyValue(null)).toBe("--");
 			expect(formatSignedCurrencyValue(undefined)).toBe("--");
-		});
-	});
-
-	describe("formatLeverageValue", () => {
-		it("formats whole number leverage", () => {
-			expect(formatLeverageValue(3)).toBe("3x");
-			expect(formatLeverageValue(10)).toBe("10x");
-		});
-
-		it("formats decimal leverage", () => {
-			expect(formatLeverageValue(1.5)).toBe("1.50x");
-			expect(formatLeverageValue(2.75)).toBe("2.75x");
-		});
-
-		it("returns -- for null/undefined", () => {
-			expect(formatLeverageValue(null)).toBe("--");
-			expect(formatLeverageValue(undefined)).toBe("--");
 		});
 	});
 

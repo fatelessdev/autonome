@@ -114,7 +114,6 @@ export const getPositions = os
 									invalidation: pos.exitPlan.invalidation ?? null,
 								}
 							: undefined,
-						leverage: pos.leverage ?? undefined,
 						confidence: pos.confidence ?? undefined,
 						lastDecisionAt: pos.lastDecisionAt ?? undefined,
 						decisionStatus: pos.decisionStatus ?? undefined,

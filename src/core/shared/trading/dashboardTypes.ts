@@ -41,7 +41,6 @@ export type Position = {
 	unrealizedPnl: number;
 	realizedPnl: number;
 	liquidationPrice: string;
-	leverage?: number;
 	notional?: string;
 	exitPlan?: PositionExitPlan | null;
 	confidence?: number | null;
@@ -86,7 +85,6 @@ export type TradingDecisionCard = {
 	side: "LONG" | "SHORT" | "HOLD";
 	action: "CREATE_POSITION" | "CLOSE_POSITION" | "UPDATE_EXIT_PLAN" | string;
 	quantity: number | null;
-	leverage: number | null;
 	profitTarget: number | null;
 	stopLoss: number | null;
 	invalidationCondition: string | null;

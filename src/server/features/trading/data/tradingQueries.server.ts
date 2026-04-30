@@ -334,7 +334,6 @@ export async function fetchPositions(options?: FetchPositionsOptions) {
 					unrealizedPnl: pos.unrealizedPnl,
 					realizedPnl: pos.realizedPnl,
 					liquidationPrice: pos.liquidationPrice ?? null,
-					leverage: null,
 					confidence: pos.confidence ?? null,
 					exitPlan: pos.exitPlan ?? null,
 					lastDecisionAt: pos.lastDecisionAt ?? null,

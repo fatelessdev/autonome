@@ -126,9 +126,6 @@ export function calculateAdvancedStats(
 			longPercent: 0,
 			expectancy: 0,
 			recoveryFactor: 0,
-			avgLeverage: 0,
-			medianLeverage: 0,
-			maxLeverage: 0,
 			avgConfidence: 0,
 			medianConfidence: 0,
 			maxConfidence: 0,
@@ -170,26 +167,6 @@ export function calculateAdvancedStats(
 	const expectancy = calculateExpectancy(pnls);
 	const recoveryFactor = calculateRecoveryFactorFromPnls(pnls);
 
-	// Leverage stats (filter nulls)
-	const leverages = trades
-		.map((t) => t.leverage)
-		.filter((l): l is number => l !== null && Number.isFinite(l))
-		.sort((a, b) => a - b);
-	const avgLeverage = leverages.length > 0 ? mean(leverages) : 0;
-	const medianLeverage = median(leverages);
-	const maxLeverage =
-		leverages.length > 0
-			? (() => {
-					const value = leverages.at(-1);
-					if (value == null) {
-						throw new Error(
-							`Failed to compute maxLeverage for model ${modelId}`,
-						);
-					}
-					return value;
-				})()
-			: 0;
-
 	// Confidence stats (filter nulls)
 	const confidences = trades
 		.map((t) => t.confidence)
@@ -224,9 +201,6 @@ export function calculateAdvancedStats(
 		longPercent,
 		expectancy,
 		recoveryFactor,
-		avgLeverage,
-		medianLeverage,
-		maxLeverage,
 		avgConfidence,
 		medianConfidence,
 		maxConfidence,

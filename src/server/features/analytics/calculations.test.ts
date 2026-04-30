@@ -14,7 +14,6 @@ const makeTrade = (
 	symbol: "BTC",
 	side: "LONG",
 	quantity: 0.1,
-	leverage: 2,
 	entryPrice: 50000,
 	exitPrice: 51000,
 	realizedPnl: 100,

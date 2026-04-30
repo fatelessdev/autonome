@@ -76,7 +76,6 @@ const parseDecisionCandidate = (value: unknown): TradingDecision | null => {
 	const quantity = normalizeNumber(
 		record.quantity ?? record.size ?? record.baseAmount,
 	);
-	const leverage = normalizeNumber(record.leverage ?? record.leverageRatio);
 	const profitTarget = normalizeNumber(
 		record.profitTarget ?? record.target ?? record.profit_target,
 	);
@@ -111,7 +110,6 @@ const parseDecisionCandidate = (value: unknown): TradingDecision | null => {
 		symbol,
 		side,
 		quantity,
-		leverage,
 		profitTarget,
 		stopLoss,
 		invalidationCondition,

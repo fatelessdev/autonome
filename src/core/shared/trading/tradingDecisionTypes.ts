@@ -13,7 +13,6 @@ export interface TradingDecision {
 	symbol: string;
 	side: TradingSide;
 	quantity: number | null;
-	leverage: number | null;
 	profitTarget: number | null;
 	stopLoss: number | null;
 	invalidationCondition: string | null;

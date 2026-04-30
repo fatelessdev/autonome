@@ -15,7 +15,7 @@ TABLES:
 
 2. "Orders" (trade lifecycle ledger)
    id TEXT PK, "modelId" TEXT FK→Models, symbol TEXT, side "OrderSide",
-   quantity NUMERIC(18,8), leverage NUMERIC(10,2), "entryPrice" NUMERIC(18,8),
+   quantity NUMERIC(18,8), "entryPrice" NUMERIC(18,8),
    "exitPlan" JSONB {stop, target, invalidation, confidence},
    status "OrderStatus" (OPEN=position, CLOSED=trade),
    "exitPrice" NUMERIC(18,8), "realizedPnl" NUMERIC(18,2),
@@ -87,13 +87,6 @@ SELECT m.name,
    (value - ${INITIAL_CAPITAL}) / ${INITIAL_CAPITAL}.0 AS return_ratio
 FROM latest JOIN "Models" m ON latest."modelId" = m.id;
 
--- Avg leverage & confidence per model
-SELECT m.name,
-  AVG(o.leverage) AS avg_leverage,
-  AVG((o."exitPlan"->>'confidence')::NUMERIC) AS avg_confidence
-FROM "Orders" o JOIN "Models" m ON o."modelId" = m.id
-WHERE o.status = 'CLOSED' AND o.leverage IS NOT NULL
-GROUP BY m.name;
 `;
 
 export const SQL_ASSISTANT_PROMPT = `You are Autonome's trading analyst. Query the database to answer questions about portfolio performance, trades, and positions.

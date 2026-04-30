@@ -130,9 +130,6 @@ function averageAdvancedByModel(stats: AdvancedStats[]): AdvancedStats[] {
 		"longPercent",
 		"expectancy",
 		"recoveryFactor",
-		"avgLeverage",
-		"medianLeverage",
-		"maxLeverage",
 		"avgConfidence",
 		"medianConfidence",
 		"maxConfidence",
@@ -156,9 +153,6 @@ function averageAdvancedByModel(stats: AdvancedStats[]): AdvancedStats[] {
 			longPercent: 0,
 			expectancy: 0,
 			recoveryFactor: 0,
-			avgLeverage: 0,
-			medianLeverage: 0,
-			maxLeverage: 0,
 			avgConfidence: 0,
 			medianConfidence: 0,
 			maxConfidence: 0,
@@ -483,28 +477,6 @@ function getAdvancedColumns(showVariant: boolean): ColumnDef<AdvancedStats>[] {
 					</span>
 				);
 			},
-		},
-		{
-			accessorKey: "avgLeverage",
-			header: ({ column }) => (
-				<SortableHeader column={column}>Avg Lev</SortableHeader>
-			),
-			cell: ({ row }) => `${row.getValue<number>("avgLeverage").toFixed(1)}x`,
-		},
-		{
-			accessorKey: "medianLeverage",
-			header: ({ column }) => (
-				<SortableHeader column={column}>Med Lev</SortableHeader>
-			),
-			cell: ({ row }) =>
-				`${row.getValue<number>("medianLeverage").toFixed(1)}x`,
-		},
-		{
-			accessorKey: "maxLeverage",
-			header: ({ column }) => (
-				<SortableHeader column={column}>Max Lev</SortableHeader>
-			),
-			cell: ({ row }) => `${row.getValue<number>("maxLeverage").toFixed(1)}x`,
 		},
 		{
 			accessorKey: "avgConfidence",

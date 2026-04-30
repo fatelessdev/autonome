@@ -242,7 +242,6 @@ export function ModelChatTab({
 																		const {
 																			confidenceLabel,
 																			quantityLabel,
-																			leverageLabel,
 																			targetLabel,
 																			stopLabel,
 																		} = formatDecisionDetails(decision);
@@ -354,10 +353,6 @@ export function ModelChatTab({
 																					<div>Quantity</div>
 																					<div className="text-right font-medium text-foreground tabular-nums">
 																						{quantityLabel}
-																					</div>
-																					<div>Leverage</div>
-																					<div className="text-right font-medium text-foreground tabular-nums">
-																						{leverageLabel}
 																					</div>
 																					<div>Target</div>
 																					<div className="text-right font-medium text-foreground tabular-nums">

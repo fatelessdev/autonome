@@ -46,7 +46,6 @@ function formatOpenPositionsSummary(params: {
 		Array<{
 			symbol: string;
 			side: string;
-			leverage: string | null;
 		}>
 	>;
 }): string {
@@ -62,19 +61,7 @@ function formatOpenPositionsSummary(params: {
 				? "flat"
 				: positions
 						.slice(0, 2)
-						.map((p) => {
-							let lev = "1.0x";
-							if (p.leverage != null) {
-								const parsed = Number.parseFloat(p.leverage);
-								if (!Number.isFinite(parsed)) {
-									throw new Error(
-										`Invalid leverage for model ${entry.modelId}: ${p.leverage}`,
-									);
-								}
-								lev = `${parsed.toFixed(1)}x`;
-							}
-							return `${p.symbol} ${p.side} ${lev}`;
-						})
+						.map((p) => `${p.symbol} ${p.side}`)
 						.join(", ");
 
 		parts.push(`#${rank} ${entry.modelName}: ${positionsLabel}`);
@@ -109,7 +96,6 @@ export async function buildCompetitionSnapshot(params: {
 						modelId: orders.modelId,
 						symbol: orders.symbol,
 						side: orders.side,
-						leverage: orders.leverage,
 					})
 					.from(orders)
 					.innerJoin(models, eq(models.id, orders.modelId))
@@ -123,14 +109,13 @@ export async function buildCompetitionSnapshot(params: {
 
 	const ordersByModelId = new Map<
 		string,
-		Array<{ symbol: string; side: string; leverage: string | null }>
+		Array<{ symbol: string; side: string }>
 	>();
 	for (const order of openOrders) {
 		const bucket = ordersByModelId.get(order.modelId) ?? [];
 		bucket.push({
 			symbol: order.symbol,
 			side: order.side,
-			leverage: order.leverage,
 		});
 		ordersByModelId.set(order.modelId, bucket);
 	}

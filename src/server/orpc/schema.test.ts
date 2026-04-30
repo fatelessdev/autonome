@@ -132,11 +132,9 @@ describe("oRPC schemas", () => {
 				notional: 30000,
 				currentPrice: 62000,
 				unrealizedPnl: 1000,
-				leverage: 2,
 				confidence: 0.8,
 			});
 			expect(result.notional).toBe(30000);
-			expect(result.leverage).toBe(2);
 		});
 	});
 

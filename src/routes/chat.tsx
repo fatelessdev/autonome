@@ -253,7 +253,7 @@ function EmptyState() {
 					trade totals."
 				</div>
 				<div className="rounded-xl  p-3 transition-colors">
-					"Show average leverage and confidence by model for the past 20
+					"Show average confidence by model for the past 20
 					invocations."
 				</div>
 				<div className="rounded-xl  p-3 transition-colors">

@@ -40,17 +40,6 @@ export const formatSignedCurrencyValue = (value: unknown): string => {
 	return numeric > 0 ? `+${formatted}` : formatted;
 };
 
-export const formatLeverageValue = (value: unknown): string => {
-	const numeric = normalizeNumber(value);
-	if (numeric == null) return "--";
-	const rounded = Math.round(numeric * 100) / 100;
-	const isWhole = Math.abs(rounded - Math.round(rounded)) < 1e-6;
-	if (isWhole) {
-		return `${Math.round(rounded)}x`;
-	}
-	return `${rounded.toFixed(2)}x`;
-};
-
 export const formatQuantityValue = (value: unknown): string => {
 	const numeric = normalizeNumber(value);
 	if (numeric == null) return "--";

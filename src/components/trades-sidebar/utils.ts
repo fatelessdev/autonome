@@ -1,7 +1,6 @@
 import { formatDuration, formatIstTimestamp } from "@/core/shared/formatting/dateFormat";
 import {
 	formatConfidenceValue,
-	formatLeverageValue,
 	formatPriceLabel,
 	formatQuantityValue,
 } from "@/core/shared/formatting/numberFormat";
@@ -49,7 +48,6 @@ export const extractTradingDecisions = (
 				side: "HOLD",
 				action: "HOLDING",
 				quantity: null,
-				leverage: null,
 				profitTarget: null,
 				stopLoss: null,
 				invalidationCondition: null,
@@ -68,7 +66,6 @@ export const extractTradingDecisions = (
 			signal: string;
 			side: string;
 			quantity: number | null;
-			leverage: number | null;
 			profitTarget: number | null;
 			stopLoss: number | null;
 			invalidationCondition: string | null;
@@ -164,7 +161,6 @@ export const extractTradingDecisions = (
 				side: normalizedSide,
 				action: normalizedAction,
 				quantity: decision.quantity ?? null,
-				leverage: decision.leverage ?? null,
 				profitTarget: decision.profitTarget ?? null,
 				stopLoss: decision.stopLoss ?? null,
 				invalidationCondition: decision.invalidationCondition ?? null,
@@ -192,7 +188,6 @@ export const formatDecisionSymbol = (symbol: string) => {
 export const formatDecisionDetails = (decision: TradingDecisionCard) => ({
 	confidenceLabel: formatConfidenceValue(decision.confidence),
 	quantityLabel: formatQuantityValue(decision.quantity),
-	leverageLabel: formatLeverageValue(decision.leverage),
 	targetLabel: formatPriceLabel(decision.profitTarget),
 	stopLabel: formatPriceLabel(decision.stopLoss),
 });
