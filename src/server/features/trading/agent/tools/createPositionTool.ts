@@ -5,12 +5,12 @@
 
 import { tool } from "ai";
 import { z } from "zod";
+import { MARKETS } from "@/core/shared/markets/marketMetadata";
 import { updateOrderCloseTrigger } from "@/server/db/ordersRepository.server";
 import { ToolCallType } from "@/server/db/tradingRepository";
 import { createToolCallMutation } from "@/server/db/tradingRepository.server";
 import { calculateCooldownUntil } from "@/server/features/trading/execution/cooldown";
 import { createPosition } from "@/server/features/trading/execution/createPosition";
-import { MARKETS } from "@/core/shared/markets/marketMetadata";
 
 import { decisionSchema, type NormalizedDecision } from "../schemas";
 import { MAX_ACTIONS_PER_SYMBOL, type ToolContext } from "./types";

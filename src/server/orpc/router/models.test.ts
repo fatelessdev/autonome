@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { getModels, getInvocations } from "./models";
+import { describe, expect, it } from "vitest";
+import { getInvocations, getModels } from "./models";
 
 describe("models", () => {
 	it("exports expected members", () => {

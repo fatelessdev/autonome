@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 
 describe("chat", () => {
 	it("can be imported", { timeout: 15000 }, async () => {

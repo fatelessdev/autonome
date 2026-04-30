@@ -6,9 +6,12 @@
  */
 
 import { QueryClient } from "@tanstack/react-query";
-import { isValidVariantId } from "@/core/shared/variants";
+import type { VariantId } from "@/core/shared/variants";
+import {
+	isValidVariantId,
+	TRADEABLE_VARIANT_IDS,
+} from "@/core/shared/variants";
 import { fallbackModel } from "@/env";
-
 import { listModels } from "@/server/db/tradingRepository";
 import {
 	createInvocationMutation,
@@ -45,12 +48,10 @@ import { getOpenPositions } from "@/server/features/trading/data/positions";
 import { openPositionsQuery } from "@/server/features/trading/data/positions.server";
 import { closePosition } from "@/server/features/trading/execution/closePosition";
 import { buildTradingPrompts } from "@/server/features/trading/prompting/promptBuilder";
-import type { VariantId } from "@/core/shared/variants";
 import {
 	getSharedNewsDigest,
 	invalidateNewsCache,
 } from "@/server/integrations/alpaca-news";
-import { TRADEABLE_VARIANT_IDS } from "@/core/shared/variants";
 
 import { createTradeAgent, type ToolContext } from "../agent";
 
@@ -438,9 +439,8 @@ export async function executeAllModelTrades(): Promise<{
 }> {
 	const models = await listModels();
 
-	const validModels: Array<
-		(typeof models)[number] & { variant: VariantId }
-	> = [];
+	const validModels: Array<(typeof models)[number] & { variant: VariantId }> =
+		[];
 
 	for (const model of models) {
 		if (!model.alpacaApiKey || !model.alpacaApiSecret) {

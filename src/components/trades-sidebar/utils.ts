@@ -1,11 +1,14 @@
-import { formatDuration, formatIstTimestamp } from "@/core/shared/formatting/dateFormat";
+import {
+	formatDuration,
+	formatIstTimestamp,
+} from "@/core/shared/formatting/dateFormat";
 import {
 	formatConfidenceValue,
 	formatPriceLabel,
 	formatQuantityValue,
 } from "@/core/shared/formatting/numberFormat";
-import { findModelInfo } from "@/core/shared/models/modelConfig";
 import { toCanonical } from "@/core/shared/markets/marketMetadata";
+import { findModelInfo } from "@/core/shared/models/modelConfig";
 import type { Conversation, TradingDecisionCard } from "./types";
 
 export const extractMarkdownPreview = (
@@ -112,8 +115,8 @@ export const extractTradingDecisions = (
 				decision.side === "HOLD"
 					? decision.side
 					: decision.signal === "LONG" ||
-						  decision.signal === "SHORT" ||
-						  decision.signal === "HOLD"
+							decision.signal === "SHORT" ||
+							decision.signal === "HOLD"
 						? decision.signal
 						: "HOLD";
 			const baseResult = resultLookup.get(symbol) ?? null;

@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { getApiBaseUrl, getSseUrl, getRpcUrl } from "./apiConfig";
+import { describe, expect, it } from "vitest";
+import { getApiBaseUrl, getRpcUrl, getSseUrl } from "./apiConfig";
 
 describe("apiConfig", () => {
 	it("exports expected members", () => {

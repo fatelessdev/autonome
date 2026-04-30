@@ -1,9 +1,11 @@
-import { describe, it, expect } from "vitest";
-import { calculateExposureToEquityPct } from "./promptSections";
-import type { PortfolioSnapshot } from "../data/portfolio";
+import { describe, expect, it } from "vitest";
 import type { ExposureSummary } from "../data/openPositionEnrichment";
+import type { PortfolioSnapshot } from "../data/portfolio";
+import { calculateExposureToEquityPct } from "./promptSections";
 
-function makePortfolio(overrides: Partial<PortfolioSnapshot> = {}): PortfolioSnapshot {
+function makePortfolio(
+	overrides: Partial<PortfolioSnapshot> = {},
+): PortfolioSnapshot {
 	return {
 		totalValue: 100000,
 		availableCash: 60000,
@@ -11,7 +13,9 @@ function makePortfolio(overrides: Partial<PortfolioSnapshot> = {}): PortfolioSna
 	};
 }
 
-function makeExposure(overrides: Partial<ExposureSummary> = {}): ExposureSummary {
+function makeExposure(
+	overrides: Partial<ExposureSummary> = {},
+): ExposureSummary {
 	return {
 		totalNotional: 40000,
 		longExposure: 30000,
@@ -29,7 +33,10 @@ describe("promptSections", () => {
 		it("calculates cash utilization percentage", () => {
 			// deployed = 100000 - 60000 = 40000
 			// pct = 40000/100000 * 100 = 40
-			const result = calculateExposureToEquityPct(makePortfolio(), makeExposure());
+			const result = calculateExposureToEquityPct(
+				makePortfolio(),
+				makeExposure(),
+			);
 			expect(result).toBe(40);
 		});
 

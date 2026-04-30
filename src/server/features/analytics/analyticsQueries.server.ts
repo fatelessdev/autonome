@@ -14,20 +14,14 @@ import {
 } from "@/core/shared/trading/calculations";
 import type { VariantId } from "@/core/shared/variants";
 import { db } from "@/db";
-import {
-	models,
-	orders,
-	portfolioSize,
-} from "@/db/schema";
-import type {
-	ClosedTradeData,
-} from "./types";
+import { models, orders, portfolioSize } from "@/db/schema";
+import type { ClosedTradeData } from "./types";
 
 type VariantFilter = VariantId;
 
+export { getModelFailureStats, getRecentFailures } from "./failureQueries";
 // Re-export extracted query modules so existing consumers are unaffected
 export { getLeaderboardData } from "./leaderboardQueries";
-export { getModelFailureStats, getRecentFailures } from "./failureQueries";
 
 /**
  * Fetch closed trades for multiple models and group them

@@ -1,8 +1,8 @@
-import type { VariantId } from "@/core/shared/variants";
 import type {
 	TradingDecision,
 	TradingDecisionResult,
 } from "@/core/shared/trading/tradingDecisionTypes";
+import type { VariantId } from "@/core/shared/variants";
 
 export type TradeSide = "LONG" | "SHORT" | "UNKNOWN";
 

@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { AlpacaError, AlpacaClient, createAlpacaClient } from "./client";
+import { describe, expect, it } from "vitest";
+import { AlpacaClient, AlpacaError, createAlpacaClient } from "./client";
 
 describe("AlpacaError", () => {
 	it("constructs with message, code, and status", () => {

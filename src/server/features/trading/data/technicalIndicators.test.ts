@@ -6,9 +6,9 @@ import {
 	getEma,
 	getMacd,
 	getMidPrices,
-	getRsi,
 	getRollingAverage,
 	getRollingStdDev,
+	getRsi,
 	getSma,
 	roundSeries,
 	roundValue,
@@ -112,7 +112,10 @@ describe("technicalIndicators", () => {
 	describe("getMacd", () => {
 		it("should return MACD line (EMA12 - EMA26)", () => {
 			// Need at least 26 prices
-			const prices = Array.from({ length: 50 }, (_, i) => 100 + Math.sin(i * 0.2) * 10);
+			const prices = Array.from(
+				{ length: 50 },
+				(_, i) => 100 + Math.sin(i * 0.2) * 10,
+			);
 			const macd = getMacd(prices);
 			expect(macd.length).toBeGreaterThan(0);
 			// Each value should be a finite number

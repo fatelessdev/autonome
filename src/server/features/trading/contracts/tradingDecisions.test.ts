@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { parseTradingToolCallMetadata, buildDecisionIndex } from "./tradingDecisions";
+import {
+	buildDecisionIndex,
+	parseTradingToolCallMetadata,
+} from "./tradingDecisions";
 
 describe("tradingDecisions", () => {
 	describe("parseTradingToolCallMetadata", () => {
@@ -49,9 +52,9 @@ describe("tradingDecisions", () => {
 		});
 
 		it("should throw when no valid decisions found", () => {
-			expect(() =>
-				parseTradingToolCallMetadata({ decisions: [] }),
-			).toThrow("No valid trading decisions found");
+			expect(() => parseTradingToolCallMetadata({ decisions: [] })).toThrow(
+				"No valid trading decisions found",
+			);
 		});
 
 		it("should fall back to root-level decision when no array", () => {
@@ -68,12 +71,8 @@ describe("tradingDecisions", () => {
 
 		it("should parse results array", () => {
 			const raw = {
-				decisions: [
-					{ symbol: "BTC", signal: "LONG", quantity: 0.5 },
-				],
-				results: [
-					{ symbol: "BTC", success: true, error: null },
-				],
+				decisions: [{ symbol: "BTC", signal: "LONG", quantity: 0.5 }],
+				results: [{ symbol: "BTC", success: true, error: null }],
 			};
 
 			const result = parseTradingToolCallMetadata(raw);
@@ -84,9 +83,7 @@ describe("tradingDecisions", () => {
 
 		it("should normalize symbol to canonical uppercase", () => {
 			const raw = {
-				decisions: [
-					{ symbol: "btc/usd", signal: "LONG", quantity: 0.1 },
-				],
+				decisions: [{ symbol: "btc/usd", signal: "LONG", quantity: 0.1 }],
 			};
 
 			const result = parseTradingToolCallMetadata(raw);
@@ -118,12 +115,8 @@ describe("tradingDecisions", () => {
 
 		it("should parse multiple decisions from multiple arrays", () => {
 			const raw = {
-				decisions: [
-					{ symbol: "BTC", signal: "LONG", quantity: 0.1 },
-				],
-				positions: [
-					{ symbol: "ETH", signal: "SHORT", quantity: 1 },
-				],
+				decisions: [{ symbol: "BTC", signal: "LONG", quantity: 0.1 }],
+				positions: [{ symbol: "ETH", signal: "SHORT", quantity: 1 }],
 			};
 
 			const result = parseTradingToolCallMetadata(raw);
@@ -138,9 +131,7 @@ describe("tradingDecisions", () => {
 					id: "tc-1",
 					createdAt: new Date("2024-01-01T00:00:00Z"),
 					metadata: {
-						decisions: [
-							{ symbol: "BTC", signal: "LONG", quantity: 0.5 },
-						],
+						decisions: [{ symbol: "BTC", signal: "LONG", quantity: 0.5 }],
 						results: [],
 						raw: {},
 					},
@@ -159,9 +150,7 @@ describe("tradingDecisions", () => {
 					id: "tc-1",
 					createdAt: new Date("2024-01-01T00:00:00Z"),
 					metadata: {
-						decisions: [
-							{ symbol: "BTC", signal: "LONG", quantity: 0.5 },
-						],
+						decisions: [{ symbol: "BTC", signal: "LONG", quantity: 0.5 }],
 						results: [],
 						raw: {},
 					},
@@ -170,9 +159,7 @@ describe("tradingDecisions", () => {
 					id: "tc-2",
 					createdAt: new Date("2024-01-02T00:00:00Z"),
 					metadata: {
-						decisions: [
-							{ symbol: "BTC", signal: "SHORT", quantity: 1 },
-						],
+						decisions: [{ symbol: "BTC", signal: "SHORT", quantity: 1 }],
 						results: [],
 						raw: {},
 					},
@@ -190,12 +177,8 @@ describe("tradingDecisions", () => {
 					id: "tc-1",
 					createdAt: new Date("2024-01-01T00:00:00Z"),
 					metadata: {
-						decisions: [
-							{ symbol: "BTC", signal: "LONG", quantity: 0.5 },
-						],
-						results: [
-							{ symbol: "BTC", success: true, error: null },
-						],
+						decisions: [{ symbol: "BTC", signal: "LONG", quantity: 0.5 }],
+						results: [{ symbol: "BTC", success: true, error: null }],
 						raw: {},
 					},
 				},
@@ -221,9 +204,7 @@ describe("tradingDecisions", () => {
 					id: "tc-good",
 					createdAt: new Date("2024-01-02T00:00:00Z"),
 					metadata: {
-						decisions: [
-							{ symbol: "BTC", signal: "LONG", quantity: 0.5 },
-						],
+						decisions: [{ symbol: "BTC", signal: "LONG", quantity: 0.5 }],
 						results: [],
 						raw: {},
 					},

@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { formatMarketSnapshots } from "./marketData";
+import { describe, expect, it } from "vitest";
 import type { MarketSnapshot } from "./marketData";
+import { formatMarketSnapshots } from "./marketData";
 
 const makeSnapshot = (
 	overrides: Partial<MarketSnapshot> = {},
@@ -74,9 +74,7 @@ describe("marketData", () => {
 
 		it("includes higher timeframe section", () => {
 			const result = formatMarketSnapshots([makeSnapshot()]);
-			expect(result).toContain(
-				"**Higher timeframe (4h, oldest -> newest)**",
-			);
+			expect(result).toContain("**Higher timeframe (4h, oldest -> newest)**");
 			expect(result).toContain("EMA20: [63500.000, 64000.000]");
 		});
 

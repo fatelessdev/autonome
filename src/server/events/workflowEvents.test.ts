@@ -1,5 +1,11 @@
-import { describe, it, expect } from "vitest";
-import { emitWorkflowEvent, emitWorkflowComplete, emitBatchComplete, emitPositionsChanged, emitTradesChanged } from "./workflowEvents";
+import { describe, expect, it } from "vitest";
+import {
+	emitBatchComplete,
+	emitPositionsChanged,
+	emitTradesChanged,
+	emitWorkflowComplete,
+	emitWorkflowEvent,
+} from "./workflowEvents";
 
 describe("workflowEvents", () => {
 	it("exports expected members", () => {

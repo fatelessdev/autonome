@@ -8,6 +8,10 @@
  */
 
 import {
+	toAlpacaSymbol,
+	toCanonical,
+} from "@/core/shared/markets/marketMetadata";
+import {
 	requireFiniteNumber,
 	requirePresent,
 } from "@/core/shared/trading/calculations";
@@ -21,7 +25,6 @@ import {
 	type OpenPositionSummary,
 } from "@/server/features/trading/data/positions";
 import { getTradingProvider } from "@/server/providers/alpaca";
-import { toAlpacaSymbol, toCanonical } from "@/core/shared/markets/marketMetadata";
 
 export interface ClosedPositionSummary {
 	symbol: string;

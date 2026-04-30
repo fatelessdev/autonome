@@ -253,8 +253,7 @@ function EmptyState() {
 					trade totals."
 				</div>
 				<div className="rounded-xl  p-3 transition-colors">
-					"Show average confidence by model for the past 20
-					invocations."
+					"Show average confidence by model for the past 20 invocations."
 				</div>
 				<div className="rounded-xl  p-3 transition-colors">
 					"What is the cumulative realized PnL across BTC trades?"

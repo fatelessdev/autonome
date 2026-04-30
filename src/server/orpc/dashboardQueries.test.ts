@@ -1,5 +1,11 @@
-import { describe, it, expect } from "vitest";
-import { DASHBOARD_QUERY_KEYS, tradesQueryOptions, positionsQueryOptions, conversationsQueryOptions, DASHBOARD_QUERIES } from "./dashboardQueries";
+import { describe, expect, it } from "vitest";
+import {
+	conversationsQueryOptions,
+	DASHBOARD_QUERIES,
+	DASHBOARD_QUERY_KEYS,
+	positionsQueryOptions,
+	tradesQueryOptions,
+} from "./dashboardQueries";
 
 describe("dashboardQueries", () => {
 	it("exports expected members", () => {

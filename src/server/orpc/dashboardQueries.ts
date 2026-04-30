@@ -1,10 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
 import { TRADE_CYCLE_INTERVAL } from "@/core/shared/cache/cacheConfig";
-import { isValidVariantId } from "@/core/shared/variants";
-import { orpc } from "@/server/orpc/client";
 import { normalizeNumber } from "@/core/shared/formatting/numberFormat";
 import { toCanonical } from "@/core/shared/markets/marketMetadata";
-
 import type {
 	Conversation,
 	ModelPositions,
@@ -12,6 +9,8 @@ import type {
 	PositionExitPlan,
 	Trade,
 } from "@/core/shared/trading/dashboardTypes";
+import { isValidVariantId } from "@/core/shared/variants";
+import { orpc } from "@/server/orpc/client";
 
 const BASE_REFRESH_MS = TRADE_CYCLE_INTERVAL;
 

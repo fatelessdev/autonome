@@ -11,15 +11,15 @@ import { useVariant } from "@/components/variant-provider";
 import { createSseConnection } from "@/core/lib/sseConnection";
 import { getSseUrl } from "@/core/shared/api/apiConfig";
 import { sampleForViewport } from "@/core/shared/charts/chartSampler";
+import { findModelInfo } from "@/core/shared/models/modelConfig";
+import type { DashboardSseEvent } from "@/core/shared/trading/dashboardEvents";
+import type { VariantId } from "@/core/shared/variants";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import {
 	type DownsampleResolution,
 	PORTFOLIO_QUERIES,
 	type PortfolioHistoryEntry,
 } from "@/server/orpc/marketQueries";
-import type { DashboardSseEvent } from "@/core/shared/trading/dashboardEvents";
-import type { VariantId } from "@/core/shared/variants";
-import { useMediaQuery } from "@/hooks/useMediaQuery";
-import { findModelInfo } from "@/core/shared/models/modelConfig";
 
 type DataPoint = {
 	month: string;

@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-	calculateOverallStats,
 	calculateAdvancedStats,
 	calculateModelAnalytics,
+	calculateOverallStats,
 	INITIAL_CAPITAL,
 } from "./calculations";
 import type { ClosedTradeData } from "./types";
@@ -135,17 +135,11 @@ describe("calculations", () => {
 
 		it("computes failure rate from metrics", () => {
 			const trades = [makeTrade()];
-			const stats = calculateAdvancedStats(
-				"m1",
-				"Model",
-				trades,
-				100000,
-				{
-					failedWorkflowCount: 5,
-					failedToolCallCount: 3,
-					invocationCount: 40,
-				},
-			);
+			const stats = calculateAdvancedStats("m1", "Model", trades, 100000, {
+				failedWorkflowCount: 5,
+				failedToolCallCount: 3,
+				invocationCount: 40,
+			});
 			expect(stats.failedWorkflowCount).toBe(5);
 			expect(stats.failedToolCallCount).toBe(3);
 			expect(stats.invocationCount).toBe(40);
@@ -172,12 +166,7 @@ describe("calculations", () => {
 				makeTrade({ realizedPnl: -50 }),
 			];
 
-			const analytics = calculateModelAnalytics(
-				"m1",
-				"Model",
-				trades,
-				100050,
-			);
+			const analytics = calculateModelAnalytics("m1", "Model", trades, 100050);
 
 			expect(analytics.overall.tradesCount).toBe(2);
 			expect(analytics.overall.totalPnl).toBe(50);

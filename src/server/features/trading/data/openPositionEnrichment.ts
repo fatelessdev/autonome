@@ -1,7 +1,5 @@
 import { toFiniteNumber } from "@/core/shared/trading/calculations";
-import type {
-	TradingDecisionWithContext,
-} from "@/server/features/trading/contracts/tradingDecisions";
+import type { TradingDecisionWithContext } from "@/server/features/trading/contracts/tradingDecisions";
 import type {
 	ExitPlanSummary,
 	OpenPositionSummary,

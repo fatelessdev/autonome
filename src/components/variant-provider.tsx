@@ -14,7 +14,8 @@ export interface VariantContextValue {
 const VariantContext = createContext<VariantContextValue | null>(null);
 
 export function VariantProvider({ children }: { children: ReactNode }) {
-	const [selectedVariant, setSelectedVariant] = useState<VariantIdWithAll>("all");
+	const [selectedVariant, setSelectedVariant] =
+		useState<VariantIdWithAll>("all");
 
 	return (
 		<VariantContext.Provider value={{ selectedVariant, setSelectedVariant }}>

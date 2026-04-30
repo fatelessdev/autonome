@@ -1,16 +1,22 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-	toCanonical,
-	toAlpacaSymbol,
 	isSupportedMarketSymbol,
 	MARKETS,
 	SUPPORTED_MARKETS,
+	toAlpacaSymbol,
+	toCanonical,
 } from "./marketMetadata";
 
 describe("marketMetadata", () => {
 	describe("MARKETS", () => {
 		it("contains expected crypto symbols", () => {
-			expect(Object.keys(MARKETS)).toEqual(["BTC", "ETH", "SOL", "XRP", "HYPE"]);
+			expect(Object.keys(MARKETS)).toEqual([
+				"BTC",
+				"ETH",
+				"SOL",
+				"XRP",
+				"HYPE",
+			]);
 		});
 
 		it("each market has canonical, symbol, and assetClass", () => {
@@ -65,7 +71,9 @@ describe("marketMetadata", () => {
 		});
 
 		it("throws for unsupported symbols", () => {
-			expect(() => toCanonical("DOGE")).toThrow("Unsupported Alpaca market symbol");
+			expect(() => toCanonical("DOGE")).toThrow(
+				"Unsupported Alpaca market symbol",
+			);
 			expect(() => toCanonical("AVAX/USD")).toThrow();
 		});
 	});
@@ -91,7 +99,9 @@ describe("marketMetadata", () => {
 		});
 
 		it("throws for unsupported symbols", () => {
-			expect(() => toAlpacaSymbol("DOGE")).toThrow("Unsupported Alpaca market symbol");
+			expect(() => toAlpacaSymbol("DOGE")).toThrow(
+				"Unsupported Alpaca market symbol",
+			);
 		});
 	});
 });

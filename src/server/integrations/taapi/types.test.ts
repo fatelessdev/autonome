@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { TAAPI_FREE_PLAN_SYMBOLS, AVAILABLE_TAAPI_INDICATORS } from "./types";
+import { describe, expect, it } from "vitest";
+import { AVAILABLE_TAAPI_INDICATORS, TAAPI_FREE_PLAN_SYMBOLS } from "./types";
 
 describe("types", () => {
 	it("exports expected members", () => {

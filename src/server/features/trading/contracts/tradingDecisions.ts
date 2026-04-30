@@ -7,7 +7,10 @@ import type {
 } from "@/core/shared/trading/tradingDecisionTypes";
 
 // Re-export shared types for backward compatibility
-export type { TradingDecision, TradingDecisionResult } from "@/core/shared/trading/tradingDecisionTypes";
+export type {
+	TradingDecision,
+	TradingDecisionResult,
+} from "@/core/shared/trading/tradingDecisionTypes";
 
 export interface TradingToolCallMetadata {
 	decisions: TradingDecision[];

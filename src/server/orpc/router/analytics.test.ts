@@ -1,5 +1,10 @@
-import { describe, it, expect } from "vitest";
-import { getModelStats, getLeaderboard, getFailures, getRunInfo } from "./analytics";
+import { describe, expect, it } from "vitest";
+import {
+	getFailures,
+	getLeaderboard,
+	getModelStats,
+	getRunInfo,
+} from "./analytics";
 
 describe("analytics", () => {
 	it("exports expected members", () => {

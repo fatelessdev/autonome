@@ -1,16 +1,16 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-	VARIANT_IDS,
-	VARIANT_CONFIG,
-	TRADEABLE_VARIANT_IDS,
-	getVariantConfig,
+	DEFAULT_VARIANT,
 	getAllVariantConfigs,
-	isValidVariantId,
-	toVariantId,
 	getVariantBadgeClasses,
 	getVariantColor,
+	getVariantConfig,
 	getVariantLabel,
-	DEFAULT_VARIANT,
+	isValidVariantId,
+	TRADEABLE_VARIANT_IDS,
+	toVariantId,
+	VARIANT_CONFIG,
+	VARIANT_IDS,
 } from "./index";
 
 describe("variants", () => {
@@ -33,7 +33,11 @@ describe("variants", () => {
 
 	describe("TRADEABLE_VARIANT_IDS", () => {
 		it("contains all current variants", () => {
-			expect(TRADEABLE_VARIANT_IDS).toEqual(["Trendsurfer", "Contrarian", "Sovereign"]);
+			expect(TRADEABLE_VARIANT_IDS).toEqual([
+				"Trendsurfer",
+				"Contrarian",
+				"Sovereign",
+			]);
 		});
 	});
 
@@ -99,8 +103,12 @@ describe("variants", () => {
 		});
 
 		it("returns fallback classes for invalid/undefined variant", () => {
-			expect(getVariantBadgeClasses(undefined)).toBe("bg-zinc-500/20 text-zinc-600");
-			expect(getVariantBadgeClasses("unknown")).toBe("bg-zinc-500/20 text-zinc-600");
+			expect(getVariantBadgeClasses(undefined)).toBe(
+				"bg-zinc-500/20 text-zinc-600",
+			);
+			expect(getVariantBadgeClasses("unknown")).toBe(
+				"bg-zinc-500/20 text-zinc-600",
+			);
 			expect(getVariantBadgeClasses("")).toBe("bg-zinc-500/20 text-zinc-600");
 		});
 	});

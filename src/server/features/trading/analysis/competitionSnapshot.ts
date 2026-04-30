@@ -1,4 +1,5 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
+import type { VariantId } from "@/core/shared/variants";
 import { db } from "@/db";
 import { models, OrderStatus, orders } from "@/db/schema";
 import type {
@@ -6,7 +7,6 @@ import type {
 	LeaderboardWindow,
 } from "@/server/features/analytics";
 import { getLeaderboardData } from "@/server/features/analytics";
-import type { VariantId } from "@/core/shared/variants";
 
 export interface CompetitionSnapshot {
 	standings: string;

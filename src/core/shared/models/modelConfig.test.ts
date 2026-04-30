@@ -1,5 +1,10 @@
-import { describe, it, expect } from "vitest";
-import { MODEL_INFO, getModelInfo, findModelInfo, getModelProvider } from "./modelConfig";
+import { describe, expect, it } from "vitest";
+import {
+	findModelInfo,
+	getModelInfo,
+	getModelProvider,
+	MODEL_INFO,
+} from "./modelConfig";
 
 describe("modelConfig", () => {
 	it("exports expected members", () => {
@@ -10,8 +15,12 @@ describe("modelConfig", () => {
 	});
 
 	it("resolves provider-qualified model names to registered entries", () => {
-		expect(findModelInfo("stepfun-ai/step-3.5-flash")).toBe(MODEL_INFO["step-3.5-flash"]);
-		expect(getModelInfo("stepfun-ai/step-3.5-flash").label).toBe("Step 3.5 Flash");
+		expect(findModelInfo("stepfun-ai/step-3.5-flash")).toBe(
+			MODEL_INFO["step-3.5-flash"],
+		);
+		expect(getModelInfo("stepfun-ai/step-3.5-flash").label).toBe(
+			"Step 3.5 Flash",
+		);
 		expect(getModelProvider("stepfun-ai/step-3.5-flash")).toBe("nim");
 	});
 });

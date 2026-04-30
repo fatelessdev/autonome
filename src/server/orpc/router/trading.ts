@@ -3,6 +3,7 @@ import "@/polyfill";
 import { os } from "@orpc/server";
 import * as Sentry from "@sentry/react";
 import { z } from "zod";
+import { parseSymbols } from "@/core/shared/formatting/numberFormat";
 import {
 	isValidVariantId,
 	type VariantId,
@@ -14,7 +15,6 @@ import {
 	fetchPositions,
 	fetchTrades,
 } from "@/server/features/trading/data/tradingQueries.server";
-import { parseSymbols } from "@/core/shared/formatting/numberFormat";
 import {
 	CryptoPricesInputSchema,
 	CryptoPricesResponseSchema,

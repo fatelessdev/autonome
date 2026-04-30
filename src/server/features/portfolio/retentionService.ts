@@ -100,9 +100,7 @@ export async function runRetentionPolicy(): Promise<{
 	);
 
 	// Step 3: Aggregate 30+ day old data into daily buckets
-	const dailyAggregatesCreated = await aggregateToDaily(
-		thirtyDaysAgo,
-	);
+	const dailyAggregatesCreated = await aggregateToDaily(thirtyDaysAgo);
 
 	// Step 4: Delete aggregated raw records (except preserved first snapshots)
 	const rawRecordsDeleted = await deleteAggregatedRawRecords(
@@ -177,9 +175,10 @@ async function aggregateSnapshots(
 	filter: ReturnType<typeof and>,
 	skipSingleRecords: boolean,
 ): Promise<number> {
-	const bucketCol = sql<string>`date_trunc(${sql.raw(`'${truncUnit}'`)}, ${portfolioSize.createdAt})`.as(
-		"bucket",
-	);
+	const bucketCol =
+		sql<string>`date_trunc(${sql.raw(`'${truncUnit}'`)}, ${portfolioSize.createdAt})`.as(
+			"bucket",
+		);
 
 	const aggregates = await db
 		.select({
@@ -235,10 +234,7 @@ async function aggregateSnapshots(
 /**
  * Aggregate raw snapshots from 7-30 days ago into hourly buckets.
  */
-function aggregateToHourly(
-	startDate: Date,
-	endDate: Date,
-): Promise<number> {
+function aggregateToHourly(startDate: Date, endDate: Date): Promise<number> {
 	return aggregateSnapshots(
 		"hour",
 		and(
@@ -252,9 +248,7 @@ function aggregateToHourly(
 /**
  * Aggregate data older than 30 days into daily buckets.
  */
-function aggregateToDaily(
-	cutoffDate: Date,
-): Promise<number> {
+function aggregateToDaily(cutoffDate: Date): Promise<number> {
 	return aggregateSnapshots(
 		"day",
 		lt(portfolioSize.createdAt, cutoffDate)!,

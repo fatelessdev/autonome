@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { SYSTEM_PROMPT, USER_PROMPT } from "./prompt2";
 
 describe("prompt2", () => {

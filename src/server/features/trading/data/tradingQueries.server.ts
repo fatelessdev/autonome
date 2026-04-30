@@ -8,6 +8,18 @@ import { queryOptions } from "@tanstack/react-query";
 import { and, asc, desc, eq, inArray, isNull, ne, or } from "drizzle-orm";
 import { CACHE_TIMING } from "@/core/shared/cache/cacheConfig";
 import {
+	formatDuration,
+	formatIstTimestamp,
+} from "@/core/shared/formatting/dateFormat";
+import {
+	toAlpacaSymbol,
+	toCanonical,
+} from "@/core/shared/markets/marketMetadata";
+import {
+	requireFiniteNumber,
+	requirePresent,
+} from "@/core/shared/trading/calculations";
+import {
 	isValidVariantId,
 	VARIANT_IDS,
 	type VariantId,
@@ -19,9 +31,6 @@ import { refreshConversationEvents } from "@/server/features/trading/data/conver
 import { enrichOpenPositions } from "@/server/features/trading/data/openPositionEnrichment";
 import { getOpenPositions } from "@/server/features/trading/data/positions";
 import { getMarketDataProvider } from "@/server/providers/alpaca";
-import { formatDuration, formatIstTimestamp } from "@/core/shared/formatting/dateFormat";
-import { toAlpacaSymbol, toCanonical } from "@/core/shared/markets/marketMetadata";
-import { requireFiniteNumber, requirePresent } from "@/core/shared/trading/calculations";
 
 // ==========================================
 // CRYPTO PRICES

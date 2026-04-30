@@ -8,7 +8,7 @@ import { createAihubmix } from "@aihubmix/ai-sdk-provider";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import * as Sentry from "@sentry/react";
 import { hasToolCall, stepCountIs, ToolLoopAgent } from "ai";
-
+import { getModelProvider } from "@/core/shared/models/modelConfig";
 import {
 	getNextAihubmixApiKey,
 	getNextNimApiKey,
@@ -16,7 +16,6 @@ import {
 } from "@/env";
 import type { Account } from "@/server/features/trading/contracts/accounts";
 import type { StepTelemetry } from "@/server/features/trading/contracts/invocationResponse";
-import { getModelProvider } from "@/core/shared/models/modelConfig";
 
 import { callOptionsSchema } from "./schemas";
 import { createTradingTools, type ToolContext } from "./tools";

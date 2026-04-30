@@ -256,8 +256,7 @@ export function ModelChatTab({
 																		const isCloseCall =
 																			action === "CLOSE_POSITION";
 																		const isHoldingCall = action === "HOLDING";
-																		const isHoldSide =
-																			decision.side === "HOLD";
+																		const isHoldSide = decision.side === "HOLD";
 																		const signalLabel = isHoldingCall
 																			? "Holding"
 																			: isUpdateCall
@@ -330,7 +329,9 @@ export function ModelChatTab({
 																					<div className="flex flex-col gap-1">
 																						<div className="flex flex-wrap items-center gap-2">
 																							<span className="text-sm font-semibold uppercase tracking-wide">
-																									{formatDecisionSymbol(decision.symbol)}
+																								{formatDecisionSymbol(
+																									decision.symbol,
+																								)}
 																							</span>
 																							<Badge
 																								variant={badgeVariant}

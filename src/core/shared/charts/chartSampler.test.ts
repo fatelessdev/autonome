@@ -1,5 +1,11 @@
-import { describe, it, expect } from "vitest";
-import { DESKTOP_POINT_BUDGET, MOBILE_POINT_BUDGET, MIN_SAMPLE_THRESHOLD, timeBasedSample, uniformStrideSample } from "./chartSampler";
+import { describe, expect, it } from "vitest";
+import {
+	DESKTOP_POINT_BUDGET,
+	MIN_SAMPLE_THRESHOLD,
+	MOBILE_POINT_BUDGET,
+	timeBasedSample,
+	uniformStrideSample,
+} from "./chartSampler";
 
 describe("chartSampler", () => {
 	it("exports expected members", () => {

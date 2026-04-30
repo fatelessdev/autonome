@@ -1,13 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-	normalizeNumber,
+	formatConfidenceValue,
 	formatCurrency,
 	formatCurrencyValue,
-	formatSignedCurrencyValue,
-	formatQuantityValue,
-	formatConfidenceValue,
 	formatPercentValue,
 	formatPriceLabel,
+	formatQuantityValue,
+	formatSignedCurrencyValue,
+	normalizeNumber,
 	parseSymbols,
 } from "./numberFormat";
 

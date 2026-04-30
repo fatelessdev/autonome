@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { parseConversationToolCallMetadata } from "./conversationsSnapshot.server";
 
 describe("conversationsSnapshot.server", () => {
@@ -31,9 +31,7 @@ describe("conversationsSnapshot.server", () => {
 			id: "tc-create-1",
 			toolCallType: "CREATE_POSITION",
 			metadata: JSON.stringify({
-				decisions: [
-					{ symbol: "BTC", signal: "LONG", quantity: 0.5 },
-				],
+				decisions: [{ symbol: "BTC", signal: "LONG", quantity: 0.5 }],
 				results: [{ symbol: "BTC", success: true }],
 			}),
 		});

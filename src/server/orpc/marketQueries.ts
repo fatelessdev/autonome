@@ -3,9 +3,9 @@ import {
 	queryOptions,
 	useQuery,
 } from "@tanstack/react-query";
+import { SUPPORTED_MARKETS } from "@/core/shared/markets/marketMetadata";
 import { isValidVariantId, type VariantId } from "@/core/shared/variants";
 import { orpc } from "@/server/orpc/client";
-import { SUPPORTED_MARKETS } from "@/core/shared/markets/marketMetadata";
 
 export type MarketSymbol = (typeof SUPPORTED_MARKETS)[number];
 
@@ -39,7 +39,11 @@ export type PortfolioHistoryResult = {
 
 const MARKET_QUERY_KEYS = {
 	prices: (symbols: readonly MarketSymbol[]) =>
-		["markets", "prices", [...symbols].sort((a, b) => a.localeCompare(b)).join(",")] as const,
+		[
+			"markets",
+			"prices",
+			[...symbols].sort((a, b) => a.localeCompare(b)).join(","),
+		] as const,
 } as const;
 
 const PORTFOLIO_QUERY_KEYS = {

@@ -31,13 +31,13 @@ import {
 } from "@/components/ui/table";
 import { useVariant } from "@/components/variant-provider";
 import { VariantSelector } from "@/components/variant-selector";
+import { exportAnalyticsToExcel } from "@/core/lib/excelExport";
 import { cn } from "@/core/lib/utils";
 import { formatPercentValue } from "@/core/shared/formatting/numberFormat";
 import { findModelInfo } from "@/core/shared/models/modelConfig";
 import { normalizeIdentifier } from "@/core/shared/strings/normalizeIdentifier";
 import { formatHoldTime } from "@/core/shared/trading/calculations";
 import { getVariantBadgeClasses } from "@/core/shared/variants";
-import { exportAnalyticsToExcel } from "@/core/lib/excelExport";
 import type {
 	AdvancedStats,
 	OverallStats,

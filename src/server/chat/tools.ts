@@ -2,6 +2,8 @@ import { google } from "@ai-sdk/google";
 import { QueryClient } from "@tanstack/react-query";
 import { tool as createTool, generateObject } from "ai";
 import { z } from "zod";
+import { getArray, safeJsonParse } from "@/core/lib/json";
+import { normalizeNumber } from "@/core/shared/formatting/numberFormat";
 import { ToolCallType } from "@/server/db/tradingRepository";
 import {
 	executeUnsafeQueryMutation,
@@ -12,8 +14,6 @@ import {
 } from "@/server/db/tradingRepository.server";
 import { portfolioQuery } from "@/server/features/trading/data/portfolio.server";
 import { openPositionsQuery } from "@/server/features/trading/data/positions.server";
-import { normalizeNumber } from "@/core/shared/formatting/numberFormat";
-import { getArray, safeJsonParse } from "@/core/lib/json";
 
 const MAX_RESULT_ROWS = 100;
 

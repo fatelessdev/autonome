@@ -1,14 +1,16 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-	resolveQuantity,
-	resolveNotionalUsd,
 	computeRiskMetrics,
 	enrichOpenPositions,
+	resolveNotionalUsd,
+	resolveQuantity,
 	summarizePositionRisk,
 } from "./openPositionEnrichment";
 import type { OpenPositionSummary } from "./positions";
 
-function makePosition(overrides: Partial<OpenPositionSummary> = {}): OpenPositionSummary {
+function makePosition(
+	overrides: Partial<OpenPositionSummary> = {},
+): OpenPositionSummary {
 	return {
 		symbol: "BTC",
 		position: "1.5000",
@@ -44,13 +46,17 @@ describe("openPositionEnrichment", () => {
 
 		it("falls back to parsing position string", () => {
 			expect(
-				resolveQuantity(makePosition({ quantity: Number.NaN, position: "4.5000" })),
+				resolveQuantity(
+					makePosition({ quantity: Number.NaN, position: "4.5000" }),
+				),
 			).toBe(4.5);
 		});
 
 		it("returns null when both are invalid", () => {
 			expect(
-				resolveQuantity(makePosition({ quantity: Number.NaN, position: "abc" })),
+				resolveQuantity(
+					makePosition({ quantity: Number.NaN, position: "abc" }),
+				),
 			).toBeNull();
 		});
 
@@ -100,8 +106,19 @@ describe("openPositionEnrichment", () => {
 
 	describe("computeRiskMetrics", () => {
 		it("calculates risk and reward for a LONG position", () => {
-			const position = makePosition({ side: "LONG", entryPrice: 100, quantity: 10 });
-			const exitPlan = { target: 120, stop: 90, invalidation: null, invalidationPrice: null, timeExit: null, cooldownUntil: null };
+			const position = makePosition({
+				side: "LONG",
+				entryPrice: 100,
+				quantity: 10,
+			});
+			const exitPlan = {
+				target: 120,
+				stop: 90,
+				invalidation: null,
+				invalidationPrice: null,
+				timeExit: null,
+				cooldownUntil: null,
+			};
 			const result = computeRiskMetrics(position, exitPlan, 1000);
 
 			// risk = (100 - 90) * 10 = 100
@@ -117,8 +134,19 @@ describe("openPositionEnrichment", () => {
 		});
 
 		it("calculates risk and reward for a SHORT position", () => {
-			const position = makePosition({ side: "SHORT", entryPrice: 100, quantity: 10 });
-			const exitPlan = { target: 80, stop: 110, invalidation: null, invalidationPrice: null, timeExit: null, cooldownUntil: null };
+			const position = makePosition({
+				side: "SHORT",
+				entryPrice: 100,
+				quantity: 10,
+			});
+			const exitPlan = {
+				target: 80,
+				stop: 110,
+				invalidation: null,
+				invalidationPrice: null,
+				timeExit: null,
+				cooldownUntil: null,
+			};
 			const result = computeRiskMetrics(position, exitPlan, 1000);
 
 			// risk = (110 - 100) * 10 = 100
@@ -138,8 +166,19 @@ describe("openPositionEnrichment", () => {
 		});
 
 		it("returns null risk when stop is above entry for LONG", () => {
-			const position = makePosition({ side: "LONG", entryPrice: 100, quantity: 10 });
-			const exitPlan = { target: 120, stop: 105, invalidation: null, invalidationPrice: null, timeExit: null, cooldownUntil: null };
+			const position = makePosition({
+				side: "LONG",
+				entryPrice: 100,
+				quantity: 10,
+			});
+			const exitPlan = {
+				target: 120,
+				stop: 105,
+				invalidation: null,
+				invalidationPrice: null,
+				timeExit: null,
+				cooldownUntil: null,
+			};
 			const result = computeRiskMetrics(position, exitPlan, 1000);
 
 			// diff = 100 - 105 = -5, not > 0
@@ -162,17 +201,20 @@ describe("openPositionEnrichment", () => {
 		it("merges decision metadata from decision index", () => {
 			const positions = [makePosition()];
 			const decisionIndex = new Map([
-				["BTC", {
-					profitTarget: 55000,
-					stopLoss: 48000,
-					confidence: 8,
-					status: "FILLED",
-					createdAt: new Date("2024-01-15"),
-					invalidationCondition: null,
-					invalidationPrice: null,
-					timeExit: null,
-					cooldownUntil: null,
-				} as any],
+				[
+					"BTC",
+					{
+						profitTarget: 55000,
+						stopLoss: 48000,
+						confidence: 8,
+						status: "FILLED",
+						createdAt: new Date("2024-01-15"),
+						invalidationCondition: null,
+						invalidationPrice: null,
+						timeExit: null,
+						cooldownUntil: null,
+					} as any,
+				],
 			]);
 
 			const enriched = enrichOpenPositions(positions, decisionIndex);

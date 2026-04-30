@@ -165,7 +165,7 @@ describe("oRPC schemas", () => {
 		it("should validate valid price", () => {
 			const result = CryptoPriceSchema.parse({
 				symbol: "BTC",
-				price: 62000.50,
+				price: 62000.5,
 			});
 			expect(result.symbol).toBe("BTC");
 			expect(result.price).toBe(62000.5);

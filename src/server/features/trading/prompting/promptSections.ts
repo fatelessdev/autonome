@@ -1,3 +1,4 @@
+import { formatPercentValue } from "@/core/shared/formatting/numberFormat";
 import { toFiniteNumber } from "@/core/shared/trading/calculations";
 import type { PerformanceMetrics } from "@/server/features/trading/analysis/performanceMetrics";
 import type {
@@ -5,7 +6,6 @@ import type {
 	ExposureSummary,
 } from "@/server/features/trading/data/openPositionEnrichment";
 import type { PortfolioSnapshot } from "@/server/features/trading/data/portfolio";
-import { formatPercentValue } from "@/core/shared/formatting/numberFormat";
 
 /**
  * Calculate exposure to equity as the percentage of equity that is actually deployed.

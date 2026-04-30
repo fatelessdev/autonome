@@ -1,5 +1,10 @@
-import { describe, it, expect } from "vitest";
-import { getTrades, getPositions, getCryptoPrices, getPortfolioHistory } from "./trading";
+import { describe, expect, it } from "vitest";
+import {
+	getCryptoPrices,
+	getPortfolioHistory,
+	getPositions,
+	getTrades,
+} from "./trading";
 
 describe("trading", () => {
 	it("exports expected members", () => {

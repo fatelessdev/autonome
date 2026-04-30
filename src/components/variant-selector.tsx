@@ -7,7 +7,11 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/core/lib/utils";
-import { useVariant, VARIANT_TABS, type VariantIdWithAll } from "./variant-provider";
+import {
+	useVariant,
+	VARIANT_TABS,
+	type VariantIdWithAll,
+} from "./variant-provider";
 
 const TEXT_COLOR_FALLBACK = "#0f172a";
 

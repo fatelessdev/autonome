@@ -1,11 +1,11 @@
 import NumberFlow from "@number-flow/react";
 import { useMemo } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { formatCurrencyValue } from "@/core/shared/formatting/numberFormat";
 import {
 	isSupportedMarketSymbol,
 	MARKETS,
 } from "@/core/shared/markets/marketMetadata";
-import { formatCurrencyValue } from "@/core/shared/formatting/numberFormat";
 import { PositionsListSkeleton } from "./loading-skeletons";
 import type { ExitPlanSelection, ModelPositions } from "./types";
 import { resolveModelIdentity } from "./utils";

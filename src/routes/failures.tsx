@@ -30,7 +30,10 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { useVariant, type VariantIdWithAll } from "@/components/variant-provider";
+import {
+	useVariant,
+	type VariantIdWithAll,
+} from "@/components/variant-provider";
 import { VariantSelector } from "@/components/variant-selector";
 import { cn } from "@/core/lib/utils";
 import { formatPercentValue } from "@/core/shared/formatting/numberFormat";

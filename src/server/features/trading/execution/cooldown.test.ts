@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-	clampCooldownMinutes,
 	calculateCooldownUntil,
+	clampCooldownMinutes,
 	DEFAULT_COOLDOWN_MINUTES,
-	MIN_COOLDOWN_MINUTES,
 	MAX_COOLDOWN_MINUTES,
+	MIN_COOLDOWN_MINUTES,
 } from "./cooldown";
 
 describe("cooldown", () => {
@@ -77,9 +77,7 @@ describe("cooldown", () => {
 
 		it("adds the specified minutes to current time", () => {
 			const result = calculateCooldownUntil(10);
-			const expected = new Date(
-				Date.now() + 10 * 60 * 1000,
-			).toISOString();
+			const expected = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 			expect(result).toBe(expected);
 		});
 

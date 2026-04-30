@@ -1,5 +1,10 @@
-import { describe, it, expect } from "vitest";
-import { emitPositionEvent, subscribeToPositionEvents, getCurrentPositions, getPositionCacheMetadata } from "./positionEvents";
+import { describe, expect, it } from "vitest";
+import {
+	emitPositionEvent,
+	getCurrentPositions,
+	getPositionCacheMetadata,
+	subscribeToPositionEvents,
+} from "./positionEvents";
 
 describe("positionEvents", () => {
 	it("exports expected members", () => {

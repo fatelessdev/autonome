@@ -1,5 +1,10 @@
-import { describe, it, expect } from "vitest";
-import { emitConversationEvent, subscribeToConversationEvents, getCurrentConversations, getConversationCacheMetadata } from "./conversationEvents";
+import { describe, expect, it } from "vitest";
+import {
+	emitConversationEvent,
+	getConversationCacheMetadata,
+	getCurrentConversations,
+	subscribeToConversationEvents,
+} from "./conversationEvents";
 
 describe("conversationEvents", () => {
 	it("exports expected members", () => {

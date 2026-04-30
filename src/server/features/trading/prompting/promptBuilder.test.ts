@@ -1,10 +1,10 @@
-import { describe, it, expect } from "vitest";
-import { buildStateSummary } from "./promptBuilder";
-import type { PortfolioSnapshot } from "@/server/features/trading/data/portfolio";
+import { describe, expect, it } from "vitest";
 import type {
 	EnrichedOpenPosition,
 	ExposureSummary,
 } from "@/server/features/trading/data/openPositionEnrichment";
+import type { PortfolioSnapshot } from "@/server/features/trading/data/portfolio";
+import { buildStateSummary } from "./promptBuilder";
 
 const makePortfolio = (
 	overrides: Partial<PortfolioSnapshot> = {},

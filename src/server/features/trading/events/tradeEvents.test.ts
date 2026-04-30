@@ -1,5 +1,10 @@
-import { describe, it, expect } from "vitest";
-import { emitTradeEvent, subscribeToTradeEvents, getCurrentTrades, getTradeCacheMetadata } from "./tradeEvents";
+import { describe, expect, it } from "vitest";
+import {
+	emitTradeEvent,
+	getCurrentTrades,
+	getTradeCacheMetadata,
+	subscribeToTradeEvents,
+} from "./tradeEvents";
 
 describe("tradeEvents", () => {
 	it("exports expected members", () => {

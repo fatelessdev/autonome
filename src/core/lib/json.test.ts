@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { isRecord, safeJsonParse, getArray } from "./json";
+import { describe, expect, it } from "vitest";
+import { getArray, isRecord, safeJsonParse } from "./json";
 
 describe("json", () => {
 	describe("isRecord", () => {

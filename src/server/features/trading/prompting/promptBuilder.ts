@@ -1,4 +1,5 @@
 import { toFiniteNumber } from "@/core/shared/trading/calculations";
+import { DEFAULT_VARIANT, type VariantId } from "@/core/shared/variants";
 import type { CompetitionSnapshot } from "@/server/features/trading/analysis/competitionSnapshot";
 import type { PerformanceMetrics } from "@/server/features/trading/analysis/performanceMetrics";
 import type { Account } from "@/server/features/trading/contracts/accounts";
@@ -14,13 +15,7 @@ import {
 	calculateExposureToEquityPct,
 	formatUsd,
 } from "@/server/features/trading/prompting/promptSections";
-import {
-	DEFAULT_VARIANT,
-	type VariantId,
-} from "@/core/shared/variants";
-import {
-	getVariantConfig,
-} from "@/server/features/trading/prompting/prompts/variants";
+import { getVariantConfig } from "@/server/features/trading/prompting/prompts/variants";
 
 interface TradingPromptParams {
 	account: Account;

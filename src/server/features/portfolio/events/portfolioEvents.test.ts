@@ -1,5 +1,10 @@
-import { describe, it, expect } from "vitest";
-import { emitPortfolioEvent, subscribeToPortfolioEvents, getPortfolioCacheMetadata, getCurrentPortfolioSummary } from "./portfolioEvents";
+import { describe, expect, it } from "vitest";
+import {
+	emitPortfolioEvent,
+	getCurrentPortfolioSummary,
+	getPortfolioCacheMetadata,
+	subscribeToPortfolioEvents,
+} from "./portfolioEvents";
 
 describe("portfolioEvents", () => {
 	it("exports expected members", () => {

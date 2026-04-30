@@ -8,10 +8,7 @@ import {
 	MARKETS,
 	SUPPORTED_MARKETS,
 } from "@/core/shared/markets/marketMetadata";
-import {
-	type MarketPrice,
-	useMarketPrices,
-} from "@/server/orpc/marketQueries";
+import { type MarketPrice, useMarketPrices } from "@/server/orpc/marketQueries";
 
 const TRACKED_SYMBOLS = SUPPORTED_MARKETS;
 const TRACKED_SYMBOL_SET = new Set(TRACKED_SYMBOLS);

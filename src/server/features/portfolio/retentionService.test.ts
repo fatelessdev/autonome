@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
 	DOWNSAMPLE_CONFIG,
-	RETENTION_CONFIG,
 	downsampleForChart,
+	RETENTION_CONFIG,
 } from "./retentionService";
 
 type PortfolioEntry = {
@@ -18,9 +18,7 @@ type PortfolioEntry = {
 	};
 };
 
-function makeEntry(
-	overrides: Partial<PortfolioEntry> = {},
-): PortfolioEntry {
+function makeEntry(overrides: Partial<PortfolioEntry> = {}): PortfolioEntry {
 	return {
 		id: "entry-1",
 		modelId: "model-1",
@@ -49,9 +47,15 @@ describe("retentionService", () => {
 	describe("DOWNSAMPLE_CONFIG", () => {
 		it("should have correct threshold values", () => {
 			expect(DOWNSAMPLE_CONFIG.THRESHOLDS.ONE_DAY).toBe(24 * 60 * 60 * 1000);
-			expect(DOWNSAMPLE_CONFIG.THRESHOLDS.THREE_DAYS).toBe(3 * 24 * 60 * 60 * 1000);
-			expect(DOWNSAMPLE_CONFIG.THRESHOLDS.SEVEN_DAYS).toBe(7 * 24 * 60 * 60 * 1000);
-			expect(DOWNSAMPLE_CONFIG.THRESHOLDS.THIRTY_DAYS).toBe(30 * 24 * 60 * 60 * 1000);
+			expect(DOWNSAMPLE_CONFIG.THRESHOLDS.THREE_DAYS).toBe(
+				3 * 24 * 60 * 60 * 1000,
+			);
+			expect(DOWNSAMPLE_CONFIG.THRESHOLDS.SEVEN_DAYS).toBe(
+				7 * 24 * 60 * 60 * 1000,
+			);
+			expect(DOWNSAMPLE_CONFIG.THRESHOLDS.THIRTY_DAYS).toBe(
+				30 * 24 * 60 * 60 * 1000,
+			);
 		});
 
 		it("should have all resolution bucket sizes", () => {
@@ -79,8 +83,14 @@ describe("retentionService", () => {
 
 		it("should auto-detect 1m resolution for ≤1 day range", () => {
 			const data = [
-				makeEntry({ createdAt: "2024-01-01T00:00:00Z", netPortfolio: "100000" }),
-				makeEntry({ createdAt: "2024-01-01T12:00:00Z", netPortfolio: "100100" }),
+				makeEntry({
+					createdAt: "2024-01-01T00:00:00Z",
+					netPortfolio: "100000",
+				}),
+				makeEntry({
+					createdAt: "2024-01-01T12:00:00Z",
+					netPortfolio: "100100",
+				}),
 			];
 			const result = downsampleForChart(data);
 			expect(result.resolution).toBe("1m");
@@ -88,8 +98,14 @@ describe("retentionService", () => {
 
 		it("should auto-detect 5m resolution for ≤3 day range", () => {
 			const data = [
-				makeEntry({ createdAt: "2024-01-01T00:00:00Z", netPortfolio: "100000" }),
-				makeEntry({ createdAt: "2024-01-03T00:00:00Z", netPortfolio: "100200" }),
+				makeEntry({
+					createdAt: "2024-01-01T00:00:00Z",
+					netPortfolio: "100000",
+				}),
+				makeEntry({
+					createdAt: "2024-01-03T00:00:00Z",
+					netPortfolio: "100200",
+				}),
 			];
 			const result = downsampleForChart(data);
 			expect(result.resolution).toBe("5m");
@@ -97,8 +113,14 @@ describe("retentionService", () => {
 
 		it("should auto-detect 15m resolution for ≤7 day range", () => {
 			const data = [
-				makeEntry({ createdAt: "2024-01-01T00:00:00Z", netPortfolio: "100000" }),
-				makeEntry({ createdAt: "2024-01-07T00:00:00Z", netPortfolio: "100500" }),
+				makeEntry({
+					createdAt: "2024-01-01T00:00:00Z",
+					netPortfolio: "100000",
+				}),
+				makeEntry({
+					createdAt: "2024-01-07T00:00:00Z",
+					netPortfolio: "100500",
+				}),
 			];
 			const result = downsampleForChart(data);
 			expect(result.resolution).toBe("15m");
@@ -106,8 +128,14 @@ describe("retentionService", () => {
 
 		it("should use forced resolution when provided", () => {
 			const data = [
-				makeEntry({ createdAt: "2024-01-01T00:00:00Z", netPortfolio: "100000" }),
-				makeEntry({ createdAt: "2024-01-02T00:00:00Z", netPortfolio: "100100" }),
+				makeEntry({
+					createdAt: "2024-01-01T00:00:00Z",
+					netPortfolio: "100000",
+				}),
+				makeEntry({
+					createdAt: "2024-01-02T00:00:00Z",
+					netPortfolio: "100100",
+				}),
 			];
 			const result = downsampleForChart(data, "1h");
 			expect(result.resolution).toBe("1h");
@@ -193,14 +221,22 @@ describe("retentionService", () => {
 					modelId: "model-1",
 					createdAt: "2024-06-01T00:00:00Z",
 					netPortfolio: "100000",
-					model: { name: "GPT-4", variant: "Sovereign", openRouterModelName: "openai/gpt-4" },
+					model: {
+						name: "GPT-4",
+						variant: "Sovereign",
+						openRouterModelName: "openai/gpt-4",
+					},
 				}),
 				makeEntry({
 					id: "e2",
 					modelId: "model-2",
 					createdAt: "2024-06-01T00:00:00Z",
 					netPortfolio: "50000",
-					model: { name: "Claude", variant: "Trendsurfer", openRouterModelName: "anthropic/claude" },
+					model: {
+						name: "Claude",
+						variant: "Trendsurfer",
+						openRouterModelName: "anthropic/claude",
+					},
 				}),
 			];
 			const result = downsampleForChart(data, "1h");

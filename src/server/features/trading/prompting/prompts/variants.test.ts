@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { getVariantConfig, getAllVariants } from "./variants";
+import { describe, expect, it } from "vitest";
 import { VARIANT_IDS } from "@/core/shared/variants";
+import { getAllVariants, getVariantConfig } from "./variants";
 
 describe("prompts/variants", () => {
 	describe("getVariantConfig", () => {
@@ -37,9 +37,7 @@ describe("prompts/variants", () => {
 			expect(getVariantConfig("Contrarian").systemPrompt).toContain(
 				"Contrarian",
 			);
-			expect(getVariantConfig("Sovereign").systemPrompt).toContain(
-				"Sovereign",
-			);
+			expect(getVariantConfig("Sovereign").systemPrompt).toContain("Sovereign");
 		});
 
 		it("userPrompt contains placeholder tokens", () => {

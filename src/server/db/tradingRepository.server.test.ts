@@ -1,5 +1,11 @@
-import { describe, it, expect } from "vitest";
-import { listModelsQuery, listModelsOrderedQuery, portfolioHistoryQuery, recentToolCallsQuery, recentToolCallsWithModelQuery } from "./tradingRepository.server";
+import { describe, expect, it } from "vitest";
+import {
+	listModelsOrderedQuery,
+	listModelsQuery,
+	portfolioHistoryQuery,
+	recentToolCallsQuery,
+	recentToolCallsWithModelQuery,
+} from "./tradingRepository.server";
 
 describe("tradingRepository.server", () => {
 	it("exports expected members", () => {

@@ -6,9 +6,9 @@
  * Single Alpaca code path.
  */
 
+import { toCanonical } from "@/core/shared/markets/marketMetadata";
 import type { Account } from "@/server/features/trading/contracts/accounts";
 import { getTradingProvider } from "@/server/providers/alpaca";
-import { toCanonical } from "@/core/shared/markets/marketMetadata";
 
 export interface ExitPlanSummary {
 	target: number | null;

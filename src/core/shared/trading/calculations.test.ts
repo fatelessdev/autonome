@@ -1,26 +1,26 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-	toFiniteNumber,
-	requireFiniteNumber,
-	requirePresent,
-	calculateUnrealizedPnl,
-	calculateTotalPnl,
-	calculateWinRate,
+	calculateCurrentDrawdown,
+	calculateExpectancy,
+	calculateHoldTimeMinutes,
 	calculateMaxDrawdown,
 	calculateMaxDrawdownAbsolute,
-	calculateCurrentDrawdown,
-	mean,
-	standardDeviation,
-	median,
-	calculateSharpeRatioFromPortfolio,
-	calculateSharpeRatioFromTrades,
-	calculateReturnPercent,
-	calculateHoldTimeMinutes,
-	formatHoldTime,
-	calculateTradeSize,
-	calculateExpectancy,
 	calculateRecoveryFactor,
 	calculateRecoveryFactorFromPnls,
+	calculateReturnPercent,
+	calculateSharpeRatioFromPortfolio,
+	calculateSharpeRatioFromTrades,
+	calculateTotalPnl,
+	calculateTradeSize,
+	calculateUnrealizedPnl,
+	calculateWinRate,
+	formatHoldTime,
+	mean,
+	median,
+	requireFiniteNumber,
+	requirePresent,
+	standardDeviation,
+	toFiniteNumber,
 } from "./calculations";
 
 describe("calculations", () => {
@@ -93,12 +93,20 @@ describe("calculations", () => {
 
 	describe("calculateUnrealizedPnl", () => {
 		it("calculates P&L for a LONG position", () => {
-			const position = { quantity: 10, notional: "1000", side: "LONG" as const };
+			const position = {
+				quantity: 10,
+				notional: "1000",
+				side: "LONG" as const,
+			};
 			expect(calculateUnrealizedPnl(position, 110)).toBe(100); // (110 - 100) * 10
 		});
 
 		it("calculates P&L for a SHORT position", () => {
-			const position = { quantity: 10, notional: "1000", side: "SHORT" as const };
+			const position = {
+				quantity: 10,
+				notional: "1000",
+				side: "SHORT" as const,
+			};
 			expect(calculateUnrealizedPnl(position, 90)).toBe(100); // (100 - 90) * 10
 		});
 
