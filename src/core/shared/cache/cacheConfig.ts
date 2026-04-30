@@ -8,47 +8,19 @@
 
 /**
  * Cache timing tiers for different data freshness requirements.
+ *
+ * Use these constants as base timing values. For gcTime, multiply the
+ * appropriate tier (e.g. `5 * CACHE_TIMING.SLOW` for a 5-minute gcTime).
  */
 export const CACHE_TIMING = {
-	/**
-	 * Real-time data that should be refreshed frequently.
-	 * Use for: positions, prices, live metrics
-	 */
-	REALTIME: {
-		staleTime: 10_000, // 10 seconds
-		gcTime: 2 * 60_000, // 2 minutes
-		refetchInterval: 15_000, // 15 seconds
-	},
-
-	/**
-	 * Standard data that updates periodically.
-	 * Use for: trades, conversations, portfolio history
-	 */
-	STANDARD: {
-		staleTime: 60_000, // 1 minute
-		gcTime: 5 * 60_000, // 5 minutes
-		refetchInterval: 60_000, // 1 minute
-	},
-
-	/**
-	 * Slow-changing data that doesn't need frequent updates.
-	 * Use for: analytics, leaderboard, model stats
-	 */
-	SLOW: {
-		staleTime: 3 * 60_000, // 3 minutes
-		gcTime: 15 * 60_000, // 15 minutes
-		refetchInterval: 3 * 60_000, // 3 minutes
-	},
-
-	/**
-	 * Static data that rarely changes.
-	 * Use for: model list, variant configurations
-	 */
-	STATIC: {
-		staleTime: Infinity,
-		gcTime: Infinity,
-		refetchInterval: false as const,
-	},
+	/** 15 seconds — positions, prices, live metrics */
+	REALTIME: 15_000,
+	/** 30 seconds — trades, conversations, portfolio snapshots */
+	STANDARD: 30_000,
+	/** 60 seconds — portfolio history, analytics */
+	SLOW: 60_000,
+	/** 120 seconds — model list, variant configurations */
+	STATIC: 120_000,
 } as const;
 
 /**
@@ -82,4 +54,7 @@ export function createQueryKey(
 	return [prefix, ...parts] as const;
 }
 
-export type CacheTiming = (typeof CACHE_TIMING)[keyof typeof CACHE_TIMING];
+/**
+ * Union type of all cache timing tier values.
+ */
+export type CacheTimingTier = (typeof CACHE_TIMING)[keyof typeof CACHE_TIMING];

@@ -6,6 +6,7 @@
 
 import { queryOptions } from "@tanstack/react-query";
 import { and, asc, desc, eq, inArray, isNull, ne, or } from "drizzle-orm";
+import { CACHE_TIMING } from "@/core/shared/cache/cacheConfig";
 import {
 	isValidVariantId,
 	VARIANT_IDS,
@@ -140,8 +141,8 @@ export const tradesQuery = (options?: FetchTradesOptions) =>
 	queryOptions({
 		queryKey: ["trades", options?.variant ?? "all", options?.limit ?? 100],
 		queryFn: () => fetchTrades(options),
-		staleTime: 30_000,
-		gcTime: 5 * 60_000,
+		staleTime: CACHE_TIMING.STANDARD,
+		gcTime: 5 * CACHE_TIMING.SLOW,
 	});
 
 export async function fetchTrades(
@@ -261,9 +262,9 @@ export const positionsQuery = (options?: FetchPositionsOptions) =>
 	queryOptions({
 		queryKey: ["positions", options?.variant ?? "all"],
 		queryFn: () => fetchPositions(options),
-		staleTime: 15_000,
-		gcTime: 2 * 60_000,
-		refetchInterval: 30_000,
+		staleTime: CACHE_TIMING.REALTIME,
+		gcTime: CACHE_TIMING.STATIC,
+		refetchInterval: CACHE_TIMING.STANDARD,
 	});
 
 export async function fetchPositions(options?: FetchPositionsOptions) {
@@ -424,7 +425,7 @@ export const cryptoPricesQuery = (symbols: string[]) => {
 		queryKey: ["crypto-prices", ...normalized],
 		queryFn: () => fetchCryptoPrices(normalized),
 		staleTime: 10_000,
-		gcTime: 2 * 60_000,
+		gcTime: CACHE_TIMING.STATIC,
 	});
 };
 
@@ -436,8 +437,8 @@ export const portfolioHistoryQuery = () =>
 	queryOptions({
 		queryKey: ["portfolio-history"],
 		queryFn: () => fetchPortfolioHistory(),
-		staleTime: 60_000,
-		gcTime: 10 * 60_000,
+		staleTime: CACHE_TIMING.SLOW,
+		gcTime: 10 * CACHE_TIMING.SLOW,
 	});
 
 // ==========================================
@@ -453,7 +454,7 @@ export const invocationsQuery = () =>
 		queryKey: ["invocations"],
 		queryFn: refreshConversationEvents,
 		staleTime: 20_000,
-		gcTime: 3 * 60_000,
+		gcTime: 3 * CACHE_TIMING.SLOW,
 	});
 
 // ==========================================
@@ -475,6 +476,6 @@ export const modelsListQuery = () =>
 	queryOptions({
 		queryKey: ["models", "simple-list"],
 		queryFn: fetchModelsList,
-		staleTime: 30_000,
-		gcTime: 5 * 60_000,
+		staleTime: CACHE_TIMING.STANDARD,
+		gcTime: 5 * CACHE_TIMING.SLOW,
 	});

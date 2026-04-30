@@ -1,4 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
+import { CACHE_TIMING } from "@/core/shared/cache/cacheConfig";
 import type { ToolCallTypeValue } from "./tradingRepository";
 import * as repo from "./tradingRepository";
 
@@ -26,8 +27,8 @@ export const portfolioHistoryQuery = (modelId: string) =>
 	queryOptions({
 		queryKey: ["portfolio-history", modelId],
 		queryFn: () => repo.getPortfolioHistory(modelId),
-		staleTime: 60_000,
-		gcTime: 10 * 60_000,
+		staleTime: CACHE_TIMING.SLOW,
+		gcTime: 10 * CACHE_TIMING.SLOW,
 	});
 
 export const recentToolCallsQuery = (params: {
@@ -38,8 +39,8 @@ export const recentToolCallsQuery = (params: {
 	queryOptions({
 		queryKey: ["tool-calls", params.modelId, params.type, params.limit ?? 100],
 		queryFn: () => repo.getRecentToolCallsForModel(params),
-		staleTime: 15_000,
-		gcTime: 2 * 60_000,
+		staleTime: CACHE_TIMING.REALTIME,
+		gcTime: CACHE_TIMING.STATIC,
 	});
 
 export const recentToolCallsWithModelQuery = (params: {
@@ -56,7 +57,7 @@ export const recentToolCallsWithModelQuery = (params: {
 		],
 		queryFn: () => repo.getRecentToolCallsWithModel(params),
 		staleTime: 20_000,
-		gcTime: 3 * 60_000,
+		gcTime: 3 * CACHE_TIMING.SLOW,
 	});
 
 export const searchModelsQuery = (params: {
@@ -78,8 +79,8 @@ export const portfolioSnapshotsQuery = (params: {
 	queryOptions({
 		queryKey: ["portfolio-snapshots", params.modelName, params.limit ?? 60],
 		queryFn: () => repo.fetchPortfolioSnapshots(params),
-		staleTime: 30_000,
-		gcTime: 5 * 60_000,
+		staleTime: CACHE_TIMING.STANDARD,
+		gcTime: 5 * CACHE_TIMING.SLOW,
 	});
 
 // ==========================================

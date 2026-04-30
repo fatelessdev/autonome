@@ -1,4 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
+import { CACHE_TIMING } from "@/core/shared/cache/cacheConfig";
 import type { Account } from "../contracts/accounts";
 import { getOpenPositions } from "./positions";
 
@@ -11,8 +12,8 @@ export const openPositionsQuery = (account: Account) =>
 	queryOptions({
 		queryKey: ["open-positions", account.id],
 		queryFn: () => getOpenPositions(account),
-		staleTime: 15_000, // 15 seconds
-		gcTime: 2 * 60_000,
-		refetchInterval: 30_000, // Auto-refresh every 30 seconds
+		staleTime: CACHE_TIMING.REALTIME,
+		gcTime: CACHE_TIMING.STATIC,
+		refetchInterval: CACHE_TIMING.STANDARD,
 		retry: 2,
 	});
