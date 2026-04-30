@@ -10,9 +10,14 @@
  * - TTL-based expiration (default 2 minutes)
  * - Thread-safe fetch deduplication via in-flight promise tracking
  * - Integrates TAAPI supplementary indicators for BTC/ETH
+ * - Integrates Binance OI data for all traded crypto assets
  */
 
 import { MARKETS } from "@/core/shared/markets/marketMetadata";
+import {
+	fetchAllOpenInterest,
+	type OpenInterestMap,
+} from "@/server/integrations/binance-oi";
 import {
 	type TaapiPreFetchResult,
 	taapiClient,
@@ -31,6 +36,7 @@ interface CacheEntry {
 	snapshots: MarketSnapshot[];
 	formatted: string;
 	taapiData: Map<string, TaapiPreFetchResult>;
+	oiData: OpenInterestMap;
 	fetchedAt: number;
 }
 
@@ -136,6 +142,47 @@ function formatTaapiIndicators(
 }
 
 /**
+ * Format open interest data for a symbol.
+ * Returns formatted string section or empty string if no data.
+ */
+function formatOpenInterest(
+	symbol: string,
+	oiData: OpenInterestMap | undefined,
+): string {
+	if (!oiData) return "";
+
+	const data = oiData.get(symbol);
+	if (!data) return "";
+
+	const lines: string[] = [];
+	lines.push(`**Open Interest (via Binance Futures)**`);
+
+	// Format OI value in human-readable form (contracts)
+	const oiFormatted =
+		data.openInterest >= 1_000_000
+			? `${(data.openInterest / 1_000_000).toFixed(2)}M`
+			: data.openInterest >= 1_000
+				? `${(data.openInterest / 1_000).toFixed(2)}K`
+				: data.openInterest.toFixed(2);
+
+	// Format OI value in USD
+	const oiUsdFormatted =
+		data.openInterestValueUsd >= 1_000_000_000
+			? `$${(data.openInterestValueUsd / 1_000_000_000).toFixed(2)}B`
+			: data.openInterestValueUsd >= 1_000_000
+				? `$${(data.openInterestValueUsd / 1_000_000).toFixed(2)}M`
+				: `$${(data.openInterestValueUsd / 1_000).toFixed(2)}K`;
+
+	lines.push(`OI: ${oiFormatted} contracts (${oiUsdFormatted})`);
+
+	// Format change with direction indicator
+	const changeSign = data.changePercent >= 0 ? "+" : "";
+	lines.push(`OI 24h Change: ${changeSign}${data.changePercent.toFixed(2)}%`);
+
+	return lines.join("\n");
+}
+
+/**
  * Get cached market intelligence, fetching fresh data if cache is stale.
  * Multiple concurrent calls will share the same in-flight fetch.
  *
@@ -171,12 +218,19 @@ export async function getSharedMarketIntelligence(credentials: {
 			alpacaSymbol: meta.symbol,
 		}));
 
-		// Fetch market snapshots and TAAPI data in parallel
-		const [snapshots, taapiData] = await Promise.all([
+		// Fetch market snapshots, TAAPI data, and OI data in parallel
+		const [snapshots, taapiData, oiData] = await Promise.all([
 			getMarketSnapshots(marketUniverse, credentials),
 			taapiClient.isConfigured()
 				? taapiClient.preFetchMultipleAssets([...TAAPI_FREE_PLAN_SYMBOLS], "1h")
 				: Promise.resolve(new Map<string, TaapiPreFetchResult>()),
+			fetchAllOpenInterest().catch((error) => {
+				console.error(
+					"[MarketIntelligenceCache] OI fetch failed, degrading gracefully:",
+					error instanceof Error ? error.message : error,
+				);
+				return new Map() as OpenInterestMap;
+			}),
 		]);
 
 		// Build formatted output with TAAPI data integrated
@@ -227,10 +281,37 @@ export async function getSharedMarketIntelligence(credentials: {
 			}
 		}
 
+		// Append OI data for all symbols that have it
+		if (oiData.size > 0) {
+			for (const [symbol] of oiData) {
+				const oiSection = formatOpenInterest(symbol, oiData);
+				if (oiSection) {
+					const marker = `### ${symbol} MARKET DATA`;
+					const markerIndex = formatted.indexOf(marker);
+					if (markerIndex !== -1) {
+						// Insert OI section after TAAPI section (if present) or before series data
+						const higherTfMarker = "**Higher timeframe (4h";
+						const higherTfIndex = formatted.indexOf(
+							higherTfMarker,
+							markerIndex,
+						);
+						if (higherTfIndex !== -1) {
+							formatted =
+								formatted.slice(0, higherTfIndex) +
+								oiSection +
+								"\n" +
+								formatted.slice(higherTfIndex);
+						}
+					}
+				}
+			}
+		}
+
 		const entry: CacheEntry = {
 			snapshots,
 			formatted,
 			taapiData,
+			oiData,
 			fetchedAt: Date.now(),
 		};
 
