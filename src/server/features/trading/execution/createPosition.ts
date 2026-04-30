@@ -28,10 +28,11 @@ import {
 // Constants
 // ==========================================
 
-/** Max attempts to poll Alpaca for a fill price on a market order. */
-const FILL_POLL_MAX_ATTEMPTS = 5;
-/** Delay between fill poll attempts (ms). */
-const FILL_POLL_DELAY_MS = 500;
+/**
+ * Exponential backoff delays (ms) for fill polling.
+ * 4 attempts: 500ms, 1s, 2s, 4s — total max wait ~7.5s.
+ */
+const FILL_POLL_BACKOFF_DELAYS_MS = [500, 1_000, 2_000, 4_000];
 
 // ==========================================
 // Types
@@ -320,8 +321,14 @@ export async function createPosition(
 				: 0;
 
 			if (!alpacaOrder.filled_avg_price) {
-				for (let attempt = 0; attempt < FILL_POLL_MAX_ATTEMPTS; attempt++) {
-					await new Promise((r) => setTimeout(r, FILL_POLL_DELAY_MS));
+				for (
+					let attempt = 0;
+					attempt < FILL_POLL_BACKOFF_DELAYS_MS.length;
+					attempt++
+				) {
+					await new Promise((r) =>
+						setTimeout(r, FILL_POLL_BACKOFF_DELAYS_MS[attempt]),
+					);
 					const refreshed = await trading.getOrder(alpacaOrder.id);
 					if (refreshed.filled_avg_price) {
 						filledPrice = Number.parseFloat(refreshed.filled_avg_price);
@@ -334,8 +341,11 @@ export async function createPosition(
 			}
 
 			if (!filledPrice) {
+				console.error(
+					`[createPosition] PERSISTENT FAILURE: Order ${alpacaOrder.id} for ${symbol} was not filled after ${FILL_POLL_BACKOFF_DELAYS_MS.length} attempts with exponential backoff. This may indicate a broker issue or halted market.`,
+				);
 				throw new Error(
-					`Order ${alpacaOrder.id} for ${symbol} was not filled after ${FILL_POLL_MAX_ATTEMPTS} polls`,
+					`Order ${alpacaOrder.id} for ${symbol} was not filled after ${FILL_POLL_BACKOFF_DELAYS_MS.length} polls with exponential backoff`,
 				);
 			}
 
