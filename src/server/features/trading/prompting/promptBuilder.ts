@@ -1,6 +1,10 @@
 import { toFiniteNumber } from "@/core/shared/trading/calculations";
 import { DEFAULT_VARIANT, type VariantId } from "@/core/shared/variants";
 import type { CompetitionSnapshot } from "@/server/features/trading/analysis/competitionSnapshot";
+import {
+	type CorrelationWarning,
+	formatCorrelationWarnings,
+} from "@/server/features/trading/analysis/correlationMatrix";
 import type { PerformanceMetrics } from "@/server/features/trading/analysis/performanceMetrics";
 import type { Account } from "@/server/features/trading/contracts/accounts";
 import type {
@@ -31,6 +35,8 @@ interface TradingPromptParams {
 	variant?: VariantId;
 	/** Leaderboard context */
 	competition: CompetitionSnapshot;
+	/** Correlation warnings for highly correlated held/considered pairs */
+	correlationWarnings?: CorrelationWarning[];
 }
 
 function renderPromptTemplate(
@@ -110,6 +116,7 @@ export function buildTradingPrompts(params: TradingPromptParams): {
 		currentTime,
 		variant = DEFAULT_VARIANT,
 		competition,
+		correlationWarnings = [],
 	} = params;
 
 	// Get variant-specific prompts
@@ -150,6 +157,7 @@ export function buildTradingPrompts(params: TradingPromptParams): {
 		"{{PERFORMANCE_OVERVIEW}}": buildPerformanceOverview({
 			performanceMetrics,
 		}),
+		"{{CORRELATION_WARNINGS}}": formatCorrelationWarnings(correlationWarnings),
 		"{{COMPETITION_STANDINGS}}": competition.standings,
 		"{{COMPETITION_PNL_DELTA}}": competition.pnlDeltaToLeader,
 		"{{COMPETITION_OPEN_POSITIONS}}": competition.openPositionsSummary,

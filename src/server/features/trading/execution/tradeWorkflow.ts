@@ -30,6 +30,11 @@ import {
 } from "@/server/events/workflowEvents";
 import { getLeaderboardData } from "@/server/features/analytics";
 import { buildCompetitionSnapshot } from "@/server/features/trading/analysis/competitionSnapshot";
+import {
+	computeCorrelationMatrix,
+	generateCorrelationWarnings,
+	invalidateCorrelationCache,
+} from "@/server/features/trading/analysis/correlationMatrix";
 import { calculatePerformanceMetrics } from "@/server/features/trading/analysis/performanceMetrics";
 import type { Account } from "@/server/features/trading/contracts/accounts";
 import { fetchLatestDecisionIndex } from "@/server/features/trading/contracts/decisionIndex";
@@ -297,6 +302,15 @@ export async function runTradeWorkflow(account: Account): Promise<string> {
 		variant: variantId,
 	});
 
+	// Compute correlation matrix from market snapshots and generate warnings
+	// for highly correlated held/considered pairs
+	const correlationMatrix = computeCorrelationMatrix(marketResult.snapshots);
+	const heldSymbols = new Set(openPositions.map((p) => p.symbol));
+	const correlationWarnings = generateCorrelationWarnings(
+		correlationMatrix,
+		heldSymbols,
+	);
+
 	// Build prompts (uses staleness-enriched positions)
 	const enrichedPrompt = buildTradingPrompts({
 		account,
@@ -309,6 +323,7 @@ export async function runTradeWorkflow(account: Account): Promise<string> {
 		currentTime,
 		variant: variantId,
 		competition: competitionSnapshot,
+		correlationWarnings,
 	});
 
 	// Create tool context for shared state
@@ -660,8 +675,9 @@ export async function executeAllModelTrades(): Promise<{
 		}
 	}
 
-	// Invalidate market cache after batch completes
+	// Invalidate market and correlation caches after batch completes
 	invalidateMarketIntelligenceCache();
+	invalidateCorrelationCache();
 	invalidateNewsCache();
 
 	const successCount = results.filter((r) => r.success).length;
