@@ -292,6 +292,11 @@ export function createPositionTool(ctx: ToolContext) {
 			if (skippedLimitReached.length > 0) {
 				response += `Skipped (session limit): ${skippedLimitReached.join(", ")}.`;
 			}
+			// Surface trade size adjustments to the LLM
+			const adjustments = results.filter((r) => r.adjustmentNote);
+			if (adjustments.length > 0) {
+				response += `Size adjustments: ${adjustments.map((r) => r.adjustmentNote).join(" | ")}`;
+			}
 
 			return response || "No positions were created";
 		},

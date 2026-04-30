@@ -67,6 +67,8 @@ export interface PositionResult {
 	error?: string;
 	/** The database order ID for this position */
 	orderId?: string;
+	/** Note about size adjustment (e.g., capped to available balance) */
+	adjustmentNote?: string;
 }
 
 interface ExitPlan {
@@ -255,10 +257,32 @@ export async function createPosition(
 				}
 			}
 
+			// Auto-adjust: cap trade size to available balance if oversized
+			let adjustedQty = orderQty;
+			let adjustmentNote: string | undefined;
+			if (estimatedPrice && estimatedPrice > 0) {
+				const accountInfo = await trading.getAccount();
+				const availableCash = accountInfo.cash;
+				const requestedNotional = orderQty * estimatedPrice;
+				if (requestedNotional > availableCash) {
+					const maxQty =
+						Math.floor((availableCash / estimatedPrice) * 1000000) / 1000000;
+					if (maxQty <= 0) {
+						throw new Error(
+							`Insufficient balance for ${symbol}: available $${availableCash.toFixed(2)} cannot cover any quantity at ~$${estimatedPrice.toFixed(2)}`,
+						);
+					}
+					adjustedQty = maxQty;
+					adjustmentNote = `Trade size adjusted: requested ${orderQty} ($${requestedNotional.toFixed(2)}) exceeds available balance ($${availableCash.toFixed(2)}). Capped to ${maxQty} ($${(maxQty * estimatedPrice).toFixed(2)}).`;
+					console.warn(`[createPosition] ${adjustmentNote}`);
+				}
+			}
+			const finalQty = adjustedQty;
+
 			// Build Alpaca order params
 			const orderParams: Parameters<typeof trading.createOrder>[0] = {
 				symbol: alpacaSymbol,
-				qty: orderQty,
+				qty: finalQty,
 				side: orderSide as "buy" | "sell",
 				type: "market",
 				time_in_force: "gtc",
@@ -303,7 +327,7 @@ export async function createPosition(
 						filledPrice = Number.parseFloat(refreshed.filled_avg_price);
 						filledQty = refreshed.filled_qty
 							? Number.parseFloat(refreshed.filled_qty)
-							: orderQty;
+							: finalQty;
 						break;
 					}
 				}
@@ -317,7 +341,7 @@ export async function createPosition(
 
 			// If Alpaca omits filled_qty but we have a confirmed fill price, fallback to the submitted qty.
 			const effectiveQty =
-				Number.isFinite(filledQty) && filledQty > 0 ? filledQty : orderQty;
+				Number.isFinite(filledQty) && filledQty > 0 ? filledQty : finalQty;
 			if (!Number.isFinite(effectiveQty) || effectiveQty <= 0) {
 				throw new Error(
 					`Invalid effective quantity for ${symbol}: ${effectiveQty}`,
@@ -385,6 +409,7 @@ export async function createPosition(
 				entryPrice: dbResult.entryPrice,
 				success: true,
 				orderId: dbResult.orderId,
+				adjustmentNote,
 			});
 		} catch (err) {
 			const errorMsg = err instanceof Error ? err.message : String(err);
