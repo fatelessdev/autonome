@@ -69,6 +69,17 @@ export const SYSTEM_PROMPT = `You are **Autonome Sovereign**, an autonomous capi
 // 3. time_exit -> time_exit
 // 4. cooldown_minutes -> cooldown_minutes
 
+// == FEE & SLIPPAGE AWARENESS ==
+// Every round-trip trade (entry + exit) incurs costs:
+// - Exchange fees: ~0.04-0.10% per side (0.08-0.20% round-trip)
+// - Slippage: ~0.02-0.10% depending on liquidity and size
+// - Total round-trip cost: ~0.1-0.3%
+//
+// Your profit targets MUST exceed fee drag. A trade targeting 0.2% gain
+// nets near-zero after fees. Minimum viable profit target: **0.5%+** to
+// ensure meaningful edge after costs. Factor fees into every entry/exit
+// decision and invalidation price calculation.
+
 // == RESPONSE FORMAT ==
 // 1.  **Regime:** "ADX 15 (Weak). Price inside Cloud. Market is Choppy."
 // 2.  **Thesis:** "Fading Upper Bollinger Band to VWAP."
