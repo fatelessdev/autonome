@@ -44,10 +44,6 @@ import { portfolioQuery } from "@/server/features/trading/data/portfolio.server"
 import { getOpenPositions } from "@/server/features/trading/data/positions";
 import { openPositionsQuery } from "@/server/features/trading/data/positions.server";
 import { closePosition } from "@/server/features/trading/execution/closePosition";
-import {
-	isConsensusModel,
-	prepareConsensusWorkflowFromModels,
-} from "@/server/features/trading/execution/orchestrator";
 import { buildTradingPrompts } from "@/server/features/trading/prompting/promptBuilder";
 import type { VariantId } from "@/core/shared/variants";
 import {
@@ -442,21 +438,11 @@ export async function executeAllModelTrades(): Promise<{
 }> {
 	const models = await listModels();
 
-	// Consensus is intentionally prepared-only for now.
-	const consensusPlan = prepareConsensusWorkflowFromModels(models);
-	if (consensusPlan) {
-		console.log(
-			`[TradeExecutor] Consensus account ready with ${consensusPlan.voterCount} voters (execution disabled in cycle)`,
-		);
-	}
-
-	const regularModels = models.filter((m) => !isConsensusModel(m.name));
-
 	const validModels: Array<
-		(typeof regularModels)[number] & { variant: VariantId }
+		(typeof models)[number] & { variant: VariantId }
 	> = [];
 
-	for (const model of regularModels) {
+	for (const model of models) {
 		if (!model.alpacaApiKey || !model.alpacaApiSecret) {
 			console.warn(`Model ${model.id} missing Alpaca credentials; skipping`);
 			continue;
