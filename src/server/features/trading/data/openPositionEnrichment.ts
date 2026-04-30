@@ -4,6 +4,10 @@ import type {
 	ExitPlanSummary,
 	OpenPositionSummary,
 } from "@/server/features/trading/data/positions";
+import {
+	computeStalenessScore,
+	type StalenessScore,
+} from "@/server/features/trading/stalenessAnalyzer";
 
 export interface EnrichedOpenPosition extends OpenPositionSummary {
 	exitPlan: ExitPlanSummary | null;
@@ -16,6 +20,10 @@ export interface EnrichedOpenPosition extends OpenPositionSummary {
 	rewardUsd: number | null;
 	rewardPercent: number | null;
 	riskRewardRatio: number | null;
+	/** Position entry time from DB orders (used for staleness scoring) */
+	entryTime?: Date | null;
+	/** Staleness score (null if within grace period, undefined if not computed) */
+	staleness?: StalenessScore | null;
 }
 
 export const resolveQuantity = (
@@ -229,3 +237,33 @@ export const summarizePositionRisk = (positions: EnrichedOpenPosition[]) => {
 };
 
 export type ExposureSummary = ReturnType<typeof summarizePositionRisk>;
+
+/**
+ * Attach staleness scores to enriched positions.
+ *
+ * Positions without entryTime (no matching DB order) or within the 24h grace
+ * period receive `staleness: null`. This is a pure computation — no side effects.
+ */
+export function attachStalenessScores(
+	positions: EnrichedOpenPosition[],
+	now: Date = new Date(),
+): EnrichedOpenPosition[] {
+	return positions.map((position) => {
+		if (!position.entryTime) {
+			return { ...position, staleness: null };
+		}
+
+		const score = computeStalenessScore(
+			{
+				entryTime: position.entryTime,
+				unrealizedPnl: position.unrealizedPnl,
+				costBasis: position.costBasis ?? null,
+				notionalUsd: position.notionalUsd,
+				fundingCostUsd: null, // Spot/paper trading — no funding costs
+			},
+			now,
+		);
+
+		return { ...position, staleness: score };
+	});
+}

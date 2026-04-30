@@ -6,12 +6,14 @@
  */
 
 import { QueryClient } from "@tanstack/react-query";
+import { toCanonical } from "@/core/shared/markets/marketMetadata";
 import type { VariantId } from "@/core/shared/variants";
 import {
 	isValidVariantId,
 	TRADEABLE_VARIANT_IDS,
 } from "@/core/shared/variants";
 import { fallbackModel } from "@/env";
+import { getAllOpenOrders } from "@/server/db/ordersRepository.server";
 import { listModels } from "@/server/db/tradingRepository";
 import {
 	createInvocationMutation,
@@ -40,6 +42,7 @@ import {
 	invalidateMarketIntelligenceCache,
 } from "@/server/features/trading/data/marketIntelligenceCache";
 import {
+	attachStalenessScores,
 	enrichOpenPositions,
 	summarizePositionRisk,
 } from "@/server/features/trading/data/openPositionEnrichment";
@@ -203,17 +206,35 @@ const triggerKillSwitch = async (account: Account): Promise<void> => {
 export async function runTradeWorkflow(account: Account): Promise<string> {
 	const queryClient = new QueryClient();
 
-	// Fetch initial data in parallel
-	const [portfolio, openPositionsRaw, decisionIndex] = await Promise.all([
-		queryClient.fetchQuery(portfolioQuery(account)),
-		queryClient.fetchQuery(openPositionsQuery(account)),
-		account.id
-			? fetchLatestDecisionIndex(account.id)
-			: Promise.resolve(new Map<string, TradingDecisionWithContext>()),
-	]);
+	// Fetch initial data in parallel (+ DB open orders for staleness entry times)
+	const [portfolio, openPositionsRaw, decisionIndex, allOpenOrders] =
+		await Promise.all([
+			queryClient.fetchQuery(portfolioQuery(account)),
+			queryClient.fetchQuery(openPositionsQuery(account)),
+			account.id
+				? fetchLatestDecisionIndex(account.id)
+				: Promise.resolve(new Map<string, TradingDecisionWithContext>()),
+			getAllOpenOrders(),
+		]);
 
 	const openPositions = enrichOpenPositions(openPositionsRaw, decisionIndex);
 	const exposureSummary = summarizePositionRisk(openPositions);
+
+	// Attach staleness scores using DB order entry times
+	const entryTimeBySymbol = new Map<string, Date>();
+	for (const order of allOpenOrders) {
+		if (order.modelId !== account.id) continue;
+		const canonical = toCanonical(order.symbol).toUpperCase();
+		entryTimeBySymbol.set(canonical, order.openedAt);
+	}
+	const enrichedWithStaleness = attachStalenessScores(
+		openPositions.map((pos) => ({
+			...pos,
+			entryTime: entryTimeBySymbol.get(pos.symbol.toUpperCase()) ?? null,
+		})),
+	);
+	// Use staleness-enriched positions for prompt building
+	const openPositionsForPrompt = enrichedWithStaleness;
 
 	// Initialize telemetry capture arrays
 	const capturedDecisions: InvocationDecisionSummary[] = [];
@@ -271,11 +292,11 @@ export async function runTradeWorkflow(account: Account): Promise<string> {
 		variant: variantId,
 	});
 
-	// Build prompts
+	// Build prompts (uses staleness-enriched positions)
 	const enrichedPrompt = buildTradingPrompts({
 		account,
 		portfolio,
-		openPositions,
+		openPositions: openPositionsForPrompt,
 		exposureSummary,
 		performanceMetrics,
 		marketIntelligence,
@@ -304,14 +325,19 @@ export async function runTradeWorkflow(account: Account): Promise<string> {
 	 */
 	const rebuildUserPrompt = async (): Promise<string> => {
 		const freshQueryClient = new QueryClient();
-		const [freshPortfolio, freshPositionsRaw, freshDecisionIndex] =
-			await Promise.all([
-				freshQueryClient.fetchQuery(portfolioQuery(account)),
-				freshQueryClient.fetchQuery(openPositionsQuery(account)),
-				account.id
-					? fetchLatestDecisionIndex(account.id)
-					: Promise.resolve(new Map<string, TradingDecisionWithContext>()),
-			]);
+		const [
+			freshPortfolio,
+			freshPositionsRaw,
+			freshDecisionIndex,
+			freshAllOpenOrders,
+		] = await Promise.all([
+			freshQueryClient.fetchQuery(portfolioQuery(account)),
+			freshQueryClient.fetchQuery(openPositionsQuery(account)),
+			account.id
+				? fetchLatestDecisionIndex(account.id)
+				: Promise.resolve(new Map<string, TradingDecisionWithContext>()),
+			getAllOpenOrders(),
+		]);
 
 		const freshPositions = enrichOpenPositions(
 			freshPositionsRaw,
@@ -319,13 +345,27 @@ export async function runTradeWorkflow(account: Account): Promise<string> {
 		);
 		const freshExposure = summarizePositionRisk(freshPositions);
 
+		// Rebuild entry time map for staleness
+		const freshEntryTimeBySymbol = new Map<string, Date>();
+		for (const order of freshAllOpenOrders) {
+			if (order.modelId !== account.id) continue;
+			const canonical = toCanonical(order.symbol).toUpperCase();
+			freshEntryTimeBySymbol.set(canonical, order.openedAt);
+		}
+		const freshWithStaleness = attachStalenessScores(
+			freshPositions.map((pos) => ({
+				...pos,
+				entryTime: freshEntryTimeBySymbol.get(pos.symbol.toUpperCase()) ?? null,
+			})),
+		);
+
 		toolContext.openPositions = freshPositions;
 		toolContext.decisionIndex = freshDecisionIndex;
 
 		const freshPrompt = buildTradingPrompts({
 			account,
 			portfolio: freshPortfolio,
-			openPositions: freshPositions,
+			openPositions: freshWithStaleness,
 			exposureSummary: freshExposure,
 			performanceMetrics,
 			marketIntelligence,

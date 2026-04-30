@@ -127,11 +127,29 @@ export function buildOpenPositionsSection(
 		// Line 5: Intent context (explicit labels)
 		const intentLine = `intent: side ${position.side} | confidence ${formatConfidence(position.confidence)} | decision_status ${position.decisionStatus ?? "N/A"} | last_decision_at ${position.lastDecisionAt ?? "N/A"}`;
 
+		// Line 6: Staleness (only for positions with computed staleness)
+		const stalenessParts: string[] = [];
+		if (position.staleness) {
+			stalenessParts.push(`staleness_score ${position.staleness.score}`);
+			stalenessParts.push(
+				`held_hours ${position.staleness.hoursHeld.toFixed(1)}`,
+			);
+			stalenessParts.push(
+				`time_dim ${position.staleness.timeHeldScore} | pnl_dim ${position.staleness.pnlActionScore} | funding_dim ${position.staleness.fundingCostScore}`,
+			);
+			if (position.staleness.isStale) {
+				stalenessParts.push("⚠ STALE — consider exit");
+			}
+		}
+
 		const lines = [mainLine, pnlLine];
 		if (riskParts.length > 0) {
 			lines.push(riskParts.join(" | "));
 		}
 		lines.push(exitPlanLine, intentLine);
+		if (stalenessParts.length > 0) {
+			lines.push(stalenessParts.join(" | "));
+		}
 
 		return lines.join("\n");
 	});
