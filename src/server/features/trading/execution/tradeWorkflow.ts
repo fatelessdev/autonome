@@ -6,6 +6,10 @@
  */
 
 import { QueryClient } from "@tanstack/react-query";
+import {
+	ErrorDeduplicator,
+	normalizeErrorMessage,
+} from "@/core/lib/errorDeduplicator";
 import { toCanonical } from "@/core/shared/markets/marketMetadata";
 import type { VariantId } from "@/core/shared/variants";
 import {
@@ -55,9 +59,10 @@ import {
 	getSharedNewsDigest,
 	invalidateNewsCache,
 } from "@/server/integrations/alpaca-news";
-
 import { createTradeAgent, type ToolContext } from "../agent";
 import { reconcilePositions } from "../reconciliation";
+
+const errorDedup = new ErrorDeduplicator();
 
 /** Result returned from runTradeWorkflow for outer timeout handling */
 export interface TradeWorkflowResult {
@@ -397,7 +402,15 @@ export async function runTradeWorkflow(account: Account): Promise<string> {
 		});
 	} catch (error) {
 		const failureMessage = `Trade workflow aborted: ${error instanceof Error ? error.message : String(error)}`;
-		console.error(`[TradeAgent] ${account.name} execution failed`, error);
+		const normalizedError = normalizeErrorMessage(failureMessage);
+		const dedupResult = errorDedup.shouldLog(normalizedError);
+		if (dedupResult.shouldLog) {
+			console.error(`[TradeAgent] ${account.name} execution failed`, error);
+		} else {
+			console.error(
+				`[TradeAgent] ${account.name} execution failed (suppressed ${dedupResult.suppressedCount} duplicate(s))`,
+			);
+		}
 
 		await incrementModelUsageMutation({
 			modelId: account.id,
@@ -522,10 +535,21 @@ export async function executeAllModelTrades(): Promise<{
 			} catch (error) {
 				primaryFailures++;
 				lastPrimaryError = error;
-				console.error(
-					`[TradeExecutor] Primary attempt ${attempt}/${PRIMARY_MODEL_ATTEMPTS} failed for ${model.name}:`,
-					error,
+				const errorMessage =
+					error instanceof Error ? error.message : String(error);
+				const dedupResult = errorDedup.shouldLog(
+					normalizeErrorMessage(errorMessage),
 				);
+				if (dedupResult.shouldLog) {
+					console.error(
+						`[TradeExecutor] Primary attempt ${attempt}/${PRIMARY_MODEL_ATTEMPTS} failed for ${model.name}:`,
+						error,
+					);
+				} else {
+					console.error(
+						`[TradeExecutor] Primary attempt ${attempt}/${PRIMARY_MODEL_ATTEMPTS} failed for ${model.name} (suppressed ${dedupResult.suppressedCount} duplicate(s))`,
+					);
+				}
 			}
 		}
 
@@ -564,10 +588,21 @@ export async function executeAllModelTrades(): Promise<{
 					return { modelId: model.id, success: true };
 				} catch (error) {
 					fallbackFailures++;
-					console.error(
-						`[TradeExecutor] Fallback failure ${fallbackFailures} for ${model.name} using ${candidate.id}:`,
-						error,
+					const fbErrorMessage =
+						error instanceof Error ? error.message : String(error);
+					const fbDedupResult = errorDedup.shouldLog(
+						normalizeErrorMessage(fbErrorMessage),
 					);
+					if (fbDedupResult.shouldLog) {
+						console.error(
+							`[TradeExecutor] Fallback failure ${fallbackFailures} for ${model.name} using ${candidate.id}:`,
+							error,
+						);
+					} else {
+						console.error(
+							`[TradeExecutor] Fallback failure ${fallbackFailures} for ${model.name} using ${candidate.id} (suppressed ${fbDedupResult.suppressedCount} duplicate(s))`,
+						);
+					}
 
 					if (fallbackFailures >= FALLBACK_FAILURE_KILL_SWITCH_THRESHOLD) {
 						try {
@@ -610,7 +645,18 @@ export async function executeAllModelTrades(): Promise<{
 				);
 			}
 		} catch (error) {
-			console.error(`[Reconciliation] Failed for ${model.name}:`, error);
+			const reconcErrorMessage =
+				error instanceof Error ? error.message : String(error);
+			const reconcDedupResult = errorDedup.shouldLog(
+				normalizeErrorMessage(reconcErrorMessage),
+			);
+			if (reconcDedupResult.shouldLog) {
+				console.error(`[Reconciliation] Failed for ${model.name}:`, error);
+			} else {
+				console.error(
+					`[Reconciliation] Failed for ${model.name} (suppressed ${reconcDedupResult.suppressedCount} duplicate(s))`,
+				);
+			}
 		}
 	}
 
