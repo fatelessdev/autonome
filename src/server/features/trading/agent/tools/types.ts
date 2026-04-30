@@ -18,6 +18,12 @@ export type { PositionResult } from "@/server/features/trading/execution/createP
 export const MAX_ACTIONS_PER_SYMBOL = 3;
 
 /**
+ * Minimum notional value (USD) for any trade to be submitted to the broker.
+ * Trades below this threshold are rejected before reaching Alpaca.
+ */
+export const MINIMUM_TRADE_SIZE_USD = 50;
+
+/**
  * Shared context passed to all tools during a trading session.
  * Contains account info, invocation tracking, and mutable state.
  */

@@ -6,6 +6,10 @@
  * Single Alpaca code path.
  */
 
+import {
+	toAlpacaSymbol,
+	toCanonical,
+} from "@/core/shared/markets/marketMetadata";
 import type { Order } from "@/db/schema";
 import {
 	createOrder,
@@ -13,9 +17,12 @@ import {
 	scaleIntoOrder,
 	updateAlpacaOrderId,
 } from "@/server/db/ordersRepository.server";
+import { MINIMUM_TRADE_SIZE_USD } from "@/server/features/trading/agent/tools/types";
 import type { Account } from "@/server/features/trading/contracts/accounts";
-import { getTradingProvider } from "@/server/providers/alpaca";
-import { toAlpacaSymbol, toCanonical } from "@/core/shared/markets/marketMetadata";
+import {
+	getMarketDataProvider,
+	getTradingProvider,
+} from "@/server/providers/alpaca";
 
 // ==========================================
 // Constants
@@ -228,6 +235,25 @@ export async function createPosition(
 			const alpacaSymbol = toAlpacaSymbol(symbol);
 			const orderQty = Math.abs(quantity);
 			const orderSide = side === "LONG" ? "buy" : "sell";
+
+			// Minimum trade size guard — fetch a quote to estimate notional
+			const marketData = getMarketDataProvider(
+				account.alpacaApiKey,
+				account.alpacaApiSecret,
+			);
+			const quote = await marketData.getQuote(alpacaSymbol);
+			const estimatedPrice =
+				quote.bid_price && quote.ask_price
+					? (quote.bid_price + quote.ask_price) / 2
+					: quote.bid_price || quote.ask_price;
+			if (estimatedPrice) {
+				const notional = orderQty * estimatedPrice;
+				if (notional < MINIMUM_TRADE_SIZE_USD) {
+					throw new Error(
+						`Trade rejected for ${symbol}: notional $${notional.toFixed(2)} is below the minimum $${MINIMUM_TRADE_SIZE_USD}. Increase quantity or skip this trade.`,
+					);
+				}
+			}
 
 			// Build Alpaca order params
 			const orderParams: Parameters<typeof trading.createOrder>[0] = {
