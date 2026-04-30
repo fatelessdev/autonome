@@ -57,9 +57,6 @@ export const env = createEnv({
 			.default("true")
 			.transform((v) => v === "true"),
 
-		// Workflow DevKit
-		WORKFLOW_POSTGRES_URL: z.string().url().optional(),
-
 		// TAAPI.io integration (optional for supplementary indicators)
 		TAAPI_API_KEY: z.string().optional(),
 		FALLBACK_MODEL: z.string().optional(),

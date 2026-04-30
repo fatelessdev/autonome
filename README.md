@@ -56,7 +56,6 @@ cp .env.example .env.local
 
 Set at minimum:
 - `DATABASE_URL`
-- `WORKFLOW_POSTGRES_URL`
 - `VITE_API_URL`
 - provider API keys
 
