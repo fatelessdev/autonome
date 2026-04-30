@@ -54,6 +54,7 @@ import {
 } from "@/server/integrations/alpaca-news";
 
 import { createTradeAgent, type ToolContext } from "../agent";
+import { reconcilePositions } from "../reconciliation";
 
 /** Result returned from runTradeWorkflow for outer timeout handling */
 export interface TradeWorkflowResult {
@@ -557,6 +558,21 @@ export async function executeAllModelTrades(): Promise<{
 	};
 
 	const results = await Promise.all(validModels.map(runModel));
+
+	// Reconcile DB orders against Alpaca positions after all trades complete
+	for (const model of validModels) {
+		try {
+			const account = toTradingAccount(model);
+			const reconciliationResult = await reconcilePositions(account);
+			if (reconciliationResult.orphanedClosed > 0) {
+				console.warn(
+					`[Reconciliation] ${model.name}: ${reconciliationResult.orphanedClosed} orphaned order(s) closed`,
+				);
+			}
+		} catch (error) {
+			console.error(`[Reconciliation] Failed for ${model.name}:`, error);
+		}
+	}
 
 	// Invalidate market cache after batch completes
 	invalidateMarketIntelligenceCache();
