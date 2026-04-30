@@ -1,3 +1,17 @@
+import {
+	buildMarketDataBlock,
+	CLOSING_INSTRUCTION,
+	COOLDOWN_SECTION,
+	DATA_SOURCE_HIERARCHY_SECTION,
+	FEE_AWARENESS_SECTION,
+	NEWS_BLOCK,
+	OPEN_POSITIONS_BLOCK,
+	PERFORMANCE_BLOCK,
+	PORTFOLIO_BLOCK,
+	SESSION_HEADER,
+	TOOL_INTERFACE_SECTION,
+} from "./promptBase";
+
 /**
  * === MODE 6: CONTRARIAN (MEAN REVERSION) ===
  * Uses VWAP as the Profit Target and ADX as the Inhibition Filter.
@@ -19,17 +33,9 @@ You are not a script; you are a market analyst. Before fading a move, you must f
    - **YES:** Volatility is compressing. An explosion is coming. **DO NOT FADE.**
    - **NO:** Volatility is normal. **FADE.**
 
-== TOOL INTERFACE ==
-Control portfolio via these tools (call directly):
-- \`createPosition\`: Open new positions
-- \`closePosition\`: Exit positions (to change SL/TP, close and reopen with new levels)
-- \`holding\`: Explicit no-action (explain reasoning)
-**Never output raw JSON or tool syntax as plain text.**
+${TOOL_INTERFACE_SECTION}
 
-== DATA SOURCE HIERARCHY (CRITICAL) ==
-You receive data from two sources. You must respect this hierarchy:
-1.  **Manual/Exchange Indicators (Execution):** Use these for exact Entry Price, Stop Loss, and Invalidation. This is the order book you trade on.
-2.  **Taapi/Binance Indicators (Context):** Use these (ADX, Supertrend, Ichimoku) *only* to determine the Broad Trend and Market Regime.
+${DATA_SOURCE_HIERARCHY_SECTION}
 
 == DECISION FRAMEWORK ==
 1. **Regime Filter:** Is ADX > 25? If YES -> ABORT.
@@ -46,24 +52,9 @@ Every position MUST specify:
 - **time_exit**: "Close if held > 12h" (mean reversion is quick)
 - **cooldown_minutes**: 1-15 minutes
 
-**WHY COOLDOWN?** Prevents impulsive direction flips. While a position is open, you cannot flip to the opposite direction until cooldown expires. This applies both while holding AND after closing. System enforces this.
+${COOLDOWN_SECTION}
 
-**IMPORTANT:** Use these EXACT field names when calling createPosition:
-1. invalidation_trigger -> invalidation_condition
-2. invalidation_price -> invalidation_price
-3. time_exit -> time_exit
-4. cooldown_minutes -> cooldown_minutes
-
-== FEE & SLIPPAGE AWARENESS ==
-Every round-trip trade (entry + exit) incurs costs:
-- Exchange fees: ~0.04-0.10% per side (0.08-0.20% round-trip)
-- Slippage: ~0.02-0.10% depending on liquidity and size
-- Total round-trip cost: ~0.1-0.3%
-
-Your profit targets MUST exceed fee drag. A trade targeting 0.2% gain
-nets near-zero after fees. Minimum viable profit target: **0.5%+** to
-ensure meaningful edge after costs. Factor fees into every entry/exit
-decision and invalidation price calculation.
+${FEE_AWARENESS_SECTION}
 
 == RESPONSE FORMAT ==
 1. **Analysis:** "ADX 18 (Range). Price at Upper Band. Volume is Low (0.8x Avg)."
@@ -72,27 +63,20 @@ decision and invalidation price calculation.
 `;
 
 export const USER_PROMPT = `
-Session: {{TOTAL_MINUTES}} min | Interval: 5 min | Invocations: {{INVOKATION_TIMES}} | {{CURRENT_TIME}} IST
-Cash: {{AVAILABLE_CASH}} | Exposure: {{EXPOSURE_TO_EQUITY_PCT}}%
+${SESSION_HEADER}
 
-== MARKET DATA ==
-{{MARKET_INTELLIGENCE}}
-*Context Guide:*
+${buildMarketDataBlock(`*Context Guide:*
 1. **Volume Veto:** Compare 'current_volume' vs 'average_volume'. If > 1.5x, DO NOT FADE.
 2. **Squeeze Check:** Look at BB_Width. If < 2.0% (Tight), DO NOT FADE.
-3. **Regime:** Check ADX. If > 25, HOLD.
+3. **Regime:** Check ADX. If > 25, HOLD.`)}
 
-== PORTFOLIO ==
-{{PORTFOLIO_SNAPSHOT}}
+${PORTFOLIO_BLOCK}
 
-== OPEN POSITIONS ==
-{{OPEN_POSITIONS_TABLE}}
+${OPEN_POSITIONS_BLOCK}
 
-== PERFORMANCE ==
-{{PERFORMANCE_OVERVIEW}}
+${PERFORMANCE_BLOCK}
 
-== NEWS ==
-{{NEWS}}
+${NEWS_BLOCK}
 
 == MISSION ==
 1. Verify ADX < 25.
@@ -100,5 +84,5 @@ Cash: {{AVAILABLE_CASH}} | Exposure: {{EXPOSURE_TO_EQUITY_PCT}}%
 3. Verify Low Volume at Bands (No Breakouts).
 4. Fade to VWAP.
 
-CRITICAL: End your response with a tool call. If no action needed, call holding() with your reasoning.
+${CLOSING_INSTRUCTION}
 `;
