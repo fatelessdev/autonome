@@ -25,6 +25,63 @@ export const COOLDOWN_SECTION = `**WHY COOLDOWN?** Prevents impulsive direction 
 3. time_exit -> time_exit
 4. cooldown_minutes -> cooldown_minutes`;
 
+export const TOOL_REFERENCE_SECTION = `== TOOL REFERENCE ==
+Below is the complete specification for each available tool.
+
+── createPosition ──────────────────────────────────
+Purpose: Open one or more new positions (or scale into existing ones).
+Input: { decisions: Decision[] }
+
+Decision schema:
+  symbol              string (enum)   — Trading pair, e.g. BTC, ETH, SOL
+  side                "LONG" | "SHORT" | "HOLD" — Trade direction
+  quantity            number > 0, ≤100000 — Position size in BASE ASSET units (e.g. 0.5 BTC)
+  profit_target       number > 0      — Take-profit price level
+  stop_loss           number > 0      — Stop-loss price level
+  invalidation_condition string       — Condition that kills the thesis (e.g. "4h close above EMA50")
+  invalidation_price  number | null   — Exact price where thesis is invalidated (optional)
+  time_exit           string | null   — Max hold duration (e.g. "Close if held >24h without profit") (optional)
+  cooldown_minutes    number 1–15     — Minutes before direction change allowed (optional)
+  confidence          number 0–100    — Setup quality score
+
+Return: Summary of accepted, failed, and skipped decisions. Includes size adjustment notes if trade was capped to available balance.
+
+Constraints:
+  • quantity MUST be positive — zero or negative values are rejected
+  • For LONG:  stop_loss < expected entry price, profit_target > expected entry price
+  • For SHORT: stop_loss > expected entry price, profit_target < expected entry price
+  • Minimum trade notional: $50 USD — smaller trades are rejected
+  • symbol must be a supported market (BTC, ETH, SOL, etc.)
+  • Cooldown: if a direction-flip cooldown is active on a symbol, the opposite-side entry is blocked
+  • Each symbol is limited to 3 actions per session (create + close combined)
+  • HOLD side = explicit no-trade for that symbol (no order placed)
+
+── closePosition ───────────────────────────────────
+Purpose: Close one or more open positions.
+Input: { symbols: string[] }
+
+  symbols  string[] (enum) — Array of symbols to close, e.g. ["BTC", "ETH"]
+
+Return: Summary of closed positions with entry/exit prices and P&L.
+
+Constraints:
+  • Each symbol must have an open position — closing a non-existent position throws an error
+  • symbol must be a supported market
+  • Each symbol is limited to 3 actions per session
+  • For crypto: pending SL/TP orders are cancelled before the position is closed
+
+── holding ─────────────────────────────────────────
+Purpose: Explicitly pass when no trading action is warranted.
+Input: { reason: string }
+
+  reason  string (max 1000 chars) — Brief explanation of why no action was taken
+
+Return: "Holding: {reason}"
+
+Constraints:
+  • reason is required and must be ≤ 1000 characters
+  • ALWAYS call holding() if you decide not to trade — never end without a tool call`;
+
 export const FEE_AWARENESS_SECTION = `== FEE & SLIPPAGE AWARENESS ==
 Every round-trip trade (entry + exit) incurs costs:
 - Exchange fees: ~0.04-0.10% per side (0.08-0.20% round-trip)

@@ -10,6 +10,7 @@ import {
 	PORTFOLIO_BLOCK,
 	SESSION_HEADER,
 	TOOL_INTERFACE_SECTION,
+	TOOL_REFERENCE_SECTION,
 } from "./promptBase";
 
 /**
@@ -25,6 +26,8 @@ export const SYSTEM_PROMPT = `You are **Autonome Trendsurfer**. You are a Trend 
 - **Filter:** You only trade when **ADX > 25**. (No Trend = No Trade).
 
 ${TOOL_INTERFACE_SECTION}
+
+${TOOL_REFERENCE_SECTION}
 
 ${DATA_SOURCE_HIERARCHY_SECTION}
 

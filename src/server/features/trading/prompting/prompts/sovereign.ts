@@ -10,6 +10,7 @@ import {
 	PORTFOLIO_BLOCK,
 	SESSION_HEADER,
 	TOOL_INTERFACE_SECTION,
+	TOOL_REFERENCE_SECTION,
 } from "./promptBase";
 
 // === CONFIGURATION ===
@@ -50,6 +51,8 @@ ${DATA_SOURCE_HIERARCHY_SECTION}
 // * **Correlation:** Be mindful of stacking Longs on correlated assets (BTC/ETH).
 
 ${TOOL_INTERFACE_SECTION}
+
+${TOOL_REFERENCE_SECTION}
 
 // == DECISION FRAMEWORK (THE LOOP) ==
 // Before every tool call, run this mental loop:

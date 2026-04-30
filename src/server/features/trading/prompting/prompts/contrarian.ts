@@ -10,6 +10,7 @@ import {
 	PORTFOLIO_BLOCK,
 	SESSION_HEADER,
 	TOOL_INTERFACE_SECTION,
+	TOOL_REFERENCE_SECTION,
 } from "./promptBase";
 
 /**
@@ -34,6 +35,8 @@ You are not a script; you are a market analyst. Before fading a move, you must f
    - **NO:** Volatility is normal. **FADE.**
 
 ${TOOL_INTERFACE_SECTION}
+
+${TOOL_REFERENCE_SECTION}
 
 ${DATA_SOURCE_HIERARCHY_SECTION}
 
