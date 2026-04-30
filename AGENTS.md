@@ -45,10 +45,26 @@ Use this file as the source of truth for coding-agent behavior in this repo.
 
 ### Scheduling
 - `src/server/workflows/tradeCycle.ts` is the primary loop:
-  - run all model trades
-  - record portfolio snapshots
+  - execute all model trades via `tradeCycleStep`
+  - run position reconciliation (DB ↔ Alpaca sync)
+  - record portfolio snapshots (with Welford Sharpe update)
   - retention/downsampling steps
-  - sleep 5 minutes
+  - sleep `TRADE_CYCLE_INTERVAL` (5 min, shared constant)
+
+### Position lifecycle
+- **Reconciliation** (`src/server/features/trading/reconciliation.ts`): after each trade cycle, compares DB OPEN orders against Alpaca live positions. Orphaned DB orders (Alpaca position closed but DB still OPEN) are marked CLOSED with `closeTrigger: "RECONCILE"`.
+- **Staleness scoring** (`src/server/features/trading/stalenessAnalyzer.ts`): 0–100 composite score per open position (time held + P&L + funding cost). Positions with score ≥ 70 or held ≥ 3 days with < 5% gain are flagged STALE and injected into the prompt's `OPEN_POSITIONS_TABLE` with a "consider exit" nudge. 24h grace period excludes fresh positions.
+- **Fill verification**: exponential backoff polling (500ms → 1s → 2s → 4s, 4 attempts) with persistent failure alert.
+
+### Analytics & intelligence
+- **Online Sharpe ratio** (`src/server/features/portfolio/welfordService.ts`): Welford's online algorithm computes running Sharpe from portfolio returns. Per-model in-memory state with cold-start bootstrap from historical `PortfolioSize` snapshots.
+- **Correlation matrix** (`src/server/features/trading/analysis/correlationMatrix.ts`): rolling 24h Pearson correlation between all active asset pairs. Warning injected into prompts when r > 0.8 between two assets both held or considered.
+- **Open interest** (`src/server/integrations/binance-oi/`): Binance Futures API for crypto OI data (absolute value + % change). Included in market intelligence cache. Graceful degradation on failure.
+- **Error deduplication** (`src/core/lib/errorDeduplicator.ts`): normalizes error messages (strips numbers/UUIDs/timestamps), deduplicates within 5-minute sliding window. Applied to agent loop error logging.
+
+### Cache & timing
+- All cache TTLs use `CACHE_TIMING` tiers from `src/core/shared/cache/cacheConfig.ts` (REALTIME=15s, STANDARD=30s, SLOW=60s, STATIC=120s). No hardcoded timing values in trading code.
+- `TRADE_CYCLE_INTERVAL` (5 min) is the single shared constant — no local `5 * 60 * 1000` definitions.
 
 ---
 
@@ -111,6 +127,15 @@ When implementing any feature/fix, do this sequence:
   - double quotes
 - Use `cn()` for class merges and `cva` for variant-style components.
 - Avoid `any` casts where typed interfaces exist (especially Alpaca errors).
+- **Spot-only execution**: no leverage anywhere in active code. Positions are sized by quantity, not leverage multipliers.
+- **Cache timing**: all TTLs via `CACHE_TIMING` from `cacheConfig.ts`. Never hardcode timing values (`15_000`, `30_000`, etc.) in trading code.
+- **Trade cycle interval**: use `TRADE_CYCLE_INTERVAL` from `cacheConfig.ts`. No local `5 * 60 * 1000` definitions.
+- **Prompt structure**: shared sections in `promptBase.ts`, composed by each variant (sovereign, trendsurfer, contrarian). Adding a new shared section requires editing exactly one file.
+- **Fee awareness**: all prompts include round-trip cost context (~0.1–0.3%) requiring profit targets to exceed fee drag.
+- **Staleness scoring**: composite 0–100 score injected into `OPEN_POSITIONS_TABLE`. Positions ≥ 70 or stale-eligible get a "consider exit" nudge in prompts.
+- **Position reconciliation**: runs each cycle after trades. Orphaned DB orders closed with `closeTrigger: "RECONCILE"`. Any new position lifecycle change must account for reconciliation.
+- **Error deduplication**: use `ErrorDeduplicator` from `@/core/lib/errorDeduplicator` for repeated error suppression. Normalize messages before checking.
+- **Correlation warnings**: when implementing features that consider multiple assets, check the correlation matrix. Positions with r > 0.8 should trigger stacking warnings in prompts.
 
 ---
 
@@ -156,6 +181,15 @@ bun run test
 - Market metadata: `src/core/shared/markets/marketMetadata.ts`
 - Shared trading calculations: `src/core/shared/trading/calculations.ts`
 - Shared SSE client util: `src/core/lib/sseConnection.ts`
+- Cache config & timing constants: `src/core/shared/cache/cacheConfig.ts`
+- Shared prompt base: `src/server/features/trading/prompting/prompts/promptBase.ts`
+- Position reconciliation: `src/server/features/trading/reconciliation.ts`
+- Staleness analyzer: `src/server/features/trading/stalenessAnalyzer.ts`
+- Correlation matrix: `src/server/features/trading/analysis/correlationMatrix.ts`
+- Welford Sharpe service: `src/server/features/portfolio/welfordService.ts`
+- Welford algorithm: `src/core/shared/trading/welford.ts`
+- Error deduplicator: `src/core/lib/errorDeduplicator.ts`
+- Binance OI integration: `src/server/integrations/binance-oi/`
 
 ---
 
