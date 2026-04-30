@@ -14,6 +14,7 @@ import { models, portfolioSize } from "@/db/schema";
 import { createPortfolioSnapshotMutation } from "@/server/db/tradingRepository.server";
 import { emitPortfolioEvent } from "@/server/features/portfolio/events/portfolioEvents";
 import { runRetentionPolicy } from "@/server/features/portfolio/retentionService";
+import { updateWelfordForModel } from "@/server/features/portfolio/welfordService";
 import type { Account } from "@/server/features/trading/contracts/accounts";
 import { portfolioQuery } from "@/server/features/trading/data/portfolio.server";
 
@@ -142,6 +143,13 @@ export async function recordPortfolios() {
 	await Promise.all(
 		validSnapshots.map(({ modelId, netPortfolio }) =>
 			createPortfolioSnapshotMutation({ modelId, netPortfolio }),
+		),
+	);
+
+	// Update Welford state for running Sharpe ratio computation
+	await Promise.all(
+		validSnapshots.map(({ modelId, netPortfolio }) =>
+			updateWelfordForModel(modelId, Number(netPortfolio)),
 		),
 	);
 

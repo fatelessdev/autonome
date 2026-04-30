@@ -11,10 +11,13 @@ import {
 	getTotalRealizedPnl,
 } from "@/server/db/ordersRepository.server";
 import type { Account } from "@/server/features/trading/contracts/accounts";
+import { getSharpeRatio } from "@/server/features/portfolio/welfordService";
 import { getTradingProvider } from "@/server/providers/alpaca";
 
 export type PerformanceMetrics = {
 	sharpeRatio: string;
+	/** Sharpe ratio computed via Welford's online algorithm from portfolio returns */
+	welfordSharpeRatio: string;
 	totalReturnPercent: string;
 	/** Realized P&L from all closed trades (historical) */
 	closedTradeRealizedPnl: number;
@@ -119,6 +122,12 @@ export async function calculatePerformanceMetrics(
 			? calculateRecoveryFactor(portfolioValues).toFixed(2)
 			: "N/A";
 
+	// Get Welford-based Sharpe ratio (online algorithm from portfolio returns)
+	const welfordResult = getSharpeRatio(account.id);
+	const welfordSharpeRatio = welfordResult.isValid
+		? welfordResult.sharpeRatio.toFixed(3)
+		: welfordResult.reason ?? "N/A";
+
 	if (portfolioValues.length < 2) {
 		if (alpacaHistory.base_value == null) {
 			throw new Error(
@@ -132,6 +141,7 @@ export async function calculatePerformanceMetrics(
 
 		return {
 			sharpeRatio: "N/A (need more data)",
+			welfordSharpeRatio,
 			totalReturnPercent: `${fallbackReturn.toFixed(2)}%`,
 			closedTradeRealizedPnl,
 			tradeCount,
@@ -163,6 +173,7 @@ export async function calculatePerformanceMetrics(
 
 	return {
 		sharpeRatio,
+		welfordSharpeRatio,
 		totalReturnPercent: `${totalReturn.toFixed(2)}%`,
 		closedTradeRealizedPnl,
 		tradeCount,

@@ -219,7 +219,7 @@ export function buildPerformanceOverview({
 	// PERFORMANCE = historical metrics only (current state is in PORTFOLIO)
 	return [
 		`closed_trade_realized_pnl: ${formatUsd(performanceMetrics.closedTradeRealizedPnl)} | trade_count: ${performanceMetrics.tradeCount} | win_rate: ${performanceMetrics.winRate}`,
-		`total_return_since_start: ${performanceMetrics.totalReturnPercent} | annualized_sharpe_ratio: ${performanceMetrics.sharpeRatio}`,
+		`total_return_since_start: ${performanceMetrics.totalReturnPercent} | annualized_sharpe_ratio: ${performanceMetrics.sharpeRatio} | welford_sharpe_ratio: ${performanceMetrics.welfordSharpeRatio}`,
 		`current_drawdown: ${performanceMetrics.currentDrawdown} | max_drawdown: ${performanceMetrics.maxDrawdown} | recovery_factor: ${performanceMetrics.recoveryFactor}`,
 	].join("\n");
 }
