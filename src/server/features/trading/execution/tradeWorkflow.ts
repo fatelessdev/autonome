@@ -226,8 +226,6 @@ export async function runTradeWorkflow(account: Account): Promise<string> {
 		string,
 		{ side: "LONG" | "SHORT"; cooldownUntil: string }
 	>();
-	const symbolActionCounts = new Map<string, number>();
-
 	// Fetch shared market data (cached across all models in the same cycle)
 	const [marketResult, newsResult] = await Promise.all([
 		getSharedMarketIntelligence({
@@ -294,7 +292,6 @@ export async function runTradeWorkflow(account: Account): Promise<string> {
 		decisionIndex,
 		actedSymbols,
 		closedPositionCooldowns,
-		symbolActionCounts,
 		capturedDecisions,
 		capturedExecutionResults,
 		capturedClosedPositions,

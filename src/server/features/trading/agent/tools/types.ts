@@ -53,12 +53,6 @@ export interface ToolContext {
 		{ side: "LONG" | "SHORT"; cooldownUntil: string }
 	>;
 
-	/**
-	 * Per-symbol action counts for session limits.
-	 * Tracks number of create/close actions per symbol.
-	 */
-	symbolActionCounts: Map<string, number>;
-
 	/** Captured decisions for invocation payload */
 	capturedDecisions: InvocationDecisionSummary[];
 

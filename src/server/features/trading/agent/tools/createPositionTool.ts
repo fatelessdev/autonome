@@ -13,7 +13,7 @@ import { calculateCooldownUntil } from "@/server/features/trading/execution/cool
 import { createPosition } from "@/server/features/trading/execution/createPosition";
 
 import { decisionSchema, type NormalizedDecision } from "../schemas";
-import { MAX_ACTIONS_PER_SYMBOL, type ToolContext } from "./types";
+import type { ToolContext } from "./types";
 
 /**
  * Creates the createPosition tool with the given context
@@ -109,7 +109,6 @@ export function createPositionTool(ctx: ToolContext) {
 			const normalized: NormalizedDecision[] = [];
 			const seenSymbols = new Set<string>();
 			const skippedDuplicates: string[] = [];
-			const skippedLimitReached: string[] = [];
 			const skippedCooldown: string[] = [];
 
 			for (const entry of [...modern]) {
@@ -123,12 +122,6 @@ export function createPositionTool(ctx: ToolContext) {
 				// Check if already acted on this symbol this session (duplicate in same invocation)
 				if (ctx.actedSymbols.has(symbol)) {
 					skippedDuplicates.push(symbol);
-					continue;
-				}
-
-				const currentCount = ctx.symbolActionCounts.get(symbol) ?? 0;
-				if (currentCount >= MAX_ACTIONS_PER_SYMBOL) {
-					skippedLimitReached.push(symbol);
 					continue;
 				}
 
@@ -177,11 +170,6 @@ export function createPositionTool(ctx: ToolContext) {
 						`Already acted on ${skippedDuplicates.join(", ")} this invocation`,
 					);
 				}
-				if (skippedLimitReached.length > 0) {
-					messages.push(
-						`Session limit (${MAX_ACTIONS_PER_SYMBOL}) reached for ${skippedLimitReached.join(", ")}`,
-					);
-				}
 				if (skippedCooldown.length > 0) {
 					messages.push(skippedCooldown.join("; "));
 				}
@@ -195,11 +183,9 @@ export function createPositionTool(ctx: ToolContext) {
 			const successful = results.filter((r) => r.success);
 			const failed = results.filter((r) => !r.success);
 
-			// Mark successful symbols as acted and increment counts
+			// Mark successful symbols as acted
 			for (const result of successful) {
 				ctx.actedSymbols.add(result.symbol);
-				const current = ctx.symbolActionCounts.get(result.symbol) ?? 0;
-				ctx.symbolActionCounts.set(result.symbol, current + 1);
 			}
 
 			// Detect close+reopen adjustments: if we just opened a symbol
@@ -288,9 +274,6 @@ export function createPositionTool(ctx: ToolContext) {
 			}
 			if (skippedDuplicates.length > 0) {
 				response += `Skipped (already acted): ${skippedDuplicates.join(", ")}. `;
-			}
-			if (skippedLimitReached.length > 0) {
-				response += `Skipped (session limit): ${skippedLimitReached.join(", ")}.`;
 			}
 			// Surface trade size adjustments to the LLM
 			const adjustments = results.filter((r) => r.adjustmentNote);
