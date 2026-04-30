@@ -34,8 +34,6 @@ interface TradingPromptParams {
 	currentTime: string;
 	/** Strategy variant - determines which prompt set to use */
 	variant?: VariantId;
-	/** Per-symbol action counts for session limit tracking */
-	symbolActionCounts?: Map<string, number>;
 	/** Leaderboard context */
 	competition: CompetitionSnapshot;
 }
@@ -116,7 +114,6 @@ export function buildTradingPrompts(params: TradingPromptParams): {
 		newsDigest,
 		currentTime,
 		variant = DEFAULT_VARIANT,
-		symbolActionCounts: _symbolActionCounts,
 		competition,
 	} = params;
 
@@ -140,9 +137,6 @@ export function buildTradingPrompts(params: TradingPromptParams): {
 		portfolio.totalValue > 0 && exposureSummary.totalRiskUsd > 0
 			? ((exposureSummary.totalRiskUsd / portfolio.totalValue) * 100).toFixed(2)
 			: "N/A";
-
-	// Tracked debt: symbol action count context is currently collected but not injected
-	// into active prompts. See problems.md issue #16.
 
 	const userPrompt = renderPromptTemplate(USER_PROMPT, {
 		"{{INVOKATION_TIMES}}": account.invocationCount.toString(),

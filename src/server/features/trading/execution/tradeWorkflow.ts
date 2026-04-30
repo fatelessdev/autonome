@@ -286,7 +286,6 @@ export async function runTradeWorkflow(account: Account): Promise<string> {
 		newsDigest,
 		currentTime,
 		variant: variantId,
-		symbolActionCounts,
 		competition: competitionSnapshot,
 	});
 
@@ -338,7 +337,6 @@ export async function runTradeWorkflow(account: Account): Promise<string> {
 			newsDigest,
 			currentTime,
 			variant: variantId,
-			symbolActionCounts,
 			competition: competitionSnapshot,
 		});
 
