@@ -6,13 +6,14 @@
  * News is fetched once per trade cycle and shared across all model invocations.
  */
 
+import { TRADE_CYCLE_INTERVAL } from "@/core/shared/cache/cacheConfig";
 import type { AlpacaNewsResponse, NewsDigestItem } from "./types";
 
 const NEWS_API_URL = "https://data.alpaca.markets/v1beta1/news";
 const FETCH_TIMEOUT_MS = 15_000;
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes (matches trade cycle interval)
+const CACHE_TTL_MS = TRADE_CYCLE_INTERVAL; // matches trade cycle interval
 const NEWS_LIMIT = 10;
-const NEWS_LOOKBACK_MS = 5 * 60 * 1000; // Last 5 minutes
+const NEWS_LOOKBACK_MS = TRADE_CYCLE_INTERVAL; // Last 5 minutes
 
 interface NewsCacheEntry {
 	items: NewsDigestItem[];

@@ -24,6 +24,12 @@ export const CACHE_TIMING = {
 } as const;
 
 /**
+ * Trade cycle interval — how often the trade cycle workflow runs.
+ * Used by tradeCycle.ts, dashboardQueries.ts, and alpaca-news/client.ts.
+ */
+export const TRADE_CYCLE_INTERVAL = 5 * 60 * 1000; // 5 minutes
+
+/**
  * Query key prefixes for proper cache isolation.
  */
 export const QUERY_KEY_PREFIX = {

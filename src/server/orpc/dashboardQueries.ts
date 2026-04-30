@@ -1,4 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
+import { TRADE_CYCLE_INTERVAL } from "@/core/shared/cache/cacheConfig";
 import { isValidVariantId } from "@/core/shared/variants";
 import { orpc } from "@/server/orpc/client";
 import { normalizeNumber } from "@/core/shared/formatting/numberFormat";
@@ -12,7 +13,7 @@ import type {
 	Trade,
 } from "@/core/shared/trading/dashboardTypes";
 
-const BASE_REFRESH_MS = 5 * 60 * 1000;
+const BASE_REFRESH_MS = TRADE_CYCLE_INTERVAL;
 
 type VariantFilter = Trade["modelVariant"] | "all" | undefined;
 

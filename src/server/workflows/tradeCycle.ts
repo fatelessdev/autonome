@@ -17,12 +17,10 @@
 "use workflow";
 
 import { sleep } from "workflow";
+import { TRADE_CYCLE_INTERVAL } from "@/core/shared/cache/cacheConfig";
 import { portfolioSnapshotStep } from "./steps/portfolioSnapshotStep";
 import { retentionPolicyStep } from "./steps/retentionPolicyStep";
 import { tradeCycleStep } from "./steps/tradeCycleStep";
-
-/** How often the trade cycle runs (in milliseconds). */
-const TRADE_CYCLE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 /** Run retention policy every N cycles (e.g., every 12 cycles = ~1 hour). */
 const RETENTION_EVERY_N_CYCLES = 12;
@@ -53,6 +51,6 @@ export default async function tradeCycleWorkflow() {
 		}
 
 		// Step 4: Sleep until next cycle (suspends without consuming resources)
-		await sleep(TRADE_CYCLE_INTERVAL_MS);
+		await sleep(TRADE_CYCLE_INTERVAL);
 	}
 }
