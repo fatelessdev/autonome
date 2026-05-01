@@ -18,10 +18,7 @@ drizzle/*.json
 .env.docker
 .env.local
 drizzle
-.netlify# Lighter SDK reference folder (npm package is used instead)
-lighter-ts/
-
-# Alpaca credentials (per-variant API keys)
+.netlify# Alpaca credentials (per-variant API keys)
 scripts/alpacaKeys.ts
 
 # Local workflow run artifacts and agent metadata

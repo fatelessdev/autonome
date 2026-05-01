@@ -51,9 +51,6 @@ todos.json
 mcp-todos.json
 count.txt
 
-# Lighter SDK examples (not needed in production)
-lighter-sdk-ts/examples
-
 # Test files
 **/*.test.ts
 **/*.test.tsx

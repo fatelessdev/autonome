@@ -1,6 +1,6 @@
 {
   "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["lighter-ts", "packages", "node_modules"],
+  "exclude": ["packages", "node_modules"],
   "compilerOptions": {
     "target": "ES2022",
     "jsx": "react-jsx",
@@ -27,7 +27,6 @@
       "@/hooks/*": ["./src/hooks/*"],
       "@/data/*": ["./src/data/*"],
       "@/db-collections": ["./src/db/collections"],
-      "@/lighter/*": ["./lighter-sdk-ts/*"],
       "@/server/*": ["./src/server/*"],
       "@/lib/*": ["./src/core/lib/*"],
       "@/*": ["./src/*"]

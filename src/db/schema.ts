@@ -89,6 +89,10 @@ export const toolCalls = pgTable(
 	},
 	(table) => ({
 		invocationIdx: index("ToolCalls_invocationId_idx").on(table.invocationId),
+		invocationTypeIdx: index("ToolCalls_invocationId_toolCallType_idx").on(
+			table.invocationId,
+			table.toolCallType,
+		),
 	}),
 );
 
@@ -148,7 +152,6 @@ export const orders = pgTable(
 		symbol: text("symbol").notNull(),
 		side: orderSideEnum("side").notNull(),
 		quantity: numeric("quantity", { precision: 18, scale: 8 }).notNull(),
-		leverage: numeric("leverage", { precision: 10, scale: 2 }),
 		// Entry details
 		entryPrice: numeric("entryPrice", { precision: 18, scale: 8 }).notNull(),
 		// Exit plan (stop-loss, take-profit, confidence in the plan)
@@ -183,6 +186,11 @@ export const orders = pgTable(
 			table.status,
 		),
 		symbolIdx: index("Orders_symbol_idx").on(table.symbol),
+		modelStatusClosedAtIdx: index("Orders_modelId_status_closedAt_idx").on(
+			table.modelId,
+			table.status,
+			table.closedAt,
+		),
 	}),
 );
 
