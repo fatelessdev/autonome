@@ -57,14 +57,23 @@ Use this file as the source of truth for coding-agent behavior in this repo.
 - **Fill verification**: exponential backoff polling (500ms → 1s → 2s → 4s, 4 attempts) with persistent failure alert.
 
 ### Analytics & intelligence
-- **Online Sharpe ratio** (`src/server/features/portfolio/welfordService.ts`): Welford's online algorithm computes running Sharpe from portfolio returns. Per-model in-memory state with cold-start bootstrap from historical `PortfolioSize` snapshots.
+- **Online Sharpe ratio** (`src/server/features/portfolio/welfordService.ts`): Welford's online algorithm is the **canonical** Sharpe implementation. Computes running Sharpe from portfolio returns. Per-model in-memory state with cold-start bootstrap from historical `PortfolioSize` snapshots. The legacy `calculateSharpeRatioFromPortfolio()` was deleted; `calculateSharpeRatioFromTrades()` was renamed to `tradeSignalToNoiseRatio()` (non-annualized, raw dollar P&L, not a true Sharpe).
+- **Advanced analytics** (`src/server/features/analytics/calculations.ts`): profit factor, average R-multiple, decision quality score (Pearson correlation of confidence vs P&L), sortino ratio, calmar ratio, consecutive win/loss streaks, and trade duration distribution. Prompt-facing metrics (profit factor, R-multiple, decision quality, streaks, duration) are injected via `buildPerformanceOverview()`. Analytics-tab-only metrics (sortino, calmar) are excluded from prompts.
 - **Correlation matrix** (`src/server/features/trading/analysis/correlationMatrix.ts`): rolling 24h Pearson correlation between all active asset pairs. Warning injected into prompts when r > 0.8 between two assets both held or considered.
 - **Open interest** (`src/server/integrations/binance-oi/`): Binance Futures API for crypto OI data (absolute value + % change). Included in market intelligence cache. Graceful degradation on failure.
 - **Error deduplication** (`src/core/lib/errorDeduplicator.ts`): normalizes error messages (strips numbers/UUIDs/timestamps), deduplicates within 5-minute sliding window. Applied to agent loop error logging.
+- **Decision diary** (`src/server/features/trading/data/decisionDiaryService.ts`): per-invocation structured logging into `DecisionDiary` table. Captures decisions (symbol, side, confidence), market snapshot (ADX, regime, BBands position, supertrend direction), and model state (cash, exposure, portfolio value, open positions). Queryable via oRPC with variant/symbol/date filters.
+- **Market state tracker** (`src/server/features/trading/data/decisionDiaryService.ts`): per-cycle market snapshot into `MarketState` table after each trade cycle. Records regime classification (trending/ranging/choppy based on ADX), top movers, active correlations above threshold, and open interest summary. Linked to decision diary via temporal join (nearest prior MarketState for same modelId).
 
 ### Cache & timing
-- All cache TTLs use `CACHE_TIMING` tiers from `src/core/shared/cache/cacheConfig.ts` (REALTIME=15s, STANDARD=30s, SLOW=60s, STATIC=120s). No hardcoded timing values in trading code.
+- All cache TTLs use `CACHE_TIMING` tiers from `src/core/shared/cache/cacheConfig.ts` (REALTIME=15s, STANDARD=30s, SLOW=60s, STATIC=120s, MARKET=120s). No hardcoded timing values in trading code.
 - `TRADE_CYCLE_INTERVAL` (5 min) is the single shared constant — no local `5 * 60 * 1000` definitions.
+
+### TAAPI key rotation
+- TAAPI.io provides supplementary technical indicators (BBands, ADX, Supertrend, Ichimoku, VWAP).
+- Uses `createApiKeyRotator()` pattern from `src/env.ts` with `TAAPI_API_KEY`, `TAAPI_API_KEY1`, `TAAPI_API_KEY2`, `TAAPI_API_KEY3`.
+- Export `getNextTaapiKey()` for round-robin cycling. On free plan (1 req/15s), 3 keys = 1 request/5s effective rate.
+- TAAPI client at `src/server/integrations/taapi/client.ts` calls `getNextTaapiKey()` per request.
 
 ---
 
@@ -177,19 +186,29 @@ bun run test
 - Trading feature root: `src/server/features/trading`
 - Alpaca providers: `src/server/providers/alpaca`
 - Trade cycle workflow: `src/server/workflows/tradeCycle.ts`
+- Trade workflow (decomposed): `src/server/features/trading/execution/tradeWorkflow.ts`
 - Workflow steps: `src/server/workflows/steps`
 - Market metadata: `src/core/shared/markets/marketMetadata.ts`
 - Shared trading calculations: `src/core/shared/trading/calculations.ts`
+- Performance metrics: `src/server/features/trading/analysis/performanceMetrics.ts`
+- Analytics calculations: `src/server/features/analytics/calculations.ts`
 - Shared SSE client util: `src/core/lib/sseConnection.ts`
 - Cache config & timing constants: `src/core/shared/cache/cacheConfig.ts`
 - Shared prompt base: `src/server/features/trading/prompting/prompts/promptBase.ts`
+- Market intelligence formatter: `src/server/features/trading/prompting/marketIntelligenceFormatter.ts`
+- Market intelligence cache: `src/server/features/trading/data/marketIntelligenceCache.ts`
 - Position reconciliation: `src/server/features/trading/reconciliation.ts`
 - Staleness analyzer: `src/server/features/trading/stalenessAnalyzer.ts`
 - Correlation matrix: `src/server/features/trading/analysis/correlationMatrix.ts`
+- Decision diary service: `src/server/features/trading/data/decisionDiaryService.ts`
 - Welford Sharpe service: `src/server/features/portfolio/welfordService.ts`
 - Welford algorithm: `src/core/shared/trading/welford.ts`
 - Error deduplicator: `src/core/lib/errorDeduplicator.ts`
 - Binance OI integration: `src/server/integrations/binance-oi/`
+- TAAPI integration: `src/server/integrations/taapi/`
+- Orders repository: `src/server/db/ordersRepository.server.ts`
+- Variants repository: `src/server/db/variantsRepository.server.ts`
+- Trading repository: `src/server/db/tradingRepository.ts`
 
 ---
 

@@ -40,10 +40,21 @@ Autonome is an AI-powered crypto trading platform where each model trades on its
 - **Fill verification**: exponential backoff polling (500ms → 1s → 2s → 4s, 4 attempts) with persistent failure alert.
 
 ### Analytics
-- **Online Sharpe ratio**: Welford's online algorithm for numerically stable running Sharpe from portfolio returns. Per-model state with cold-start bootstrap from historical snapshots.
+- **Online Sharpe ratio**: Welford's online algorithm (canonical implementation) for numerically stable running Sharpe from portfolio returns. Per-model state with cold-start bootstrap from historical snapshots.
+- **Profit factor**: `sum(wins) / abs(sum(losses))` — how much the variant makes per dollar lost.
+- **Average R-Multiple**: `mean(wins) / abs(mean(losses))` — whether average wins exceed average losses.
+- **Decision quality score**: Pearson correlation between model confidence and realized P&L — measures confidence calibration.
+- **Sortino ratio**: annualized return / downside deviation — better than Sharpe for asymmetric returns (analytics tab only).
+- **Calmar ratio**: total return % / max drawdown % — return per unit of drawdown risk (analytics tab only).
+- **Consecutive win/loss streaks**: longest and current streaks from chronologically sorted trades.
+- **Trade duration distribution**: average hold time for winners vs losers — detects cutting winners short.
 - **Correlation matrix**: rolling 24h Pearson correlation between all active asset pairs. Warning injected when r > 0.8 between two assets both held or considered.
 - **Open interest**: Binance Futures API for crypto OI (absolute value + % change). Included in market intelligence cache. Graceful degradation on failure.
 - **Error deduplication**: normalizes messages (strips numbers/UUIDs/timestamps), deduplicates within 5-minute sliding window.
+
+### Decision diary & market state
+- **Decision diary** (`DecisionDiary` table): per-invocation structured logging of decisions (symbol, side, confidence), market snapshot (ADX, regime, BBands, supertrend), and model state (cash, exposure, portfolio value). Queryable via oRPC with variant/symbol/date filters.
+- **Market state** (`MarketState` table): per-cycle market snapshot after each trade cycle. Records regime classification (trending/ranging/choppy), top movers, active correlations, and open interest. Linked to decision diary via temporal join for post-hoc analysis.
 
 ### Prompt engineering
 - **Variant-based prompts**: sovereign, trendsurfer, contrarian — each with strategy-specific content
@@ -112,11 +123,14 @@ bun run dev
 | `AIHUBMIX_API_KEY` | Conditional | AIHubMix API key (supports up to 6 keys for rotation) |
 | `MISTRAL_API_KEY` | No | Mistral API key |
 | `TAAPI_API_KEY` | No | TAAPI.io key for supplementary technical indicators |
+| `TAAPI_API_KEY1` | No | Additional TAAPI key for round-robin rotation |
+| `TAAPI_API_KEY2` | No | Additional TAAPI key for round-robin rotation |
+| `TAAPI_API_KEY3` | No | Additional TAAPI key for round-robin rotation |
 | `VITE_API_URL` | No | Frontend API URL (default `http://localhost:8081`) |
 | `VITE_APP_TITLE` | No | App title (default `Autonome`) |
 | `FALLBACK_MODEL` | No | Reasoning-model fallback for single-model competitions |
 
-**Note:** Alpaca credentials are per model and stored in the DB `Models` table (`alpacaApiKey`, `alpacaApiSecret`), not in environment variables. API provider keys support round-robin rotation across multiple keys.
+**Note:** Alpaca credentials are per model and stored in the DB `Models` table (`alpacaApiKey`, `alpacaApiSecret`), not in environment variables. API provider keys support round-robin rotation across multiple keys. TAAPI keys also support rotation — on the free plan (1 req/15s), 3 keys yield 1 request/5s effective rate.
 
 ## Core scripts
 
@@ -162,9 +176,15 @@ bun run test
 - Env schema: `src/env.ts`
 - DB schema: `src/db/schema.ts`
 - Trading core: `src/server/features/trading`
+- Trade workflow (decomposed): `src/server/features/trading/execution/tradeWorkflow.ts`
 - Reconciliation: `src/server/features/trading/reconciliation.ts`
 - Staleness analyzer: `src/server/features/trading/stalenessAnalyzer.ts`
 - Correlation matrix: `src/server/features/trading/analysis/correlationMatrix.ts`
+- Performance metrics: `src/server/features/trading/analysis/performanceMetrics.ts`
+- Analytics calculations: `src/server/features/analytics/calculations.ts`
+- Market intelligence formatter: `src/server/features/trading/prompting/marketIntelligenceFormatter.ts`
+- Market intelligence cache: `src/server/features/trading/data/marketIntelligenceCache.ts`
+- Decision diary service: `src/server/features/trading/data/decisionDiaryService.ts`
 - Welford Sharpe: `src/server/features/portfolio/welfordService.ts`
 - Error deduplicator: `src/core/lib/errorDeduplicator.ts`
 - Cache config: `src/core/shared/cache/cacheConfig.ts`
@@ -172,6 +192,10 @@ bun run test
 - Workflow events: `src/server/events/workflowEvents.ts`
 - Workflow loop: `src/server/workflows/tradeCycle.ts`
 - Binance OI: `src/server/integrations/binance-oi/`
+- TAAPI integration: `src/server/integrations/taapi/`
+- Orders repository: `src/server/db/ordersRepository.server.ts`
+- Variants repository: `src/server/db/variantsRepository.server.ts`
+- Trading repository: `src/server/db/tradingRepository.ts`
 - SSE client utility: `src/core/lib/sseConnection.ts`
 
 ## Notes
