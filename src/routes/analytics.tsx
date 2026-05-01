@@ -135,6 +135,7 @@ function averageAdvancedByModel(stats: AdvancedStats[]): AdvancedStats[] {
 		"maxConfidence",
 		"failedWorkflowCount",
 		"failedToolCallCount",
+		"failedCount",
 		"invocationCount",
 		"failureRate",
 	];
@@ -158,6 +159,7 @@ function averageAdvancedByModel(stats: AdvancedStats[]): AdvancedStats[] {
 			maxConfidence: 0,
 			failedWorkflowCount: 0,
 			failedToolCallCount: 0,
+			failedCount: 0,
 			invocationCount: 0,
 			failureRate: 0,
 		};

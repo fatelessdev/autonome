@@ -292,6 +292,7 @@ function FailuresRoute() {
 				(sum, e) => sum + e.failedToolCallCount,
 				0,
 			);
+			const totalFailed = entries.reduce((sum, e) => sum + e.failedCount, 0);
 			const totalInvocations = entries.reduce(
 				(sum, e) => sum + e.invocationCount,
 				0,
@@ -302,11 +303,10 @@ function FailuresRoute() {
 				variant: "TOTAL",
 				failedWorkflowCount: totalWorkflow,
 				failedToolCallCount: totalToolCall,
+				failedCount: totalFailed,
 				invocationCount: totalInvocations,
 				failureRate:
-					totalInvocations > 0
-						? ((totalWorkflow + totalToolCall) / totalInvocations) * 100
-						: 0,
+					totalInvocations > 0 ? (totalFailed / totalInvocations) * 100 : 0,
 			};
 		});
 	})();

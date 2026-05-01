@@ -187,6 +187,7 @@ export async function getAllModelsWithFailureCounts(
 		variant: VariantId;
 		failedWorkflowCount: number;
 		failedToolCallCount: number;
+		failedCount: number;
 		invocationCount: number;
 	}>
 > {
@@ -201,8 +202,19 @@ export async function getAllModelsWithFailureCounts(
 		})
 		.from(models);
 
-	if (!variantFilter) return baseQuery;
-	return baseQuery.where(eq(models.variant, variantFilter));
+	const rows = await (variantFilter
+		? baseQuery.where(eq(models.variant, variantFilter))
+		: baseQuery);
+
+	// Compute failedCount from DB-stored counters, capped at invocationCount
+	// to prevent failureRate > 100% when a single invocation has both failure types.
+	return rows.map((row) => ({
+		...row,
+		failedCount: Math.min(
+			row.failedWorkflowCount + row.failedToolCallCount,
+			row.invocationCount,
+		),
+	}));
 }
 
 /**

@@ -111,12 +111,12 @@ function isInvocationFailure(
 	}
 
 	// Check for workflow-level failures (errors in response)
+	// Tight matching to avoid false positives on legitimate analysis text
+	// that may contain phrases like "failed to break resistance" or "exceptional"
 	const hasErrorInResponse =
-		lowerResponse.includes("error:") ||
+		lowerResponse.startsWith("error:") ||
 		lowerResponse.includes("error occurred") ||
-		lowerResponse.includes("failed to") ||
-		lowerResponse.includes("aborted") ||
-		lowerResponse.includes("exception");
+		lowerResponse.includes("aborted");
 
 	const failureReason =
 		(payload?.failureReason as string) ?? (payload?.error as string) ?? null;
@@ -201,10 +201,10 @@ export async function getModelFailureStats(
 	// Count failures per model
 	const stats = new Map<
 		string,
-		{ workflow: number; toolCall: number; total: number }
+		{ workflow: number; toolCall: number; failed: number; total: number }
 	>();
 	for (const model of allModels) {
-		stats.set(model.id, { workflow: 0, toolCall: 0, total: 0 });
+		stats.set(model.id, { workflow: 0, toolCall: 0, failed: 0, total: 0 });
 	}
 
 	for (const inv of invocationRows) {
@@ -216,21 +216,20 @@ export async function getModelFailureStats(
 		const payload = inv.responsePayload as Record<string, unknown> | null;
 		const tcMetadatas = toolCallsByInvocation.get(inv.id) ?? [];
 
-		const { isWorkflowFailure, isToolCallFailure } = isInvocationFailure(
-			inv.response,
-			payload,
-			tcMetadatas,
-		);
+		const { isFailure, isWorkflowFailure, isToolCallFailure } =
+			isInvocationFailure(inv.response, payload, tcMetadatas);
 
 		if (isWorkflowFailure) modelStats.workflow++;
 		if (isToolCallFailure) modelStats.toolCall++;
+		if (isFailure) modelStats.failed++;
 	}
 
-	// Build result
+	// Build result — failureRate uses unique failed invocations, not sum of categories
 	return allModels.map((model) => {
 		const modelStats = stats.get(model.id) ?? {
 			workflow: 0,
 			toolCall: 0,
+			failed: 0,
 			total: 0,
 		};
 		return {
@@ -239,12 +238,10 @@ export async function getModelFailureStats(
 			variant: model.variant,
 			failedWorkflowCount: modelStats.workflow,
 			failedToolCallCount: modelStats.toolCall,
+			failedCount: modelStats.failed,
 			invocationCount: modelStats.total,
 			failureRate:
-				modelStats.total > 0
-					? ((modelStats.workflow + modelStats.toolCall) / modelStats.total) *
-						100
-					: 0,
+				modelStats.total > 0 ? (modelStats.failed / modelStats.total) * 100 : 0,
 		};
 	});
 }

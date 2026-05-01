@@ -54,6 +54,7 @@ const AdvancedStatsSchema = z.object({
 	maxConfidence: z.number(),
 	failedWorkflowCount: z.number(),
 	failedToolCallCount: z.number(),
+	failedCount: z.number(),
 	invocationCount: z.number(),
 	failureRate: z.number(),
 });
@@ -131,6 +132,7 @@ const ModelFailureStatsSchema = z.object({
 	variant: z.string(),
 	failedWorkflowCount: z.number(),
 	failedToolCallCount: z.number(),
+	failedCount: z.number(),
 	invocationCount: z.number(),
 	failureRate: z.number(),
 });
@@ -192,6 +194,7 @@ export const getModelStats = os
 					{
 						failedWorkflowCount: model.failedWorkflowCount,
 						failedToolCallCount: model.failedToolCallCount,
+						failedCount: model.failedCount,
 						invocationCount: model.invocationCount,
 					},
 					model.variant,

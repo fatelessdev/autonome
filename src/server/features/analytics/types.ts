@@ -42,6 +42,8 @@ export interface AdvancedStats {
 	// Failure metrics
 	failedWorkflowCount: number;
 	failedToolCallCount: number;
+	/** Number of unique failed invocations (an invocation with both failure types counts once) */
+	failedCount: number;
 	invocationCount: number;
 	failureRate: number;
 }
@@ -112,6 +114,8 @@ export interface ModelFailureStats {
 	variant: string;
 	failedWorkflowCount: number;
 	failedToolCallCount: number;
+	/** Number of unique failed invocations (an invocation with both failure types counts once) */
+	failedCount: number;
 	invocationCount: number;
 	failureRate: number;
 }

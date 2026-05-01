@@ -94,6 +94,7 @@ export function calculateAdvancedStats(
 	failureMetrics?: {
 		failedWorkflowCount: number;
 		failedToolCallCount: number;
+		failedCount?: number;
 		invocationCount: number;
 	},
 	variant?: string,
@@ -101,12 +102,18 @@ export function calculateAdvancedStats(
 	const defaultFailureMetrics = {
 		failedWorkflowCount: failureMetrics?.failedWorkflowCount ?? 0,
 		failedToolCallCount: failureMetrics?.failedToolCallCount ?? 0,
+		failedCount:
+			failureMetrics?.failedCount ??
+			Math.min(
+				(failureMetrics?.failedWorkflowCount ?? 0) +
+					(failureMetrics?.failedToolCallCount ?? 0),
+				failureMetrics?.invocationCount ?? 0,
+			),
 		invocationCount: failureMetrics?.invocationCount ?? 0,
 	};
 	const failureRate =
 		defaultFailureMetrics.invocationCount > 0
-			? ((defaultFailureMetrics.failedWorkflowCount +
-					defaultFailureMetrics.failedToolCallCount) /
+			? (defaultFailureMetrics.failedCount /
 					defaultFailureMetrics.invocationCount) *
 				100
 			: 0;
@@ -220,6 +227,7 @@ export function calculateModelAnalytics(
 	failureMetrics?: {
 		failedWorkflowCount: number;
 		failedToolCallCount: number;
+		failedCount?: number;
 		invocationCount: number;
 	},
 ): ModelAnalytics {

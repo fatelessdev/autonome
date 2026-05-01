@@ -142,8 +142,36 @@ describe("calculations", () => {
 			});
 			expect(stats.failedWorkflowCount).toBe(5);
 			expect(stats.failedToolCallCount).toBe(3);
+			expect(stats.failedCount).toBe(8);
 			expect(stats.invocationCount).toBe(40);
 			expect(stats.failureRate).toBeCloseTo(20);
+		});
+
+		it("failure rate never exceeds 100% when both failure types present on same invocations", () => {
+			const trades = [makeTrade()];
+			// All 10 invocations have both workflow AND tool-call failures
+			// Old formula: (10 + 10) / 10 * 100 = 200% (BUG)
+			// New formula: failedCount = min(10 + 10, 10) = 10, rate = 10/10 * 100 = 100%
+			const stats = calculateAdvancedStats("m1", "Model", trades, 100000, {
+				failedWorkflowCount: 10,
+				failedToolCallCount: 10,
+				invocationCount: 10,
+			});
+			expect(stats.failureRate).toBeCloseTo(100);
+			expect(stats.failedCount).toBe(10);
+		});
+
+		it("failure rate uses explicit failedCount when provided", () => {
+			const trades = [makeTrade()];
+			// 10 workflow + 10 toolcall but only 8 unique failures
+			const stats = calculateAdvancedStats("m1", "Model", trades, 100000, {
+				failedWorkflowCount: 10,
+				failedToolCallCount: 10,
+				failedCount: 8,
+				invocationCount: 20,
+			});
+			expect(stats.failedCount).toBe(8);
+			expect(stats.failureRate).toBeCloseTo(40);
 		});
 
 		it("includes variant when provided", () => {
@@ -181,6 +209,7 @@ describe("calculations", () => {
 			});
 
 			expect(analytics.advanced.failedWorkflowCount).toBe(2);
+			expect(analytics.advanced.failedCount).toBe(3);
 			expect(analytics.advanced.failureRate).toBeCloseTo(30);
 		});
 	});
