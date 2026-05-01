@@ -35,13 +35,21 @@ import {
 	getLeaderboardData,
 	type LeaderboardEntry,
 } from "@/server/features/analytics";
-import { buildCompetitionSnapshot } from "@/server/features/trading/analysis/competitionSnapshot";
+import {
+	buildCompetitionSnapshot,
+	type CompetitionSnapshot,
+} from "@/server/features/trading/analysis/competitionSnapshot";
 import {
 	computeCorrelationMatrix,
+	type CorrelationMatrix,
+	type CorrelationWarning,
 	generateCorrelationWarnings,
 	invalidateCorrelationCache,
 } from "@/server/features/trading/analysis/correlationMatrix";
-import { calculatePerformanceMetrics } from "@/server/features/trading/analysis/performanceMetrics";
+import {
+	calculatePerformanceMetrics,
+	type PerformanceMetrics,
+} from "@/server/features/trading/analysis/performanceMetrics";
 import type { Account } from "@/server/features/trading/contracts/accounts";
 import { fetchLatestDecisionIndex } from "@/server/features/trading/contracts/decisionIndex";
 import {
@@ -49,6 +57,7 @@ import {
 	type InvocationClosedPositionSummary,
 	type InvocationDecisionSummary,
 	type InvocationExecutionResultSummary,
+	type InvocationResponsePayload,
 	type StepTelemetry,
 } from "@/server/features/trading/contracts/invocationResponse";
 import type { TradingDecisionWithContext } from "@/server/features/trading/contracts/tradingDecisions";
@@ -56,6 +65,7 @@ import {
 	writeDecisionDiaryEntry,
 	writeMarketStateEntry,
 } from "@/server/features/trading/data/decisionDiaryService";
+import type { MarketSnapshot } from "@/server/features/trading/data/marketData";
 import {
 	getCachedMarketIntelligence,
 	getSharedMarketIntelligence,
@@ -63,9 +73,12 @@ import {
 } from "@/server/features/trading/data/marketIntelligenceCache";
 import {
 	attachStalenessScores,
+	type EnrichedOpenPosition,
+	type ExposureSummary,
 	enrichOpenPositions,
 	summarizePositionRisk,
 } from "@/server/features/trading/data/openPositionEnrichment";
+import type { PortfolioSnapshot } from "@/server/features/trading/data/portfolio";
 import { portfolioQuery } from "@/server/features/trading/data/portfolio.server";
 import { openPositionsQuery } from "@/server/features/trading/data/positions.server";
 import { buildTradingPrompts } from "@/server/features/trading/prompting/promptBuilder";
@@ -73,6 +86,7 @@ import {
 	getSharedNewsDigest,
 	invalidateNewsCache,
 } from "@/server/integrations/alpaca-news";
+import type { TaapiPreFetchResult } from "@/server/integrations/taapi";
 import { createTradeAgent, type ToolContext } from "../agent";
 import { reconcilePositions } from "../reconciliation";
 
@@ -232,14 +246,74 @@ export interface TradeWorkflowOptions {
 	leaderboardCache: Map<VariantId, LeaderboardEntry[]>;
 }
 
-/**
- * Runs a complete trade workflow for a single account.
- * This is the core logic — scheduling is handled by Workflow DevKit.
- */
-export async function runTradeWorkflow(
+// ==========================================
+// Decomposed workflow phases
+// ==========================================
+
+/** Shared helper: builds entry-time map and attaches staleness scores to positions. */
+function enrichPositionsWithStaleness(
+	positions: EnrichedOpenPosition[],
+	allOpenOrders: OrderWithModel[],
+	modelId: string,
+): EnrichedOpenPosition[] {
+	const entryTimeBySymbol = new Map<string, Date>();
+	for (const order of allOpenOrders) {
+		if (order.modelId !== modelId) continue;
+		const canonical = toCanonical(order.symbol).toUpperCase();
+		entryTimeBySymbol.set(canonical, order.openedAt);
+	}
+	return attachStalenessScores(
+		positions.map((pos) => ({
+			...pos,
+			entryTime: entryTimeBySymbol.get(pos.symbol.toUpperCase()) ?? null,
+		})),
+	);
+}
+
+/** Aggregated context returned by prepareTradeContext(). */
+interface TradeContext {
+	portfolio: PortfolioSnapshot;
+	openPositions: EnrichedOpenPosition[];
+	openPositionsForPrompt: EnrichedOpenPosition[];
+	exposureSummary: ExposureSummary;
+	marketIntelligence: string;
+	marketSnapshots: MarketSnapshot[];
+	taapiData: Map<string, TaapiPreFetchResult>;
+	newsDigest: string;
+	correlationMatrix: CorrelationMatrix;
+	correlationWarnings: CorrelationWarning[];
+	currentTime: string;
+	modelInvocation: { id: string };
+	currentPortfolioValue: number;
+	performanceMetrics: PerformanceMetrics;
+	variantId: VariantId;
+	competitionSnapshot: CompetitionSnapshot;
+	capturedDecisions: InvocationDecisionSummary[];
+	capturedExecutionResults: InvocationExecutionResultSummary[];
+	capturedClosedPositions: InvocationClosedPositionSummary[];
+	capturedStepTelemetry: StepTelemetry[];
+	toolContext: ToolContext;
+	enrichedPrompt: {
+		systemPrompt: string;
+		userPrompt: string;
+		stateSummary: string;
+	};
+	rebuildUserPrompt: () => Promise<string>;
+}
+
+/** Result from executeAgent(). */
+interface AgentResult {
+	type: "success";
+	text: string;
+	responsePayload: InvocationResponsePayload;
+	toolCallTelemetry: Array<{ toolName?: string; error?: unknown }>;
+}
+
+/** Phase 1: Fetch all context data, enrich positions, build prompts. */
+async function prepareTradeContext(
 	account: Account,
 	options: TradeWorkflowOptions,
-): Promise<string> {
+): Promise<TradeContext> {
 	const { allOpenOrders, leaderboardCache } = options;
 	const queryClient = new QueryClient();
 
@@ -254,22 +328,11 @@ export async function runTradeWorkflow(
 
 	const openPositions = enrichOpenPositions(openPositionsRaw, decisionIndex);
 	const exposureSummary = summarizePositionRisk(openPositions);
-
-	// Attach staleness scores using DB order entry times
-	const entryTimeBySymbol = new Map<string, Date>();
-	for (const order of allOpenOrders) {
-		if (order.modelId !== account.id) continue;
-		const canonical = toCanonical(order.symbol).toUpperCase();
-		entryTimeBySymbol.set(canonical, order.openedAt);
-	}
-	const enrichedWithStaleness = attachStalenessScores(
-		openPositions.map((pos) => ({
-			...pos,
-			entryTime: entryTimeBySymbol.get(pos.symbol.toUpperCase()) ?? null,
-		})),
+	const openPositionsForPrompt = enrichPositionsWithStaleness(
+		openPositions,
+		allOpenOrders,
+		account.id,
 	);
-	// Use staleness-enriched positions for prompt building
-	const openPositionsForPrompt = enrichedWithStaleness;
 
 	// Initialize telemetry capture arrays
 	const capturedDecisions: InvocationDecisionSummary[] = [];
@@ -283,6 +346,7 @@ export async function runTradeWorkflow(
 		string,
 		{ side: "LONG" | "SHORT"; cooldownUntil: string }
 	>();
+
 	// Fetch shared market data (cached across all models in the same cycle)
 	const [marketResult, newsResult] = await Promise.all([
 		getSharedMarketIntelligence({
@@ -331,7 +395,6 @@ export async function runTradeWorkflow(
 	});
 
 	// Compute correlation matrix from market snapshots and generate warnings
-	// for highly correlated held/considered pairs
 	const correlationMatrix = computeCorrelationMatrix(marketResult.snapshots);
 	const heldSymbols = new Set(openPositions.map((p) => p.symbol));
 	const correlationWarnings = generateCorrelationWarnings(
@@ -367,14 +430,8 @@ export async function runTradeWorkflow(
 		capturedClosedPositions,
 	};
 
-	/**
-	 * Rebuilds the state summary with fresh portfolio data.
-	 * Called by prepareStep after each tool call.
-	 *
-	 * Uses outer-scope data for: performanceMetrics, marketIntelligence,
-	 * newsDigest, competition, allOpenOrders (hoisted).
-	 * Only portfolio, positions, and decisionIndex are refreshed per step.
-	 */
+	// Rebuild user prompt helper — uses outer-scope data for immutable context,
+	// only refreshes portfolio, positions, and decisionIndex per step.
 	const rebuildUserPrompt = async (): Promise<string> => {
 		const freshQueryClient = new QueryClient();
 		const [freshPortfolio, freshPositionsRaw, freshDecisionIndex] =
@@ -391,19 +448,10 @@ export async function runTradeWorkflow(
 			freshDecisionIndex,
 		);
 		const freshExposure = summarizePositionRisk(freshPositions);
-
-		// Rebuild entry time map for staleness (reuse hoisted open orders)
-		const freshEntryTimeBySymbol = new Map<string, Date>();
-		for (const order of allOpenOrders) {
-			if (order.modelId !== account.id) continue;
-			const canonical = toCanonical(order.symbol).toUpperCase();
-			freshEntryTimeBySymbol.set(canonical, order.openedAt);
-		}
-		const freshWithStaleness = attachStalenessScores(
-			freshPositions.map((pos) => ({
-				...pos,
-				entryTime: freshEntryTimeBySymbol.get(pos.symbol.toUpperCase()) ?? null,
-			})),
+		const freshWithStaleness = enrichPositionsWithStaleness(
+			freshPositions,
+			allOpenOrders,
+			account.id,
 		);
 
 		toolContext.openPositions = freshPositions;
@@ -424,19 +472,51 @@ export async function runTradeWorkflow(
 
 		return freshPrompt.stateSummary;
 	};
-	// Create the agent
+
+	return {
+		portfolio,
+		openPositions,
+		openPositionsForPrompt,
+		exposureSummary,
+		marketIntelligence,
+		marketSnapshots,
+		taapiData,
+		newsDigest,
+		correlationMatrix,
+		correlationWarnings,
+		currentTime,
+		modelInvocation,
+		currentPortfolioValue,
+		performanceMetrics,
+		variantId,
+		competitionSnapshot,
+		capturedDecisions,
+		capturedExecutionResults,
+		capturedClosedPositions,
+		capturedStepTelemetry,
+		toolContext,
+		enrichedPrompt,
+		rebuildUserPrompt,
+	};
+}
+
+/** Phase 2: Create agent, generate, handle success/error. */
+async function executeAgent(
+	account: Account,
+	ctx: TradeContext,
+): Promise<AgentResult> {
 	const { agent } = createTradeAgent({
 		account,
-		systemPrompt: enrichedPrompt.systemPrompt,
-		toolContext,
-		onStepTelemetry: (telemetry) => capturedStepTelemetry.push(telemetry),
-		rebuildUserPrompt,
+		systemPrompt: ctx.enrichedPrompt.systemPrompt,
+		toolContext: ctx.toolContext,
+		onStepTelemetry: (telemetry) => ctx.capturedStepTelemetry.push(telemetry),
+		rebuildUserPrompt: ctx.rebuildUserPrompt,
 	});
 
 	let result: Awaited<ReturnType<typeof agent.generate>>;
 	try {
 		result = await agent.generate({
-			prompt: enrichedPrompt.userPrompt,
+			prompt: ctx.enrichedPrompt.userPrompt,
 			abortSignal: AbortSignal.timeout(AGENT_TIMEOUT_MS),
 			options: {
 				reasoningEffort: "high",
@@ -460,43 +540,19 @@ export async function runTradeWorkflow(
 		});
 
 		await updateInvocationMutation({
-			id: modelInvocation.id,
+			id: ctx.modelInvocation.id,
 			response: failureMessage,
 			responsePayload: buildInvocationResponsePayload({
-				prompt: enrichedPrompt.userPrompt,
+				prompt: ctx.enrichedPrompt.userPrompt,
 				result: null,
-				decisions: capturedDecisions,
-				executionResults: capturedExecutionResults,
-				closedPositions: capturedClosedPositions,
-				stepTelemetry: capturedStepTelemetry,
+				decisions: ctx.capturedDecisions,
+				executionResults: ctx.capturedExecutionResults,
+				closedPositions: ctx.capturedClosedPositions,
+				stepTelemetry: ctx.capturedStepTelemetry,
 			}),
 		});
 
-		// Write DecisionDiary entry even for failed invocations (captures partial decisions)
-		try {
-			await writeDecisionDiaryEntry({
-				modelId: account.id,
-				invocationId: modelInvocation.id,
-				variant: variantId,
-				decisions: capturedDecisions,
-				marketSnapshots,
-				taapiData,
-				correlationMatrix,
-				portfolioValue: currentPortfolioValue,
-				cash: portfolio.availableCash,
-				exposurePct:
-					exposureSummary.totalNotional > 0
-						? (exposureSummary.totalNotional / currentPortfolioValue) * 100
-						: 0,
-				openPositionsCount: openPositionsForPrompt.length,
-			});
-		} catch (diaryError) {
-			// Non-blocking: diary write failure should not break the trade cycle
-			console.error(
-				`[DecisionDiary] Failed to write entry for ${account.name} (failed invocation):`,
-				diaryError,
-			);
-		}
+		await persistDiaryEntry(account, ctx, false);
 
 		const wrappedError = new Error(failureMessage, {
 			cause: error instanceof Error ? error : undefined,
@@ -525,52 +581,88 @@ export async function runTradeWorkflow(
 	});
 
 	const responseText = result.text.trim();
-
 	const responsePayload = buildInvocationResponsePayload({
-		prompt: enrichedPrompt.userPrompt,
+		prompt: ctx.enrichedPrompt.userPrompt,
 		result,
-		decisions: capturedDecisions,
-		executionResults: capturedExecutionResults,
-		closedPositions: capturedClosedPositions,
-		stepTelemetry: capturedStepTelemetry,
+		decisions: ctx.capturedDecisions,
+		executionResults: ctx.capturedExecutionResults,
+		closedPositions: ctx.capturedClosedPositions,
+		stepTelemetry: ctx.capturedStepTelemetry,
 	});
 
-	await updateInvocationMutation({
-		id: modelInvocation.id,
-		response: responseText,
+	return {
+		type: "success",
+		text: responseText,
 		responsePayload,
+		toolCallTelemetry,
+	};
+}
+
+/** Phase 3: Persist invocation results, diary entry, and emit events. */
+async function persistResults(
+	account: Account,
+	ctx: TradeContext,
+	agentResult: AgentResult,
+): Promise<string> {
+	await updateInvocationMutation({
+		id: ctx.modelInvocation.id,
+		response: agentResult.text,
+		responsePayload: agentResult.responsePayload,
 	});
 
-	// Write DecisionDiary entry for this invocation
+	await persistDiaryEntry(account, ctx, true);
+	await emitAllDataChanged(account.id);
+
+	return agentResult.text;
+}
+
+/**
+ * Write a DecisionDiary entry. Non-blocking on failure.
+ * @param failedInvocation - true if called on a failed invocation (for logging context)
+ */
+async function persistDiaryEntry(
+	account: Account,
+	ctx: TradeContext,
+	failedInvocation: boolean,
+): Promise<void> {
 	try {
 		await writeDecisionDiaryEntry({
 			modelId: account.id,
-			invocationId: modelInvocation.id,
-			variant: variantId,
-			decisions: capturedDecisions,
-			marketSnapshots,
-			taapiData,
-			correlationMatrix,
-			portfolioValue: currentPortfolioValue,
-			cash: portfolio.availableCash,
+			invocationId: ctx.modelInvocation.id,
+			variant: ctx.variantId,
+			decisions: ctx.capturedDecisions,
+			marketSnapshots: ctx.marketSnapshots,
+			taapiData: ctx.taapiData,
+			correlationMatrix: ctx.correlationMatrix,
+			portfolioValue: ctx.currentPortfolioValue,
+			cash: ctx.portfolio.availableCash,
 			exposurePct:
-				exposureSummary.totalNotional > 0
-					? (exposureSummary.totalNotional / currentPortfolioValue) * 100
+				ctx.exposureSummary.totalNotional > 0
+					? (ctx.exposureSummary.totalNotional / ctx.currentPortfolioValue) *
+						100
 					: 0,
-			openPositionsCount: openPositionsForPrompt.length,
+			openPositionsCount: ctx.openPositionsForPrompt.length,
 		});
 	} catch (diaryError) {
-		// Non-blocking: diary write failure should not break the trade cycle
+		const suffix = failedInvocation ? " (failed invocation)" : "";
 		console.error(
-			`[DecisionDiary] Failed to write entry for ${account.name}:`,
+			`[DecisionDiary] Failed to write entry for ${account.name}${suffix}:`,
 			diaryError,
 		);
 	}
+}
 
-	// Emit unified workflow event
-	await emitAllDataChanged(account.id);
-
-	return responseText;
+/**
+ * Runs a complete trade workflow for a single account.
+ * Delegates to three phases: prepareTradeContext → executeAgent → persistResults.
+ */
+export async function runTradeWorkflow(
+	account: Account,
+	options: TradeWorkflowOptions,
+): Promise<string> {
+	const ctx = await prepareTradeContext(account, options);
+	const agentResult = await executeAgent(account, ctx);
+	return persistResults(account, ctx, agentResult);
 }
 
 /**
