@@ -56,9 +56,7 @@ import {
 	summarizePositionRisk,
 } from "@/server/features/trading/data/openPositionEnrichment";
 import { portfolioQuery } from "@/server/features/trading/data/portfolio.server";
-import { getOpenPositions } from "@/server/features/trading/data/positions";
 import { openPositionsQuery } from "@/server/features/trading/data/positions.server";
-import { closePosition } from "@/server/features/trading/execution/closePosition";
 import { buildTradingPrompts } from "@/server/features/trading/prompting/promptBuilder";
 import {
 	getSharedNewsDigest,
@@ -191,22 +189,24 @@ const resolveFallbackCandidates = async (params: {
 	return candidates;
 };
 
-const triggerKillSwitch = async (account: Account): Promise<void> => {
-	const openPositions = await getOpenPositions(account);
-	if (openPositions.length === 0) {
-		console.warn(
-			`[KillSwitch] No open positions for ${account.name} (${account.id})`,
-		);
-		return;
-	}
-
-	const symbols = [
-		...new Set(openPositions.map((position) => position.symbol)),
-	];
+/**
+ * Log-only alerting on fallback exhaustion.
+ * Positions are preserved — no position closure on AI failure.
+ */
+const logFallbackExhaustion = (
+	modelName: string,
+	modelId: string,
+	primaryFailures: number,
+	fallbackFailures: number,
+	lastError: unknown,
+): void => {
+	const errorMessage =
+		lastError instanceof Error ? lastError.message : String(lastError);
 	console.error(
-		`[KillSwitch] Closing ${symbols.length} position(s) for ${account.name} (${account.id})`,
+		`[KillSwitch] ${modelName} (${modelId}) exhausted all fallback attempts. ` +
+			`Primary failures: ${primaryFailures}, fallback failures: ${fallbackFailures}. ` +
+			`Last error: ${errorMessage}. Positions preserved — no action taken.`,
 	);
-	await closePosition(account, symbols);
 };
 
 /**
@@ -620,14 +620,13 @@ export async function executeAllModelTrades(): Promise<{
 					}
 
 					if (fallbackFailures >= FALLBACK_FAILURE_KILL_SWITCH_THRESHOLD) {
-						try {
-							await triggerKillSwitch(baseAccount);
-						} catch (killSwitchError) {
-							console.error(
-								`[KillSwitch] Failed for ${model.name}:`,
-								killSwitchError,
-							);
-						}
+						logFallbackExhaustion(
+							model.name,
+							model.id,
+							primaryFailures,
+							fallbackFailures,
+							error,
+						);
 						return { modelId: model.id, success: false };
 					}
 
