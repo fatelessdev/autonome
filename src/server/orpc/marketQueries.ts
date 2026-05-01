@@ -3,6 +3,7 @@ import {
 	queryOptions,
 	useQuery,
 } from "@tanstack/react-query";
+import { CACHE_TIMING } from "@/core/shared/cache/cacheConfig";
 import { SUPPORTED_MARKETS } from "@/core/shared/markets/marketMetadata";
 import { isValidVariantId, type VariantId } from "@/core/shared/variants";
 import { orpc } from "@/server/orpc/client";
@@ -88,9 +89,9 @@ export function marketPricesQueryOptions(
 	return queryOptions({
 		queryKey: MARKET_QUERY_KEYS.prices(symbols),
 		queryFn: () => requestMarketPrices(symbols),
-		staleTime: 10_000,
-		gcTime: 5 * 60_000,
-		refetchInterval: 10_000,
+		staleTime: CACHE_TIMING.REALTIME,
+		gcTime: 5 * CACHE_TIMING.SLOW,
+		refetchInterval: CACHE_TIMING.REALTIME,
 	});
 }
 
@@ -147,9 +148,9 @@ export const portfolioHistoryQueryOptions = (variant?: VariantId) =>
 	queryOptions({
 		queryKey: PORTFOLIO_QUERY_KEYS.history(variant),
 		queryFn: () => requestPortfolioHistory(variant),
-		staleTime: 3 * 60_000,
-		gcTime: 15 * 60_000,
-		refetchInterval: 3 * 60_000,
+		staleTime: CACHE_TIMING.MARKET,
+		gcTime: 5 * CACHE_TIMING.STATIC,
+		refetchInterval: CACHE_TIMING.MARKET,
 	});
 
 export function prefetchPortfolioHistory(
@@ -211,9 +212,9 @@ export const variantHistoryQueryOptions = (
 	queryOptions({
 		queryKey: VARIANT_QUERY_KEYS.history(window),
 		queryFn: () => requestVariantHistory(window),
-		staleTime: 3 * 60_000,
-		gcTime: 15 * 60_000,
-		refetchInterval: 3 * 60_000,
+		staleTime: CACHE_TIMING.MARKET,
+		gcTime: 5 * CACHE_TIMING.STATIC,
+		refetchInterval: CACHE_TIMING.MARKET,
 	});
 
 async function requestVariantStats() {
@@ -225,9 +226,9 @@ export const variantStatsQueryOptions = () =>
 	queryOptions({
 		queryKey: VARIANT_QUERY_KEYS.stats(),
 		queryFn: requestVariantStats,
-		staleTime: 3 * 60_000,
-		gcTime: 15 * 60_000,
-		refetchInterval: 3 * 60_000,
+		staleTime: CACHE_TIMING.MARKET,
+		gcTime: 5 * CACHE_TIMING.STATIC,
+		refetchInterval: CACHE_TIMING.MARKET,
 	});
 
 export const VARIANT_QUERIES = {

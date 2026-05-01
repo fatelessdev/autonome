@@ -13,6 +13,7 @@
  * - Integrates Binance OI data for all traded crypto assets
  */
 
+import { CACHE_TIMING } from "@/core/shared/cache/cacheConfig";
 import { MARKETS } from "@/core/shared/markets/marketMetadata";
 import {
 	fetchAllOpenInterest,
@@ -29,7 +30,7 @@ import {
 	type MarketSnapshot,
 } from "./marketData";
 
-const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+const CACHE_TTL_MS = CACHE_TIMING.MARKET; // 2 minutes (market intelligence tier)
 const FETCH_TIMEOUT_MS = 60_000; // 1 minute timeout for entire fetch operation
 
 interface CacheEntry {
@@ -196,19 +197,31 @@ export async function getSharedMarketIntelligence(credentials: {
 }): Promise<{
 	snapshots: MarketSnapshot[];
 	formatted: string;
+	taapiData: Map<string, TaapiPreFetchResult>;
+	oiData: OpenInterestMap;
 }> {
 	const now = Date.now();
 	const cached = globalThis.__marketIntelligenceCache;
 
 	// Return cached data if still valid
 	if (cached && now - cached.fetchedAt < CACHE_TTL_MS) {
-		return { snapshots: cached.snapshots, formatted: cached.formatted };
+		return {
+			snapshots: cached.snapshots,
+			formatted: cached.formatted,
+			taapiData: cached.taapiData,
+			oiData: cached.oiData,
+		};
 	}
 
 	// If a fetch is already in progress, wait for it
 	if (globalThis.__marketIntelligenceFetchPromise) {
 		const result = await globalThis.__marketIntelligenceFetchPromise;
-		return { snapshots: result.snapshots, formatted: result.formatted };
+		return {
+			snapshots: result.snapshots,
+			formatted: result.formatted,
+			taapiData: result.taapiData,
+			oiData: result.oiData,
+		};
 	}
 
 	// Start a new fetch
@@ -335,7 +348,12 @@ export async function getSharedMarketIntelligence(credentials: {
 
 	try {
 		const result = await timedFetchPromise;
-		return { snapshots: result.snapshots, formatted: result.formatted };
+		return {
+			snapshots: result.snapshots,
+			formatted: result.formatted,
+			taapiData: result.taapiData,
+			oiData: result.oiData,
+		};
 	} finally {
 		// Clear the in-flight promise once resolved OR rejected (including timeout)
 		globalThis.__marketIntelligenceFetchPromise = null;
@@ -348,6 +366,26 @@ export async function getSharedMarketIntelligence(credentials: {
  */
 export function invalidateMarketIntelligenceCache(): void {
 	globalThis.__marketIntelligenceCache = null;
+}
+
+/**
+ * Get the current cached market intelligence data without triggering a fetch.
+ * Returns null if cache is empty or expired.
+ * Used by the diary service to access cycle-level market data for MarketState writes.
+ */
+export function getCachedMarketIntelligence(): {
+	snapshots: MarketSnapshot[];
+	taapiData: Map<string, TaapiPreFetchResult>;
+	oiData: OpenInterestMap;
+} | null {
+	const cached = globalThis.__marketIntelligenceCache;
+	if (!cached) return null;
+
+	return {
+		snapshots: cached.snapshots,
+		taapiData: cached.taapiData,
+		oiData: cached.oiData,
+	};
 }
 
 /**

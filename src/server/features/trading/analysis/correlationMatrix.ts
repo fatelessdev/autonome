@@ -12,6 +12,7 @@
  * the market intelligence cache).
  */
 
+import { CACHE_TIMING } from "@/core/shared/cache/cacheConfig";
 import type { MarketSnapshot } from "@/server/features/trading/data/marketData";
 
 // ==========================================
@@ -102,7 +103,7 @@ export function computePearsonCorrelation(
 // Matrix Computation
 // ==========================================
 
-const CORRELATION_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes (same as market cache)
+const CORRELATION_CACHE_TTL_MS = CACHE_TIMING.MARKET; // 2 minutes (same as market cache)
 
 declare global {
 	// eslint-disable-next-line no-var

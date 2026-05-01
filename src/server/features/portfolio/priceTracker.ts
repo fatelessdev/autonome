@@ -8,6 +8,7 @@
 
 import { QueryClient } from "@tanstack/react-query";
 import { sql } from "drizzle-orm";
+import { CACHE_TIMING } from "@/core/shared/cache/cacheConfig";
 import { INITIAL_CAPITAL } from "@/core/shared/trading/calculations";
 import { db } from "@/db";
 import { models, portfolioSize } from "@/db/schema";
@@ -30,8 +31,8 @@ function getPortfolioFetchClient(): QueryClient {
 		globalThis.__portfolioQueryClient = new QueryClient({
 			defaultOptions: {
 				queries: {
-					staleTime: 30_000,
-					gcTime: 5 * 60_000,
+					staleTime: CACHE_TIMING.STANDARD,
+					gcTime: 5 * CACHE_TIMING.SLOW,
 				},
 			},
 		});
@@ -46,7 +47,7 @@ export async function runRetentionPolicyJob() {
 	try {
 		const result = await runRetentionPolicy();
 		console.log(
-			`[Portfolio Retention] Completed: ${result.hourlyAggregatesCreated} hourly, ${result.dailyAggregatesCreated} daily created, ${result.rawRecordsDeleted} raw deleted`,
+			`[Portfolio Retention] Completed: ${result.hourlyAggregatesCreated} hourly, ${result.dailyAggregatesCreated} daily created, ${result.rawRecordsDeleted} raw deleted, ${result.diaryEntriesPruned} diary pruned, ${result.marketStatesPruned} market states pruned`,
 		);
 	} catch (error) {
 		console.error(

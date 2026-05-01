@@ -433,7 +433,7 @@ export const cryptoPricesQuery = (symbols: string[]) => {
 	return queryOptions({
 		queryKey: ["crypto-prices", ...normalized],
 		queryFn: () => fetchCryptoPrices(normalized),
-		staleTime: 10_000,
+		staleTime: CACHE_TIMING.REALTIME,
 		gcTime: CACHE_TIMING.STATIC,
 	});
 };
@@ -462,7 +462,7 @@ export const invocationsQuery = () =>
 	queryOptions({
 		queryKey: ["invocations"],
 		queryFn: refreshConversationEvents,
-		staleTime: 20_000,
+		staleTime: CACHE_TIMING.STANDARD,
 		gcTime: 3 * CACHE_TIMING.SLOW,
 	});
 

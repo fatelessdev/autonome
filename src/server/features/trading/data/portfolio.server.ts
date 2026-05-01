@@ -1,4 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
+import { CACHE_TIMING } from "@/core/shared/cache/cacheConfig";
 import type { Account } from "../contracts/accounts";
 import { getPortfolio } from "./portfolio";
 
@@ -11,8 +12,8 @@ export const portfolioQuery = (account: Account) =>
 	queryOptions({
 		queryKey: ["portfolio", account.id],
 		queryFn: () => getPortfolio(account),
-		staleTime: 10_000, // 10 seconds
-		gcTime: 1 * 60_000,
+		staleTime: CACHE_TIMING.REALTIME,
+		gcTime: CACHE_TIMING.SLOW,
 		retry: 2,
 		retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
 	});

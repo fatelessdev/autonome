@@ -1,5 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { eq, inArray } from "drizzle-orm";
+import { CACHE_TIMING } from "@/core/shared/cache/cacheConfig";
 import { VARIANT_IDS, type VariantId } from "@/core/shared/variants";
 import { db } from "@/db";
 import { invocations, models } from "@/db/schema";
@@ -202,6 +203,6 @@ export const conversationsQuery = () =>
 	queryOptions({
 		queryKey: ["conversations"],
 		queryFn: refreshConversationEvents,
-		staleTime: 20_000,
-		gcTime: 3 * 60_000,
+		staleTime: CACHE_TIMING.STANDARD,
+		gcTime: 3 * CACHE_TIMING.SLOW,
 	});

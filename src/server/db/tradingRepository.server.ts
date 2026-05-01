@@ -56,7 +56,7 @@ export const recentToolCallsWithModelQuery = (params: {
 			params.limit ?? 25,
 		],
 		queryFn: () => repo.getRecentToolCallsWithModel(params),
-		staleTime: 20_000,
+		staleTime: CACHE_TIMING.STANDARD,
 		gcTime: 3 * CACHE_TIMING.SLOW,
 	});
 

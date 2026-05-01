@@ -21,6 +21,8 @@ export const CACHE_TIMING = {
 	SLOW: 60_000,
 	/** 120 seconds — model list, variant configurations */
 	STATIC: 120_000,
+	/** 120 seconds — market intelligence, correlation matrix */
+	MARKET: 120_000,
 } as const;
 
 /**
