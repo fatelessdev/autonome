@@ -18,6 +18,12 @@ This directory is split by persistence responsibility.
   - Table: `"Orders"`.
   - Used by create/close position flows and performance analysis.
 
+- `variantsRepository.server.ts`
+  - Owns read-only queries for the variants oRPC router.
+  - Tables: `"Models"`, `"Orders"`, `"PortfolioSize"` (read-only cross-table queries).
+  - Functions: `getVariantModelIds()`, `getClosedOrdersByModelIds()`, `getPortfolioHistoryByModelIds()`.
+  - Used by `src/server/orpc/router/variants.ts` — the router has no direct db imports.
+
 ## Boundary Rules
 
 - Feature code should prefer `*.server.ts` wrappers for query options and semantic mutations.

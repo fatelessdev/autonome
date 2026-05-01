@@ -2,15 +2,17 @@ import "@/polyfill";
 
 import { os } from "@orpc/server";
 import * as Sentry from "@sentry/react";
-import { and, eq, gte, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
 	VARIANT_CONFIG,
 	VARIANT_IDS,
 	variantIdSchema,
 } from "@/core/shared/variants";
-import { db } from "@/db";
-import { models, orders, portfolioSize } from "@/db/schema";
+import {
+	getClosedOrdersByModelIds,
+	getPortfolioHistoryByModelIds,
+	getVariantModelIds,
+} from "@/server/db/variantsRepository.server";
 import { VARIANT_PROMPTS } from "@/server/features/trading/prompting/prompts/variants";
 
 // ==================== Schema Definitions ====================
@@ -81,13 +83,7 @@ export const getVariantStats = os
 		return Sentry.startSpan({ name: "variants.getVariantStats" }, async () => {
 			const stats = await Promise.all(
 				VARIANT_IDS.map(async (variantId) => {
-					// Get all models with this variant
-					const variantModels = await db
-						.select({ id: models.id })
-						.from(models)
-						.where(eq(models.variant, variantId));
-
-					const modelIds = variantModels.map((m) => m.id);
+					const modelIds = await getVariantModelIds(variantId);
 
 					if (modelIds.length === 0) {
 						return {
@@ -102,18 +98,7 @@ export const getVariantStats = os
 						};
 					}
 
-					// Get closed orders (trades) for these models
-					const closedOrders = await db
-						.select({
-							realizedPnl: orders.realizedPnl,
-						})
-						.from(orders)
-						.where(
-							and(
-								eq(orders.status, "CLOSED"),
-								sql`${orders.modelId} = ANY(${modelIds})`,
-							),
-						);
+					const closedOrders = await getClosedOrdersByModelIds(modelIds);
 
 					const totalTrades = closedOrders.length;
 					const wins = closedOrders.filter(
@@ -173,13 +158,7 @@ export const getVariantHistory = os
 
 				const variants = await Promise.all(
 					VARIANT_IDS.map(async (variantId) => {
-						// Get all models with this variant
-						const variantModels = await db
-							.select({ id: models.id })
-							.from(models)
-							.where(eq(models.variant, variantId));
-
-						const modelIds = variantModels.map((m) => m.id);
+						const modelIds = await getVariantModelIds(variantId);
 
 						if (modelIds.length === 0) {
 							return {
@@ -191,19 +170,10 @@ export const getVariantHistory = os
 						}
 
 						// Get portfolio history for these models, grouped by timestamp
-						const history = await db
-							.select({
-								createdAt: portfolioSize.createdAt,
-								netPortfolio: portfolioSize.netPortfolio,
-							})
-							.from(portfolioSize)
-							.where(
-								and(
-									gte(portfolioSize.createdAt, startTime),
-									sql`${portfolioSize.modelId} = ANY(${modelIds})`,
-								),
-							)
-							.orderBy(portfolioSize.createdAt);
+						const history = await getPortfolioHistoryByModelIds(
+							modelIds,
+							startTime,
+						);
 
 						// Group by hour and average the values
 						const hourlyMap = new Map<string, number[]>();
