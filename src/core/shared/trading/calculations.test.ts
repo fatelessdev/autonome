@@ -8,8 +8,6 @@ import {
 	calculateRecoveryFactor,
 	calculateRecoveryFactorFromPnls,
 	calculateReturnPercent,
-	calculateSharpeRatioFromPortfolio,
-	calculateSharpeRatioFromTrades,
 	calculateTotalPnl,
 	calculateTradeSize,
 	calculateUnrealizedPnl,
@@ -21,6 +19,7 @@ import {
 	requirePresent,
 	standardDeviation,
 	toFiniteNumber,
+	tradeSignalToNoiseRatio,
 } from "./calculations";
 
 describe("calculations", () => {
@@ -207,10 +206,10 @@ describe("calculations", () => {
 	});
 
 	describe("standardDeviation", () => {
-		it("calculates population standard deviation", () => {
-			// [2, 4, 4, 4, 5, 5, 7, 9] -> mean=5, variance=4, stddev=2
+		it("calculates sample standard deviation (N-1)", () => {
+			// [2, 4, 4, 4, 5, 5, 7, 9] -> mean=5, sample variance=32/7≈4.571, stddev≈2.138
 			const result = standardDeviation([2, 4, 4, 4, 5, 5, 7, 9]);
-			expect(result).toBeCloseTo(2.0, 1);
+			expect(result).toBeCloseTo(2.138, 2);
 		});
 
 		it("returns 0 for single value", () => {
@@ -240,51 +239,21 @@ describe("calculations", () => {
 		});
 	});
 
-	describe("calculateSharpeRatioFromPortfolio", () => {
-		it("returns invalid for <2 data points", () => {
-			const result = calculateSharpeRatioFromPortfolio([100]);
-			expect(result.isValid).toBe(false);
-			expect(result.reason).toBe("Insufficient data points");
-		});
-
-		it("returns invalid for <30 data points", () => {
-			const values = Array.from({ length: 20 }, (_, i) => 100 + i);
-			const result = calculateSharpeRatioFromPortfolio(values);
-			expect(result.isValid).toBe(false);
-			expect(result.reason).toBe("Need at least 30 observations");
-		});
-
-		it("calculates sharpe for sufficient data", () => {
-			// Generate a series with positive drift
-			const values = Array.from({ length: 60 }, (_, i) => 100 + i * 0.5);
-			const result = calculateSharpeRatioFromPortfolio(values, 1);
-			expect(result.isValid).toBe(true);
-			expect(typeof result.sharpeRatio).toBe("number");
-		});
-
-		it("returns invalid for constant values (zero volatility)", () => {
-			const values = Array(60).fill(100);
-			const result = calculateSharpeRatioFromPortfolio(values);
-			expect(result.isValid).toBe(false);
-			expect(result.reason).toBe("Volatility too low for meaningful Sharpe");
-		});
-	});
-
-	describe("calculateSharpeRatioFromTrades", () => {
-		it("calculates simple Sharpe from P&Ls", () => {
+	describe("tradeSignalToNoiseRatio", () => {
+		it("calculates signal-to-noise from P&Ls", () => {
 			const pnls = [10, 20, -5, 15, 8];
-			const result = calculateSharpeRatioFromTrades(pnls);
-			// mean = 9.6, stdDev ~= 8.58, sharpe ~= 1.119
-			expect(result).toBeGreaterThan(1);
+			const result = tradeSignalToNoiseRatio(pnls);
+			// mean = 9.6, sample stdDev ~= 9.607, ratio ~= 1.0
+			expect(result).toBeGreaterThan(0.9);
 		});
 
 		it("returns 0 for <2 P&Ls", () => {
-			expect(calculateSharpeRatioFromTrades([10])).toBe(0);
-			expect(calculateSharpeRatioFromTrades([])).toBe(0);
+			expect(tradeSignalToNoiseRatio([10])).toBe(0);
+			expect(tradeSignalToNoiseRatio([])).toBe(0);
 		});
 
 		it("returns 0 for zero volatility", () => {
-			expect(calculateSharpeRatioFromTrades([5, 5, 5])).toBe(0);
+			expect(tradeSignalToNoiseRatio([5, 5, 5])).toBe(0);
 		});
 	});
 

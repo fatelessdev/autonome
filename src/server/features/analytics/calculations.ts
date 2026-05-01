@@ -8,12 +8,12 @@ import {
 	calculateHoldTimeMinutes,
 	calculateRecoveryFactorFromPnls,
 	calculateReturnPercent,
-	calculateSharpeRatioFromTrades,
 	calculateTotalPnl,
 	calculateTradeSize,
 	calculateWinRate,
 	mean,
 	median,
+	tradeSignalToNoiseRatio,
 } from "@/core/shared/trading/calculations";
 
 import type {
@@ -49,7 +49,7 @@ export function calculateOverallStats(
 			winRate: 0,
 			biggestWin: 0,
 			biggestLoss: 0,
-			sharpeRatio: 0,
+			tradeSignalToNoise: 0,
 			tradesCount: 0,
 		};
 	}
@@ -63,8 +63,8 @@ export function calculateOverallStats(
 	const biggestWin = wins.length > 0 ? Math.max(...wins) : 0;
 	const biggestLoss = losses.length > 0 ? Math.min(...losses) : 0;
 
-	// Use trade-based Sharpe ratio calculation
-	const sharpeRatio = calculateSharpeRatioFromTrades(pnls);
+	// Use trade signal-to-noise ratio (non-annualized, from closed trade P&Ls)
+	const tradeSignalToNoise = tradeSignalToNoiseRatio(pnls);
 
 	const returnPercent = calculateReturnPercent(currentAccountValue);
 
@@ -78,7 +78,7 @@ export function calculateOverallStats(
 		winRate,
 		biggestWin,
 		biggestLoss,
-		sharpeRatio,
+		tradeSignalToNoise,
 		tradesCount,
 	};
 }

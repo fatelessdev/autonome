@@ -78,7 +78,7 @@ export function exportAnalyticsToExcel(
 			"Win Rate %",
 			"Biggest Win ($)",
 			"Biggest Loss ($)",
-			"Sharpe Ratio",
+			"Signal/Noise Ratio",
 			"Trades Count",
 		],
 		...overallStats.map((stat) => [
@@ -90,7 +90,7 @@ export function exportAnalyticsToExcel(
 			stat.winRate,
 			stat.biggestWin,
 			stat.biggestLoss,
-			stat.sharpeRatio,
+			stat.tradeSignalToNoise,
 			stat.tradesCount,
 		]),
 	];

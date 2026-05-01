@@ -17,7 +17,8 @@ export interface OverallStats {
 	winRate: number;
 	biggestWin: number;
 	biggestLoss: number;
-	sharpeRatio: number;
+	/** Trade-level signal-to-noise ratio (non-annualized, from closed trade P&Ls) */
+	tradeSignalToNoise: number;
 	tradesCount: number;
 }
 

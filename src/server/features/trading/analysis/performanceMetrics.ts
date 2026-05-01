@@ -3,8 +3,8 @@ import {
 	calculateMaxDrawdown,
 	calculateRecoveryFactor,
 	calculateReturnPercent,
-	calculateSharpeRatioFromTrades,
 	calculateWinRate,
+	tradeSignalToNoiseRatio,
 } from "@/core/shared/trading/calculations";
 import type { Order } from "@/db/schema";
 import { getClosedOrdersByModel } from "@/server/db/ordersRepository.server";
@@ -13,7 +13,8 @@ import type { Account } from "@/server/features/trading/contracts/accounts";
 import { getTradingProvider } from "@/server/providers/alpaca";
 
 export type PerformanceMetrics = {
-	sharpeRatio: string;
+	/** Trade-level signal-to-noise ratio (non-annualized, from closed trade P&Ls) */
+	tradeSignalToNoise: string;
 	/** Sharpe ratio computed via Welford's online algorithm from portfolio returns */
 	welfordSharpeRatio: string;
 	totalReturnPercent: string;
@@ -48,12 +49,11 @@ const parseRequiredRealizedPnl = (
 };
 
 /**
- * Calculate trade-based Sharpe ratio and total realized P&L from the same
- * closed-orders query. Avoids querying the orders table three separate times
- * (getTotalRealizedPnl + getClosedOrdersByModel + calculateTradeSharpe).
+ * Calculate trade signal-to-noise ratio and total realized P&L from the same
+ * closed-orders query. Avoids querying the orders table three separate times.
  */
 function calculateTradeStatsFromOrders(closedOrders: Order[]): {
-	sharpeRatio: string;
+	tradeSignalToNoise: string;
 	closedTradeRealizedPnl: number;
 	tradeCount: number;
 	winRate: string;
@@ -66,18 +66,18 @@ function calculateTradeStatsFromOrders(closedOrders: Order[]): {
 	const winRate =
 		tradeCount > 0 ? `${calculateWinRate(pnls).toFixed(1)}%` : "N/A";
 
-	let sharpeRatio: string;
+	let tradeSignalToNoise: string;
 	if (pnls.length < 2) {
-		sharpeRatio = "N/A (need more trades)";
+		tradeSignalToNoise = "N/A (need more trades)";
 	} else {
-		const sharpe = calculateSharpeRatioFromTrades(pnls);
-		sharpeRatio =
-			Number.isFinite(sharpe) && Math.abs(sharpe) <= 100
-				? sharpe.toFixed(2)
+		const ratio = tradeSignalToNoiseRatio(pnls);
+		tradeSignalToNoise =
+			Number.isFinite(ratio) && Math.abs(ratio) <= 100
+				? ratio.toFixed(2)
 				: "N/A (insufficient data)";
 	}
 
-	return { sharpeRatio, closedTradeRealizedPnl, tradeCount, winRate };
+	return { tradeSignalToNoise, closedTradeRealizedPnl, tradeCount, winRate };
 }
 
 export async function calculatePerformanceMetrics(
@@ -99,7 +99,7 @@ export async function calculatePerformanceMetrics(
 		getClosedOrdersByModel(account.id),
 	]);
 
-	const { sharpeRatio, closedTradeRealizedPnl, tradeCount, winRate } =
+	const { tradeSignalToNoise, closedTradeRealizedPnl, tradeCount, winRate } =
 		calculateTradeStatsFromOrders(closedOrders);
 
 	// Calculate drawdown from portfolio history
@@ -135,7 +135,7 @@ export async function calculatePerformanceMetrics(
 		);
 
 		return {
-			sharpeRatio: "N/A (need more data)",
+			tradeSignalToNoise: "N/A (need more data)",
 			welfordSharpeRatio,
 			totalReturnPercent: `${fallbackReturn.toFixed(2)}%`,
 			closedTradeRealizedPnl,
@@ -163,7 +163,7 @@ export async function calculatePerformanceMetrics(
 				);
 
 	return {
-		sharpeRatio,
+		tradeSignalToNoise,
 		welfordSharpeRatio,
 		totalReturnPercent: `${totalReturn.toFixed(2)}%`,
 		closedTradeRealizedPnl,

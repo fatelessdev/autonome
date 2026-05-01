@@ -165,7 +165,8 @@ export function mean(values: number[]): number {
 }
 
 /**
- * Calculate standard deviation (population).
+ * Calculate sample standard deviation (divides by N-1, Bessel's correction).
+ * Consistent with Welford's online algorithm in welford.ts.
  */
 export function standardDeviation(
 	values: number[],
@@ -174,7 +175,8 @@ export function standardDeviation(
 	if (values.length < 2) return 0;
 	const avg = meanValue ?? mean(values);
 	const squaredDiffs = values.map((v) => (v - avg) ** 2);
-	const variance = squaredDiffs.reduce((a, b) => a + b, 0) / values.length;
+	const variance =
+		squaredDiffs.reduce((a, b) => a + b, 0) / (values.length - 1);
 	return Math.sqrt(variance);
 }
 
@@ -190,99 +192,17 @@ export function median(sortedValues: number[]): number {
 		: (sortedValues[mid - 1] + sortedValues[mid]) / 2;
 }
 
-// ==================== Sharpe Ratio ====================
-
-export interface SharpeRatioResult {
-	sharpeRatio: number;
-	sharpeRatioFormatted: string;
-	isValid: boolean;
-	reason?: string;
-}
+// ==================== Trade Signal-to-Noise Ratio ====================
 
 /**
- * Calculate Sharpe ratio from portfolio history (NAV-based).
- * This is the preferred method for accurate risk-adjusted returns.
- *
- * @param portfolioValues Array of portfolio values over time (chronological order)
- * @param periodMinutes Minutes between each observation (default: 1 for 1-minute snapshots)
- * @returns Sharpe ratio calculation result
- */
-export function calculateSharpeRatioFromPortfolio(
-	portfolioValues: number[],
-	periodMinutes: number = 1,
-): SharpeRatioResult {
-	if (portfolioValues.length < 2) {
-		return {
-			sharpeRatio: 0,
-			sharpeRatioFormatted: "N/A (need more data)",
-			isValid: false,
-			reason: "Insufficient data points",
-		};
-	}
-
-	// Calculate period returns
-	const returns: number[] = [];
-	for (let i = 1; i < portfolioValues.length; i++) {
-		const prevValue = portfolioValues[i - 1];
-		const currValue = portfolioValues[i];
-		if (prevValue > 0) {
-			returns.push((currValue - prevValue) / prevValue);
-		}
-	}
-
-	if (returns.length < 2) {
-		return {
-			sharpeRatio: 0,
-			sharpeRatioFormatted: "N/A (need more data)",
-			isValid: false,
-			reason: "Insufficient return data",
-		};
-	}
-
-	// Require minimum 30 data points for statistical significance
-	if (returns.length < 30) {
-		return {
-			sharpeRatio: 0,
-			sharpeRatioFormatted: "N/A (insufficient data)",
-			isValid: false,
-			reason: "Need at least 30 observations",
-		};
-	}
-
-	const meanReturn = mean(returns);
-	const stdDev = standardDeviation(returns, meanReturn);
-
-	if (stdDev === 0 || stdDev < 0.0001) {
-		return {
-			sharpeRatio: 0,
-			sharpeRatioFormatted: "N/A (low volatility)",
-			isValid: false,
-			reason: "Volatility too low for meaningful Sharpe",
-		};
-	}
-
-	// Annualize based on the observation period
-	const periodsPerYear = (365 * 24 * 60) / periodMinutes;
-	const annualizedReturn = (1 + meanReturn) ** periodsPerYear - 1;
-	const annualizedStdDev = stdDev * Math.sqrt(periodsPerYear);
-
-	const sharpeRatio = (annualizedReturn - RISK_FREE_RATE) / annualizedStdDev;
-
-	return {
-		sharpeRatio,
-		sharpeRatioFormatted: sharpeRatio.toFixed(3),
-		isValid: true,
-	};
-}
-
-/**
- * Calculate Sharpe ratio from trade P&Ls (simplified trade-based method).
- * Less accurate than portfolio-based but useful when only trade data is available.
+ * Compute a trade-level signal-to-noise ratio from realized P&Ls.
+ * This is NOT an annualized Sharpe ratio — it's a raw mean/stddev ratio
+ * useful for comparing trade quality across models.
  *
  * @param pnls Array of realized P&L values from closed trades
- * @returns Sharpe ratio (non-annualized, raw signal-to-noise)
+ * @returns Signal-to-noise ratio (non-annualized, raw dollar P&L)
  */
-export function calculateSharpeRatioFromTrades(pnls: number[]): number {
+export function tradeSignalToNoiseRatio(pnls: number[]): number {
 	if (pnls.length < 2) return 0;
 
 	const meanPnl = mean(pnls);
@@ -290,8 +210,6 @@ export function calculateSharpeRatioFromTrades(pnls: number[]): number {
 
 	if (stdDev === 0) return 0;
 
-	// Simple Sharpe: (mean - risk-free) / stdDev
-	// Risk-free rate is 0, so just mean / stdDev
 	return (meanPnl - RISK_FREE_RATE) / stdDev;
 }
 

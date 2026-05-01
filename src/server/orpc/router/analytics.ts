@@ -31,7 +31,7 @@ const OverallStatsSchema = z.object({
 	winRate: z.number(),
 	biggestWin: z.number(),
 	biggestLoss: z.number(),
-	sharpeRatio: z.number(),
+	tradeSignalToNoise: z.number(),
 	tradesCount: z.number(),
 });
 

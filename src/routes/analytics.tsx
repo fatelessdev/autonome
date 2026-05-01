@@ -82,7 +82,7 @@ function averageOverallByModel(stats: OverallStats[]): OverallStats[] {
 		"winRate",
 		"biggestWin",
 		"biggestLoss",
-		"sharpeRatio",
+		"tradeSignalToNoise",
 		"tradesCount",
 	];
 
@@ -96,7 +96,7 @@ function averageOverallByModel(stats: OverallStats[]): OverallStats[] {
 			winRate: 0,
 			biggestWin: 0,
 			biggestLoss: 0,
-			sharpeRatio: 0,
+			tradeSignalToNoise: 0,
 			tradesCount: 0,
 		};
 
@@ -329,11 +329,11 @@ function getOverallColumns(showVariant: boolean): ColumnDef<OverallStats>[] {
 			),
 		},
 		{
-			accessorKey: "sharpeRatio",
+			accessorKey: "tradeSignalToNoise",
 			header: ({ column }) => (
-				<SortableHeader column={column}>Sharpe</SortableHeader>
+				<SortableHeader column={column}>Signal/Noise</SortableHeader>
 			),
-			cell: ({ row }) => row.getValue<number>("sharpeRatio").toFixed(2),
+			cell: ({ row }) => row.getValue<number>("tradeSignalToNoise").toFixed(2),
 		},
 		{
 			accessorKey: "tradesCount",
