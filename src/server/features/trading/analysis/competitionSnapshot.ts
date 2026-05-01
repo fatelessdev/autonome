@@ -75,9 +75,12 @@ export async function buildCompetitionSnapshot(params: {
 	modelId: string;
 	variant?: VariantId;
 	window?: LeaderboardWindow;
+	/** Pre-fetched leaderboard entries to avoid redundant DB queries */
+	leaderboardEntries?: LeaderboardEntry[];
 }): Promise<CompetitionSnapshot> {
 	const { modelId, variant, window = "7d" } = params;
-	const rawEntries = await getLeaderboardData(window, variant);
+	const rawEntries =
+		params.leaderboardEntries ?? (await getLeaderboardData(window, variant));
 	const entries = [...rawEntries].sort((a, b) => b.pnlPercent - a.pnlPercent);
 
 	const leader = entries[0];

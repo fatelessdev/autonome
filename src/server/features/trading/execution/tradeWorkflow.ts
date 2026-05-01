@@ -17,7 +17,10 @@ import {
 	TRADEABLE_VARIANT_IDS,
 } from "@/core/shared/variants";
 import { fallbackModel } from "@/env";
-import { getAllOpenOrders } from "@/server/db/ordersRepository.server";
+import {
+	getAllOpenOrders,
+	type OrderWithModel,
+} from "@/server/db/ordersRepository.server";
 import { listModels } from "@/server/db/tradingRepository";
 import {
 	createInvocationMutation,
@@ -28,7 +31,10 @@ import {
 	emitAllDataChanged,
 	emitBatchComplete,
 } from "@/server/events/workflowEvents";
-import { getLeaderboardData } from "@/server/features/analytics";
+import {
+	getLeaderboardData,
+	type LeaderboardEntry,
+} from "@/server/features/analytics";
 import { buildCompetitionSnapshot } from "@/server/features/trading/analysis/competitionSnapshot";
 import {
 	computeCorrelationMatrix,
@@ -47,6 +53,11 @@ import {
 } from "@/server/features/trading/contracts/invocationResponse";
 import type { TradingDecisionWithContext } from "@/server/features/trading/contracts/tradingDecisions";
 import {
+	writeDecisionDiaryEntry,
+	writeMarketStateEntry,
+} from "@/server/features/trading/data/decisionDiaryService";
+import {
+	getCachedMarketIntelligence,
 	getSharedMarketIntelligence,
 	invalidateMarketIntelligenceCache,
 } from "@/server/features/trading/data/marketIntelligenceCache";
@@ -157,8 +168,12 @@ const resolveFallbackCandidates = async (params: {
 		openRouterModelName: string;
 		variant: VariantId;
 	}>;
+	/** Pre-fetched leaderboard data for the base model's variant */
+	leaderboardEntries?: LeaderboardEntry[];
 }): Promise<FallbackCandidate[]> => {
-	const leaderboard = await getLeaderboardData("7d", params.baseModel.variant);
+	const leaderboard =
+		params.leaderboardEntries ??
+		(await getLeaderboardData("7d", params.baseModel.variant));
 	const sorted = [...leaderboard].sort((a, b) => b.pnlPercent - a.pnlPercent);
 	const validById = new Map(
 		params.validModels.map((model) => [model.id, model]),
@@ -209,23 +224,33 @@ const logFallbackExhaustion = (
 	);
 };
 
+/** Options passed into runTradeWorkflow to avoid redundant per-model queries */
+export interface TradeWorkflowOptions {
+	/** Pre-fetched open orders from executeAllModelTrades scope */
+	allOpenOrders: OrderWithModel[];
+	/** Cached leaderboard data per variant (populated by executeAllModelTrades) */
+	leaderboardCache: Map<VariantId, LeaderboardEntry[]>;
+}
+
 /**
  * Runs a complete trade workflow for a single account.
  * This is the core logic — scheduling is handled by Workflow DevKit.
  */
-export async function runTradeWorkflow(account: Account): Promise<string> {
+export async function runTradeWorkflow(
+	account: Account,
+	options: TradeWorkflowOptions,
+): Promise<string> {
+	const { allOpenOrders, leaderboardCache } = options;
 	const queryClient = new QueryClient();
 
-	// Fetch initial data in parallel (+ DB open orders for staleness entry times)
-	const [portfolio, openPositionsRaw, decisionIndex, allOpenOrders] =
-		await Promise.all([
-			queryClient.fetchQuery(portfolioQuery(account)),
-			queryClient.fetchQuery(openPositionsQuery(account)),
-			account.id
-				? fetchLatestDecisionIndex(account.id)
-				: Promise.resolve(new Map<string, TradingDecisionWithContext>()),
-			getAllOpenOrders(),
-		]);
+	// Fetch initial data in parallel (open orders already hoisted to cycle scope)
+	const [portfolio, openPositionsRaw, decisionIndex] = await Promise.all([
+		queryClient.fetchQuery(portfolioQuery(account)),
+		queryClient.fetchQuery(openPositionsQuery(account)),
+		account.id
+			? fetchLatestDecisionIndex(account.id)
+			: Promise.resolve(new Map<string, TradingDecisionWithContext>()),
+	]);
 
 	const openPositions = enrichOpenPositions(openPositionsRaw, decisionIndex);
 	const exposureSummary = summarizePositionRisk(openPositions);
@@ -270,6 +295,8 @@ export async function runTradeWorkflow(account: Account): Promise<string> {
 		}),
 	]);
 	const marketIntelligence = marketResult.formatted;
+	const marketSnapshots = marketResult.snapshots;
+	const taapiData = marketResult.taapiData;
 	const newsDigest = newsResult.formatted;
 
 	const currentTime = new Intl.DateTimeFormat("en-US", {
@@ -296,10 +323,11 @@ export async function runTradeWorkflow(account: Account): Promise<string> {
 
 	const variantId = resolveVariantId(account.variant, `account ${account.id}`);
 
-	// Leaderboard context (variant-scoped)
+	// Leaderboard context (variant-scoped, pre-fetched at cycle level)
 	const competitionSnapshot = await buildCompetitionSnapshot({
 		modelId: account.id,
 		variant: variantId,
+		leaderboardEntries: leaderboardCache.get(variantId),
 	});
 
 	// Compute correlation matrix from market snapshots and generate warnings
@@ -342,22 +370,21 @@ export async function runTradeWorkflow(account: Account): Promise<string> {
 	/**
 	 * Rebuilds the state summary with fresh portfolio data.
 	 * Called by prepareStep after each tool call.
+	 *
+	 * Uses outer-scope data for: performanceMetrics, marketIntelligence,
+	 * newsDigest, competition, allOpenOrders (hoisted).
+	 * Only portfolio, positions, and decisionIndex are refreshed per step.
 	 */
 	const rebuildUserPrompt = async (): Promise<string> => {
 		const freshQueryClient = new QueryClient();
-		const [
-			freshPortfolio,
-			freshPositionsRaw,
-			freshDecisionIndex,
-			freshAllOpenOrders,
-		] = await Promise.all([
-			freshQueryClient.fetchQuery(portfolioQuery(account)),
-			freshQueryClient.fetchQuery(openPositionsQuery(account)),
-			account.id
-				? fetchLatestDecisionIndex(account.id)
-				: Promise.resolve(new Map<string, TradingDecisionWithContext>()),
-			getAllOpenOrders(),
-		]);
+		const [freshPortfolio, freshPositionsRaw, freshDecisionIndex] =
+			await Promise.all([
+				freshQueryClient.fetchQuery(portfolioQuery(account)),
+				freshQueryClient.fetchQuery(openPositionsQuery(account)),
+				account.id
+					? fetchLatestDecisionIndex(account.id)
+					: Promise.resolve(new Map<string, TradingDecisionWithContext>()),
+			]);
 
 		const freshPositions = enrichOpenPositions(
 			freshPositionsRaw,
@@ -365,9 +392,9 @@ export async function runTradeWorkflow(account: Account): Promise<string> {
 		);
 		const freshExposure = summarizePositionRisk(freshPositions);
 
-		// Rebuild entry time map for staleness
+		// Rebuild entry time map for staleness (reuse hoisted open orders)
 		const freshEntryTimeBySymbol = new Map<string, Date>();
-		for (const order of freshAllOpenOrders) {
+		for (const order of allOpenOrders) {
 			if (order.modelId !== account.id) continue;
 			const canonical = toCanonical(order.symbol).toUpperCase();
 			freshEntryTimeBySymbol.set(canonical, order.openedAt);
@@ -445,6 +472,32 @@ export async function runTradeWorkflow(account: Account): Promise<string> {
 			}),
 		});
 
+		// Write DecisionDiary entry even for failed invocations (captures partial decisions)
+		try {
+			await writeDecisionDiaryEntry({
+				modelId: account.id,
+				invocationId: modelInvocation.id,
+				variant: variantId,
+				decisions: capturedDecisions,
+				marketSnapshots,
+				taapiData,
+				correlationMatrix,
+				portfolioValue: currentPortfolioValue,
+				cash: portfolio.availableCash,
+				exposurePct:
+					exposureSummary.totalNotional > 0
+						? (exposureSummary.totalNotional / currentPortfolioValue) * 100
+						: 0,
+				openPositionsCount: openPositionsForPrompt.length,
+			});
+		} catch (diaryError) {
+			// Non-blocking: diary write failure should not break the trade cycle
+			console.error(
+				`[DecisionDiary] Failed to write entry for ${account.name} (failed invocation):`,
+				diaryError,
+			);
+		}
+
 		const wrappedError = new Error(failureMessage, {
 			cause: error instanceof Error ? error : undefined,
 		}) as WorkflowExecutionError;
@@ -487,6 +540,32 @@ export async function runTradeWorkflow(account: Account): Promise<string> {
 		response: responseText,
 		responsePayload,
 	});
+
+	// Write DecisionDiary entry for this invocation
+	try {
+		await writeDecisionDiaryEntry({
+			modelId: account.id,
+			invocationId: modelInvocation.id,
+			variant: variantId,
+			decisions: capturedDecisions,
+			marketSnapshots,
+			taapiData,
+			correlationMatrix,
+			portfolioValue: currentPortfolioValue,
+			cash: portfolio.availableCash,
+			exposurePct:
+				exposureSummary.totalNotional > 0
+					? (exposureSummary.totalNotional / currentPortfolioValue) * 100
+					: 0,
+			openPositionsCount: openPositionsForPrompt.length,
+		});
+	} catch (diaryError) {
+		// Non-blocking: diary write failure should not break the trade cycle
+		console.error(
+			`[DecisionDiary] Failed to write entry for ${account.name}:`,
+			diaryError,
+		);
+	}
 
 	// Emit unified workflow event
 	await emitAllDataChanged(account.id);
@@ -536,6 +615,23 @@ export async function executeAllModelTrades(): Promise<{
 		return { successCount: 0, failureCount: 0, totalModels: 0 };
 	}
 
+	// Hoist getAllOpenOrders to cycle scope — used by all runTradeWorkflow calls
+	// and reconciliation. Eliminates N redundant DB queries per cycle.
+	const allOpenOrders = await getAllOpenOrders();
+
+	// Pre-fetch leaderboard data per variant to avoid redundant queries
+	const leaderboardCache = new Map<VariantId, LeaderboardEntry[]>();
+	for (const variant of TRADEABLE_VARIANT_IDS) {
+		if (!leaderboardCache.has(variant)) {
+			leaderboardCache.set(variant, await getLeaderboardData("7d", variant));
+		}
+	}
+
+	const workflowOptions: TradeWorkflowOptions = {
+		allOpenOrders,
+		leaderboardCache,
+	};
+
 	const runModel = async (
 		model: (typeof validModels)[number],
 	): Promise<{ modelId: string; success: boolean }> => {
@@ -545,7 +641,7 @@ export async function executeAllModelTrades(): Promise<{
 		let lastPrimaryError: unknown = null;
 		for (let attempt = 1; attempt <= PRIMARY_MODEL_ATTEMPTS; attempt++) {
 			try {
-				await runTradeWorkflow(baseAccount);
+				await runTradeWorkflow(baseAccount, workflowOptions);
 				return { modelId: model.id, success: true };
 			} catch (error) {
 				primaryFailures++;
@@ -578,6 +674,7 @@ export async function executeAllModelTrades(): Promise<{
 		const fallbackCandidates = await resolveFallbackCandidates({
 			baseModel: model,
 			validModels,
+			leaderboardEntries: leaderboardCache.get(model.variant),
 		});
 
 		if (fallbackCandidates.length === 0) {
@@ -599,7 +696,7 @@ export async function executeAllModelTrades(): Promise<{
 					console.warn(
 						`[TradeExecutor] Fallback attempt ${attempt}/${FALLBACK_MODEL_ATTEMPTS} for ${model.name} using ${candidate.source} candidate ${candidate.id} (${candidate.reasoningModel})`,
 					);
-					await runTradeWorkflow(fallbackAccount);
+					await runTradeWorkflow(fallbackAccount, workflowOptions);
 					return { modelId: model.id, success: true };
 				} catch (error) {
 					fallbackFailures++;
@@ -649,8 +746,7 @@ export async function executeAllModelTrades(): Promise<{
 	const results = await Promise.all(validModels.map(runModel));
 
 	// Reconcile DB orders against Alpaca positions after all trades complete
-	// Fetch all open orders once, then reconcile all models in parallel
-	const allOpenOrders = await getAllOpenOrders();
+	// Use hoisted allOpenOrders from cycle scope
 	await Promise.all(
 		validModels.map(async (model) => {
 			try {
@@ -680,6 +776,31 @@ export async function executeAllModelTrades(): Promise<{
 			}
 		}),
 	);
+
+	// Write MarketState entries for each model after trade cycle completes
+	const cachedMarket = getCachedMarketIntelligence();
+	if (cachedMarket) {
+		const correlationMatrix = computeCorrelationMatrix(cachedMarket.snapshots);
+		await Promise.all(
+			validModels.map(async (model) => {
+				try {
+					await writeMarketStateEntry({
+						modelId: model.id,
+						marketSnapshots: cachedMarket.snapshots,
+						taapiData: cachedMarket.taapiData,
+						correlationMatrix,
+						oiData: cachedMarket.oiData,
+					});
+				} catch (marketStateError) {
+					// Non-blocking: market state write failure should not break the cycle
+					console.error(
+						`[MarketState] Failed to write entry for ${model.name}:`,
+						marketStateError,
+					);
+				}
+			}),
+		);
+	}
 
 	// Invalidate market and correlation caches after batch completes
 	invalidateMarketIntelligenceCache();
