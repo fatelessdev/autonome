@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { variantIdSchema } from "@/core/shared/variants";
 import {
+	encodeCursor,
 	queryDecisionDiary,
 	queryMarketState,
 } from "@/server/db/tradingRepository";
@@ -54,8 +55,8 @@ const OpenInterestEntrySchema = z.object({
 const MarketStateEntrySchema = z.object({
 	id: z.string(),
 	modelId: z.string(),
-	regime: z.string(),
-	adxValue: z.string(),
+	regime: z.string().nullable(),
+	adxValue: z.string().nullable(),
 	topMovers: z.array(TopMoverSchema),
 	activeCorrelations: z.array(ActiveCorrelationSchema),
 	openInterestSummary: z.array(OpenInterestEntrySchema).nullable(),
@@ -140,10 +141,13 @@ export const getDecisionDiary = os
 					cursor: input.cursor,
 				});
 
-				const nextCursor =
-					entries.length === input.limit
-						? (entries[entries.length - 1]?.id ?? null)
-						: null;
+				let nextCursor: string | null = null;
+				if (entries.length === input.limit) {
+					const last = entries[entries.length - 1];
+					if (last) {
+						nextCursor = encodeCursor(last.createdAt, last.id);
+					}
+				}
 
 				return { entries, nextCursor };
 			},
@@ -170,10 +174,13 @@ export const getMarketState = os
 				cursor: input.cursor,
 			});
 
-			const nextCursor =
-				entries.length === input.limit
-					? (entries[entries.length - 1]?.id ?? null)
-					: null;
+			let nextCursor: string | null = null;
+			if (entries.length === input.limit) {
+				const last = entries[entries.length - 1];
+				if (last) {
+					nextCursor = encodeCursor(last.recordedAt, last.id);
+				}
+			}
 
 			return { entries, nextCursor };
 		});

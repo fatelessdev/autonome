@@ -190,6 +190,8 @@ export const modelRelations = relations(models, ({ many }) => ({
 	invocations: many(invocations),
 	portfolioSnapshots: many(portfolioSize),
 	orders: many(orders),
+	decisionDiaries: many(decisionDiary),
+	marketStates: many(marketState),
 }));
 
 export const invocationRelations = relations(invocations, ({ one, many }) => ({
@@ -198,6 +200,7 @@ export const invocationRelations = relations(invocations, ({ one, many }) => ({
 		references: [models.id],
 	}),
 	toolCalls: many(toolCalls),
+	decisionDiaries: many(decisionDiary),
 }));
 
 export const toolCallRelations = relations(toolCalls, ({ one }) => ({
@@ -214,9 +217,138 @@ export const portfolioRelations = relations(portfolioSize, ({ one }) => ({
 	}),
 }));
 
+/**
+ * DecisionDiary — per-invocation structured decision data.
+ *
+ * Captures the AI's decisions, market context, and model state at the time
+ * of each invocation. Used for variant experiment evaluation and post-hoc analysis.
+ */
+export const decisionDiary = pgTable(
+	"DecisionDiary",
+	{
+		id: text("id")
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		modelId: text("modelId")
+			.notNull()
+			.references(() => models.id, {
+				onDelete: "restrict",
+				onUpdate: "cascade",
+			}),
+		invocationId: text("invocationId")
+			.notNull()
+			.references(() => invocations.id, {
+				onDelete: "restrict",
+				onUpdate: "cascade",
+			}),
+		variant: variantEnum("variant").notNull(),
+		decisions: jsonb("decisions").notNull().$type<
+			Array<{
+				symbol: string;
+				side: "LONG" | "SHORT" | "HOLD";
+				confidence: number | null;
+				reasoningSummary: string | null;
+			}>
+		>(),
+		marketSnapshot: jsonb("marketSnapshot").notNull().$type<{
+			adx: number | null;
+			regime: "trending" | "ranging" | "choppy" | null;
+			bbandsPosition: "upper" | "middle" | "lower" | null;
+			supertrendDirection: "long" | "short" | null;
+		}>(),
+		modelState: jsonb("modelState").notNull().$type<{
+			cash: number;
+			exposurePct: number;
+			portfolioValue: number;
+			openPositionsCount: number;
+		}>(),
+		createdAt: timestamp("createdAt").defaultNow().notNull(),
+	},
+	(table) => ({
+		modelIdx: index("DecisionDiary_modelId_idx").on(table.modelId),
+		createdAtIdx: index("DecisionDiary_createdAt_idx").on(table.createdAt),
+		variantIdx: index("DecisionDiary_variant_idx").on(table.variant),
+		modelCreatedAtIdx: index("DecisionDiary_modelId_createdAt_idx").on(
+			table.modelId,
+			table.createdAt,
+		),
+	}),
+);
+
+/**
+ * MarketState — per-cycle market snapshot.
+ *
+ * Captures the overall market regime, ADX, top movers, active correlations,
+ * and open interest summary after each trade cycle. Linked to DecisionDiary
+ * entries via temporal join (nearest prior MarketState for same model).
+ */
+export const marketState = pgTable(
+	"MarketState",
+	{
+		id: text("id")
+			.primaryKey()
+			.$defaultFn(() => crypto.randomUUID()),
+		modelId: text("modelId")
+			.notNull()
+			.references(() => models.id, {
+				onDelete: "restrict",
+				onUpdate: "cascade",
+			}),
+		regime: text("regime"),
+		adxValue: numeric("adxValue", { precision: 10, scale: 2 }),
+		topMovers: jsonb("topMovers").notNull().$type<
+			Array<{
+				symbol: string;
+				changePct: number;
+			}>
+		>(),
+		activeCorrelations: jsonb("activeCorrelations").notNull().$type<
+			Array<{
+				symbolA: string;
+				symbolB: string;
+				correlation: number;
+			}>
+		>(),
+		openInterestSummary: jsonb("openInterestSummary").$type<Array<{
+			symbol: string;
+			openInterest: number;
+			openInterestValueUsd: number;
+			changePercent: number;
+		}> | null>(),
+		recordedAt: timestamp("recordedAt").defaultNow().notNull(),
+	},
+	(table) => ({
+		modelIdx: index("MarketState_modelId_idx").on(table.modelId),
+		recordedAtIdx: index("MarketState_recordedAt_idx").on(table.recordedAt),
+		regimeIdx: index("MarketState_regime_idx").on(table.regime),
+		modelRecordedAtIdx: index("MarketState_modelId_recordedAt_idx").on(
+			table.modelId,
+			table.recordedAt,
+		),
+	}),
+);
+
 export const orderRelations = relations(orders, ({ one }) => ({
 	model: one(models, {
 		fields: [orders.modelId],
+		references: [models.id],
+	}),
+}));
+
+export const decisionDiaryRelations = relations(decisionDiary, ({ one }) => ({
+	model: one(models, {
+		fields: [decisionDiary.modelId],
+		references: [models.id],
+	}),
+	invocation: one(invocations, {
+		fields: [decisionDiary.invocationId],
+		references: [invocations.id],
+	}),
+}));
+
+export const marketStateRelations = relations(marketState, ({ one }) => ({
+	model: one(models, {
+		fields: [marketState.modelId],
 		references: [models.id],
 	}),
 }));
@@ -227,6 +359,10 @@ export type ToolCall = typeof toolCalls.$inferSelect;
 export type PortfolioSnapshot = typeof portfolioSize.$inferSelect;
 export type Order = typeof orders.$inferSelect;
 export type NewOrder = typeof orders.$inferInsert;
+export type DecisionDiaryEntry = typeof decisionDiary.$inferSelect;
+export type NewDecisionDiaryEntry = typeof decisionDiary.$inferInsert;
+export type MarketStateEntry = typeof marketState.$inferSelect;
+export type NewMarketStateEntry = typeof marketState.$inferInsert;
 
 export const ToolCallType = {
 	CREATE_POSITION: toolCallTypeEnum.enumValues[0],

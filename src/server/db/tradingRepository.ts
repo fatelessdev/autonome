@@ -1,6 +1,17 @@
 import { randomUUID } from "node:crypto";
 
-import { and, asc, desc, eq, gt, ilike, lt, or, sql } from "drizzle-orm";
+import {
+	and,
+	asc,
+	desc,
+	eq,
+	gte,
+	ilike,
+	inArray,
+	lt,
+	or,
+	sql,
+} from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -310,8 +321,8 @@ export async function createDecisionDiaryEntry(params: {
 
 export async function createMarketStateEntry(params: {
 	modelId: string;
-	regime: string;
-	adxValue: string;
+	regime: string | null;
+	adxValue: string | null;
 	topMovers: Array<{ symbol: string; changePct: number }>;
 	activeCorrelations: Array<{
 		symbolA: string;
@@ -363,6 +374,30 @@ export async function pruneMarketState(cutoffDate: Date): Promise<number> {
 // DecisionDiary & MarketState Reads
 // ==========================================
 
+// ==========================================
+// Composite cursor helpers
+//
+// Cursor format: "{createdAt_iso}::{id}"
+// This ensures correct pagination ordering when used with ORDER BY (createdAt DESC, id DESC).
+// UUID v4 IDs are not lexicographically time-ordered, so we pair them with createdAt.
+// ==========================================
+
+export function encodeCursor(createdAt: Date, id: string): string {
+	return `${createdAt.toISOString()}::${id}`;
+}
+
+export function decodeCursor(
+	cursor: string,
+): { createdAt: Date; id: string } | null {
+	const sep = cursor.indexOf("::");
+	if (sep === -1) return null;
+	const isoPart = cursor.slice(0, sep);
+	const idPart = cursor.slice(sep + 2);
+	const date = new Date(isoPart);
+	if (Number.isNaN(date.getTime())) return null;
+	return { createdAt: date, id: idPart };
+}
+
 export interface DecisionDiaryQueryFilters {
 	variant?: string;
 	symbol?: string;
@@ -382,10 +417,13 @@ export interface DecisionDiaryWithMarketState extends DecisionDiaryEntry {
  *
  * - variant: exact match on variant column
  * - symbol: filters entries where the `decisions` jsonb array contains an object with that symbol
- * - dateFrom/dateTo: range filter on createdAt
+ * - dateFrom/dateTo: range filter on createdAt (dateFrom is INCLUSIVE)
  * - modelId: exact match
- * - limit/cursor: pagination (cursor-based on id, descending createdAt)
- * - includeMarketState: when true, attaches the nearest prior MarketState for the same modelId
+ * - limit/cursor: pagination using composite (createdAt, id) cursor
+ * - includeMarketState: when true, batch-fetches nearest prior MarketState for each modelId
+ *
+ * Cursor is a composite "{createdAt_iso}::{id}" string — not a raw UUID.
+ * This avoids silent data loss when paginating with random UUID v4 IDs.
  */
 export async function queryDecisionDiary(
 	filters: DecisionDiaryQueryFilters & { includeMarketState?: boolean },
@@ -418,7 +456,7 @@ export async function queryDecisionDiary(
 	}
 
 	if (dateFrom) {
-		conditions.push(gt(decisionDiary.createdAt, dateFrom));
+		conditions.push(gte(decisionDiary.createdAt, dateFrom));
 	}
 
 	if (dateTo) {
@@ -433,7 +471,20 @@ export async function queryDecisionDiary(
 	}
 
 	if (cursor) {
-		conditions.push(lt(decisionDiary.id, cursor));
+		const decoded = decodeCursor(cursor);
+		if (decoded) {
+			// Composite cursor: (createdAt, id) < (cursor.createdAt, cursor.id) in DESC order
+			// i.e. createdAt < cursor.createdAt OR (createdAt = cursor.createdAt AND id < cursor.id)
+			conditions.push(
+				or(
+					lt(decisionDiary.createdAt, decoded.createdAt),
+					and(
+						eq(decisionDiary.createdAt, decoded.createdAt),
+						lt(decisionDiary.id, decoded.id),
+					),
+				),
+			);
+		}
 	}
 
 	const where = conditions.length > 0 ? and(...conditions) : undefined;
@@ -442,35 +493,69 @@ export async function queryDecisionDiary(
 		.select()
 		.from(decisionDiary)
 		.where(where)
-		.orderBy(desc(decisionDiary.createdAt))
+		.orderBy(desc(decisionDiary.createdAt), desc(decisionDiary.id))
 		.limit(pageSize);
 
 	if (!includeMarketState || rows.length === 0) {
 		return rows;
 	}
 
-	// Temporal join: for each diary entry, find the nearest prior MarketState for the same modelId
-	const entriesWithMarketState: DecisionDiaryWithMarketState[] =
-		await Promise.all(
-			rows.map(async (row) => {
-				const [nearest] = await db
-					.select()
-					.from(marketState)
-					.where(
-						and(
-							eq(marketState.modelId, row.modelId),
-							lt(marketState.recordedAt, row.createdAt),
-						),
-					)
-					.orderBy(desc(marketState.recordedAt))
-					.limit(1);
+	// Batch temporal join: collect unique modelIds, fetch recent MarketState
+	// records in one query, then join in memory.
+	const uniqueModelIds = [...new Set(rows.map((r) => r.modelId))];
 
-				return {
-					...row,
-					nearestMarketState: nearest ?? null,
-				};
-			}),
-		);
+	const firstCreatedAt = rows[0]?.createdAt;
+	if (!firstCreatedAt) return rows;
+
+	const earliestCreatedAt = rows.reduce(
+		(min, r) => (r.createdAt < min ? r.createdAt : min),
+		firstCreatedAt,
+	);
+
+	// Fetch all MarketState records that could be "nearest prior" for any diary entry.
+	// We need records for each modelId that are older than the latest diary entry's createdAt.
+	const latestCreatedAt = rows.reduce(
+		(max, r) => (r.createdAt > max ? r.createdAt : max),
+		firstCreatedAt,
+	);
+
+	const marketStateRows = await db
+		.select()
+		.from(marketState)
+		.where(
+			and(
+				inArray(marketState.modelId, uniqueModelIds),
+				lt(marketState.recordedAt, latestCreatedAt),
+				// Only fetch records that could be relevant (within a reasonable window)
+				gte(marketState.recordedAt, earliestCreatedAt),
+			),
+		)
+		.orderBy(desc(marketState.recordedAt));
+
+	// Build lookup: for each modelId, sorted by recordedAt DESC
+	const marketStateByModel = new Map<string, MarketStateEntry[]>();
+	for (const ms of marketStateRows) {
+		const list = marketStateByModel.get(ms.modelId);
+		if (list) {
+			list.push(ms);
+		} else {
+			marketStateByModel.set(ms.modelId, [ms]);
+		}
+	}
+
+	// Join in memory: for each diary entry, find the nearest prior MarketState
+	const entriesWithMarketState: DecisionDiaryWithMarketState[] = rows.map(
+		(row) => {
+			const candidates = marketStateByModel.get(row.modelId);
+			if (!candidates) {
+				return { ...row, nearestMarketState: null };
+			}
+			// candidates are sorted DESC by recordedAt — find the first one before row.createdAt
+			const nearest =
+				candidates.find((ms) => ms.recordedAt < row.createdAt) ?? null;
+			return { ...row, nearestMarketState: nearest };
+		},
+	);
 
 	return entriesWithMarketState;
 }
@@ -486,6 +571,9 @@ export interface MarketStateQueryFilters {
 
 /**
  * Query MarketState entries with optional filters.
+ *
+ * dateFrom is INCLUSIVE. Cursor uses composite (recordedAt, id) to avoid
+ * silent data loss from UUID v4 ordering.
  */
 export async function queryMarketState(
 	filters: MarketStateQueryFilters,
@@ -500,7 +588,7 @@ export async function queryMarketState(
 	}
 
 	if (dateFrom) {
-		conditions.push(gt(marketState.recordedAt, dateFrom));
+		conditions.push(gte(marketState.recordedAt, dateFrom));
 	}
 
 	if (dateTo) {
@@ -512,7 +600,18 @@ export async function queryMarketState(
 	}
 
 	if (cursor) {
-		conditions.push(lt(marketState.id, cursor));
+		const decoded = decodeCursor(cursor);
+		if (decoded) {
+			conditions.push(
+				or(
+					lt(marketState.recordedAt, decoded.createdAt),
+					and(
+						eq(marketState.recordedAt, decoded.createdAt),
+						lt(marketState.id, decoded.id),
+					),
+				),
+			);
+		}
 	}
 
 	const where = conditions.length > 0 ? and(...conditions) : undefined;
@@ -521,7 +620,7 @@ export async function queryMarketState(
 		.select()
 		.from(marketState)
 		.where(where)
-		.orderBy(desc(marketState.recordedAt))
+		.orderBy(desc(marketState.recordedAt), desc(marketState.id))
 		.limit(pageSize);
 }
 
