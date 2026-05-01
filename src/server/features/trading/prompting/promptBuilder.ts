@@ -7,11 +7,13 @@ import {
 } from "@/server/features/trading/analysis/correlationMatrix";
 import type { PerformanceMetrics } from "@/server/features/trading/analysis/performanceMetrics";
 import type { Account } from "@/server/features/trading/contracts/accounts";
+import type { MarketSnapshot } from "@/server/features/trading/data/marketData";
 import type {
 	EnrichedOpenPosition,
 	ExposureSummary,
 } from "@/server/features/trading/data/openPositionEnrichment";
 import type { PortfolioSnapshot } from "@/server/features/trading/data/portfolio";
+import { formatMarketIntelligence } from "@/server/features/trading/prompting/marketIntelligenceFormatter";
 import {
 	buildOpenPositionsSection,
 	buildPerformanceOverview,
@@ -20,6 +22,15 @@ import {
 	formatUsd,
 } from "@/server/features/trading/prompting/promptSections";
 import { getVariantConfig } from "@/server/features/trading/prompting/prompts/variants";
+import type { OpenInterestMap } from "@/server/integrations/binance-oi";
+import type { TaapiPreFetchResult } from "@/server/integrations/taapi";
+
+/** Structured market intelligence data from the cache layer. */
+interface MarketIntelligenceData {
+	snapshots: MarketSnapshot[];
+	taapiData: Map<string, TaapiPreFetchResult>;
+	oiData: OpenInterestMap;
+}
 
 interface TradingPromptParams {
 	account: Account;
@@ -27,7 +38,8 @@ interface TradingPromptParams {
 	openPositions: EnrichedOpenPosition[];
 	exposureSummary: ExposureSummary;
 	performanceMetrics: PerformanceMetrics;
-	marketIntelligence: string;
+	/** Structured market intelligence data — formatted internally */
+	marketIntelligence: MarketIntelligenceData;
 	/** Formatted news digest from Alpaca News API */
 	newsDigest: string;
 	currentTime: string;
@@ -124,6 +136,10 @@ export function buildTradingPrompts(params: TradingPromptParams): {
 	const SYSTEM_PROMPT = variantConfig.systemPrompt;
 	const USER_PROMPT = variantConfig.userPrompt;
 
+	// Format structured market intelligence into prompt string
+	const formattedMarketIntelligence =
+		formatMarketIntelligence(marketIntelligence);
+
 	const exposureRatio = calculateExposureToEquityPct(
 		portfolio,
 		exposureSummary,
@@ -147,7 +163,7 @@ export function buildTradingPrompts(params: TradingPromptParams): {
 		"{{AVAILABLE_CASH}}": availableCashLabel,
 		"{{EXPOSURE_TO_EQUITY_PCT}}": exposurePercentLabel,
 		"{{RISK_TO_EQUITY_PCT}}": riskToEquityPct,
-		"{{MARKET_INTELLIGENCE}}": marketIntelligence,
+		"{{MARKET_INTELLIGENCE}}": formattedMarketIntelligence,
 		"{{PORTFOLIO_SNAPSHOT}}": buildPortfolioSnapshotSection({
 			portfolio,
 			openPositions,

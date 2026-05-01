@@ -40,9 +40,9 @@ import {
 	type CompetitionSnapshot,
 } from "@/server/features/trading/analysis/competitionSnapshot";
 import {
-	computeCorrelationMatrix,
 	type CorrelationMatrix,
 	type CorrelationWarning,
+	computeCorrelationMatrix,
 	generateCorrelationWarnings,
 	invalidateCorrelationCache,
 } from "@/server/features/trading/analysis/correlationMatrix";
@@ -86,6 +86,7 @@ import {
 	getSharedNewsDigest,
 	invalidateNewsCache,
 } from "@/server/integrations/alpaca-news";
+import type { OpenInterestMap } from "@/server/integrations/binance-oi";
 import type { TaapiPreFetchResult } from "@/server/integrations/taapi";
 import { createTradeAgent, type ToolContext } from "../agent";
 import { reconcilePositions } from "../reconciliation";
@@ -276,7 +277,11 @@ interface TradeContext {
 	openPositions: EnrichedOpenPosition[];
 	openPositionsForPrompt: EnrichedOpenPosition[];
 	exposureSummary: ExposureSummary;
-	marketIntelligence: string;
+	marketIntelligence: {
+		snapshots: MarketSnapshot[];
+		taapiData: Map<string, TaapiPreFetchResult>;
+		oiData: OpenInterestMap;
+	};
 	marketSnapshots: MarketSnapshot[];
 	taapiData: Map<string, TaapiPreFetchResult>;
 	newsDigest: string;
@@ -358,7 +363,11 @@ async function prepareTradeContext(
 			alpacaApiSecret: account.alpacaApiSecret,
 		}),
 	]);
-	const marketIntelligence = marketResult.formatted;
+	const marketIntelligence = {
+		snapshots: marketResult.snapshots,
+		taapiData: marketResult.taapiData,
+		oiData: marketResult.oiData,
+	};
 	const marketSnapshots = marketResult.snapshots;
 	const taapiData = marketResult.taapiData;
 	const newsDigest = newsResult.formatted;
