@@ -4,6 +4,7 @@ import {
 	getModelStats,
 	getRunInfo,
 } from "./analytics";
+import { getDecisionDiary, getMarketState } from "./diary";
 import { getInvocations, getModels } from "./models";
 import {
 	getCryptoPrices,
@@ -34,6 +35,8 @@ export default {
 		getLeaderboard,
 		getFailures,
 		getRunInfo,
+		getDecisionDiary,
+		getMarketState,
 	},
 
 	// Variants (strategy configuration)
