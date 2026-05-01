@@ -11,9 +11,13 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { and, avg, count, eq, gte, lt, min, sql } from "drizzle-orm";
+import { and, avg, count, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { models, portfolioSize, type Variant } from "@/db/schema";
+import {
+	pruneDecisionDiary,
+	pruneMarketState,
+} from "@/server/db/tradingRepository";
 
 // ==================== Retention Configuration ====================
 
@@ -26,6 +30,8 @@ export const RETENTION_CONFIG = {
 	RAW_DATA_RETENTION_MS: 7 * 24 * 60 * 60 * 1000, // 7 days
 	/** After this, aggregate to daily buckets */
 	HOURLY_TO_DAILY_MS: 30 * 24 * 60 * 60 * 1000, // 30 days
+	/** Keep DecisionDiary and MarketState entries for this duration */
+	DIARY_RETENTION_MS: 30 * 24 * 60 * 60 * 1000, // 30 days
 } as const;
 
 // ==================== Downsampling Configuration ====================
@@ -84,10 +90,13 @@ export async function runRetentionPolicy(): Promise<{
 	hourlyAggregatesCreated: number;
 	dailyAggregatesCreated: number;
 	rawRecordsDeleted: number;
+	diaryEntriesPruned: number;
+	marketStatesPruned: number;
 }> {
 	const now = Date.now();
 	const sevenDaysAgo = new Date(now - RETENTION_CONFIG.RAW_DATA_RETENTION_MS);
 	const thirtyDaysAgo = new Date(now - RETENTION_CONFIG.HOURLY_TO_DAILY_MS);
+	const diaryCutoff = new Date(now - RETENTION_CONFIG.DIARY_RETENTION_MS);
 
 	// Step 1: Get first snapshot per model (must preserve these)
 	const firstSnapshots = await getFirstSnapshotPerModel();
@@ -108,58 +117,43 @@ export async function runRetentionPolicy(): Promise<{
 		preservedIds,
 	);
 
+	// Step 5: Prune DecisionDiary and MarketState entries older than 30 days
+	const [diaryEntriesPruned, marketStatesPruned] = await Promise.all([
+		pruneDecisionDiary(diaryCutoff),
+		pruneMarketState(diaryCutoff),
+	]);
+
 	return {
 		hourlyAggregatesCreated,
 		dailyAggregatesCreated,
 		rawRecordsDeleted,
+		diaryEntriesPruned,
+		marketStatesPruned,
 	};
 }
 
 /**
  * Get the first (oldest) snapshot for each model.
  * These are never deleted to ensure graphs start from origin.
+ * Uses DISTINCT ON for a single DB call regardless of model count.
  */
 async function getFirstSnapshotPerModel(): Promise<
 	Array<{ id: string; modelId: string; createdAt: Date }>
 > {
-	// Get minimum createdAt per model
-	const minDates = await db
-		.select({
-			modelId: portfolioSize.modelId,
-			minCreatedAt: min(portfolioSize.createdAt).as("minCreatedAt"),
-		})
-		.from(portfolioSize)
-		.groupBy(portfolioSize.modelId);
+	const results = await db.execute(sql`
+		SELECT DISTINCT ON ("modelId")
+			"id",
+			"modelId",
+			"createdAt"
+		FROM "PortfolioSize"
+		ORDER BY "modelId", "createdAt" ASC
+	`);
 
-	if (minDates.length === 0) return [];
-
-	// Fetch the actual records for those dates
-	const results: Array<{ id: string; modelId: string; createdAt: Date }> = [];
-
-	for (const { modelId, minCreatedAt } of minDates) {
-		if (!minCreatedAt) continue;
-
-		const [firstSnapshot] = await db
-			.select({
-				id: portfolioSize.id,
-				modelId: portfolioSize.modelId,
-				createdAt: portfolioSize.createdAt,
-			})
-			.from(portfolioSize)
-			.where(
-				and(
-					eq(portfolioSize.modelId, modelId),
-					eq(portfolioSize.createdAt, minCreatedAt),
-				),
-			)
-			.limit(1);
-
-		if (firstSnapshot) {
-			results.push(firstSnapshot);
-		}
-	}
-
-	return results;
+	return results.rows as Array<{
+		id: string;
+		modelId: string;
+		createdAt: Date;
+	}>;
 }
 
 /**
@@ -196,27 +190,49 @@ async function aggregateSnapshots(
 
 	if (aggregates.length === 0) return 0;
 
+	// Filter to only the buckets we need to insert
+	const candidates = aggregates.filter((agg) => {
+		if (!agg.avgPortfolio || !agg.bucket) return false;
+		if (skipSingleRecords && Number(agg.recordCount) <= 1) return false;
+		return true;
+	}) as Array<{
+		modelId: string;
+		bucket: string;
+		avgPortfolio: string;
+		recordCount: number;
+	}>;
+
+	if (candidates.length === 0) return 0;
+
+	// Batch existence check: fetch all (modelId, createdAt) pairs that already exist
+	// for the candidate bucket times, instead of querying per-bucket
+	const candidateBucketTimes = candidates.map((agg) => new Date(agg.bucket));
+	const modelIds = [...new Set(candidates.map((agg) => agg.modelId))];
+
+	const existingRows = await db
+		.select({
+			modelId: portfolioSize.modelId,
+			createdAt: portfolioSize.createdAt,
+		})
+		.from(portfolioSize)
+		.where(
+			and(
+				inArray(portfolioSize.modelId, modelIds),
+				inArray(portfolioSize.createdAt, candidateBucketTimes),
+			),
+		);
+
+	// Build a Set of "modelId:timestamp" for fast lookup
+	const existingKeys = new Set(
+		existingRows.map((row) => `${row.modelId}:${row.createdAt.getTime()}`),
+	);
+
 	let created = 0;
-	for (const agg of aggregates) {
-		if (!agg.avgPortfolio || !agg.bucket) continue;
-
+	for (const agg of candidates) {
 		const bucketTime = new Date(agg.bucket);
+		const key = `${agg.modelId}:${bucketTime.getTime()}`;
 
-		if (skipSingleRecords && Number(agg.recordCount) <= 1) continue;
-
-		// Check if aggregate already exists for this bucket
-		const existing = await db
-			.select({ id: portfolioSize.id })
-			.from(portfolioSize)
-			.where(
-				and(
-					eq(portfolioSize.modelId, agg.modelId),
-					eq(portfolioSize.createdAt, bucketTime),
-				),
-			)
-			.limit(1);
-
-		if (existing.length > 0) continue;
+		if (existingKeys.has(key)) continue;
 
 		await db.insert(portfolioSize).values({
 			id: randomUUID(),

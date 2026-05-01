@@ -6,7 +6,7 @@
  * Failure analysis queries → ./failureQueries.ts
  */
 
-import { and, asc, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import {
 	INITIAL_CAPITAL,
 	requireFiniteNumber,
@@ -129,8 +129,9 @@ export async function getAllModels(): Promise<
 }
 
 /**
- * Get current account value from latest portfolio snapshot
- * Falls back to INITIAL_CAPITAL (100,000) if no snapshots exist
+ * Get current account value from latest portfolio snapshot per model.
+ * Uses DISTINCT ON for a single efficient DB call.
+ * Falls back to INITIAL_CAPITAL (100,000) if no snapshots exist.
  */
 export async function getModelAccountValues(
 	modelIds: string[],
@@ -140,20 +141,22 @@ export async function getModelAccountValues(
 		return values;
 	}
 
-	const rows = await db
-		.select({
-			modelId: portfolioSize.modelId,
-			netPortfolio: portfolioSize.netPortfolio,
-			createdAt: portfolioSize.createdAt,
-		})
-		.from(portfolioSize)
-		.where(inArray(portfolioSize.modelId, modelIds))
-		.orderBy(desc(portfolioSize.createdAt));
+	const rows = await db.execute(sql`
+		SELECT DISTINCT ON ("modelId")
+			"modelId",
+			"netPortfolio"
+		FROM "PortfolioSize"
+		WHERE "modelId" IN (${sql.join(
+			modelIds.map((id) => sql`${id}`),
+			sql`, `,
+		)})
+		ORDER BY "modelId", "createdAt" DESC
+	`);
 
-	for (const row of rows) {
-		if (values.has(row.modelId)) {
-			continue;
-		}
+	for (const row of rows.rows as Array<{
+		modelId: string;
+		netPortfolio: string;
+	}>) {
 		const numericValue = Number(row.netPortfolio);
 		values.set(
 			row.modelId,
