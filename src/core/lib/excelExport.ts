@@ -111,6 +111,7 @@ export function exportAnalyticsToExcel(
 			"Max Hold Time",
 			"Long %",
 			"Expectancy ($)",
+			"Recovery Factor",
 			"Avg Confidence %",
 			"Median Confidence %",
 			"Max Confidence %",
@@ -118,6 +119,15 @@ export function exportAnalyticsToExcel(
 			"Failed Tool Calls",
 			"Invocation Count",
 			"Failure Rate %",
+			"Profit Factor",
+			"R-Multiple",
+			"Decision Quality",
+			"Sortino Ratio",
+			"Calmar Ratio",
+			"Longest Win Streak",
+			"Longest Loss Streak",
+			"Avg Win Duration",
+			"Avg Loss Duration",
 		],
 		...advancedStats.map((stat) => [
 			stat.modelName,
@@ -131,6 +141,7 @@ export function exportAnalyticsToExcel(
 			formatHoldTime(stat.maxHoldTimeMinutes),
 			stat.longPercent,
 			stat.expectancy,
+			stat.recoveryFactor,
 			stat.avgConfidence,
 			stat.medianConfidence,
 			stat.maxConfidence,
@@ -138,6 +149,25 @@ export function exportAnalyticsToExcel(
 			stat.failedToolCallCount,
 			stat.invocationCount,
 			stat.failureRate,
+			stat.profitFactor === "N/A"
+				? "N/A"
+				: stat.profitFactor === "Infinity" ||
+						!Number.isFinite(stat.profitFactor as number)
+					? "Infinity"
+					: stat.profitFactor,
+			stat.avgRMultiple === "N/A"
+				? "N/A"
+				: stat.avgRMultiple === "Infinity" ||
+						!Number.isFinite(stat.avgRMultiple as number)
+					? "Infinity"
+					: stat.avgRMultiple,
+			stat.decisionQualityScore,
+			stat.sortinoRatio,
+			stat.calmarRatio,
+			stat.longestWinStreak,
+			stat.longestLossStreak,
+			formatHoldTime(stat.avgWinDurationMinutes),
+			formatHoldTime(stat.avgLossDurationMinutes),
 		]),
 	];
 	const advancedSheet = XLSX.utils.aoa_to_sheet(advancedData);

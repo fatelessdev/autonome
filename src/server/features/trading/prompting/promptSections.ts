@@ -217,11 +217,67 @@ export function buildPerformanceOverview({
 	performanceMetrics: PerformanceMetrics;
 }): string {
 	// PERFORMANCE = historical metrics only (current state is in PORTFOLIO)
-	return [
+	// Prompt-facing metrics: profit factor, R-multiple, decision quality, streaks, duration, time-in-market
+	const lines = [
 		`closed_trade_realized_pnl: ${formatUsd(performanceMetrics.closedTradeRealizedPnl)} | trade_count: ${performanceMetrics.tradeCount} | win_rate: ${performanceMetrics.winRate}`,
 		`total_return_since_start: ${performanceMetrics.totalReturnPercent} | annualized_sharpe_ratio: ${performanceMetrics.welfordSharpeRatio} | trade_signal_to_noise: ${performanceMetrics.tradeSignalToNoise}`,
 		`current_drawdown: ${performanceMetrics.currentDrawdown} | max_drawdown: ${performanceMetrics.maxDrawdown} | recovery_factor: ${performanceMetrics.recoveryFactor}`,
-	].join("\n");
+		`profit_factor: ${performanceMetrics.profitFactor} | avg_r_multiple: ${performanceMetrics.avgRMultiple} | decision_quality: ${performanceMetrics.decisionQualityScore}`,
+		`longest_win_streak: ${performanceMetrics.longestWinStreak} | longest_loss_streak: ${performanceMetrics.longestLossStreak} | current_streak: ${performanceMetrics.currentStreakCount} ${performanceMetrics.currentStreakType}`,
+		`avg_win_duration: ${performanceMetrics.avgWinDurationMinutes} | avg_loss_duration: ${performanceMetrics.avgLossDurationMinutes}`,
+	];
+
+	// Threshold warnings for prompt-facing metrics
+	const warnings: string[] = [];
+
+	// Profit factor < 1.0 means losing money overall
+	if (
+		performanceMetrics.profitFactor !== "N/A" &&
+		performanceMetrics.profitFactor !== "Infinity"
+	) {
+		const pf = Number(performanceMetrics.profitFactor);
+		if (Number.isFinite(pf) && pf < 1.0) {
+			warnings.push(
+				`⚠ profit_factor ${pf.toFixed(2)} < 1.0 — system is net losing`,
+			);
+		}
+	}
+
+	// R-multiple < 1.0 means average win < average loss
+	if (
+		performanceMetrics.avgRMultiple !== "N/A" &&
+		performanceMetrics.avgRMultiple !== "Infinity"
+	) {
+		const rm = Number(performanceMetrics.avgRMultiple);
+		if (Number.isFinite(rm) && rm < 1.0) {
+			warnings.push(
+				`⚠ avg_r_multiple ${rm.toFixed(2)} < 1.0 — average win smaller than average loss`,
+			);
+		}
+	}
+
+	// Decision quality negative means confidence is anti-correlated with P&L
+	if (performanceMetrics.decisionQualityScore !== "N/A") {
+		const dq = Number(performanceMetrics.decisionQualityScore);
+		if (Number.isFinite(dq) && dq < 0) {
+			warnings.push(
+				`⚠ decision_quality ${dq.toFixed(3)} < 0 — confidence is anti-correlated with outcome`,
+			);
+		}
+	}
+
+	// Loss streak > 5 is concerning
+	if (performanceMetrics.longestLossStreak > 5) {
+		warnings.push(
+			`⚠ longest_loss_streak ${performanceMetrics.longestLossStreak} — extended losing streak detected`,
+		);
+	}
+
+	if (warnings.length > 0) {
+		lines.push(warnings.join("\n"));
+	}
+
+	return lines.join("\n");
 }
 
 export { formatUsd };

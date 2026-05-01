@@ -57,6 +57,18 @@ const AdvancedStatsSchema = z.object({
 	failedCount: z.number(),
 	invocationCount: z.number(),
 	failureRate: z.number(),
+	// New analytics metrics
+	profitFactor: z.union([z.number(), z.literal("Infinity"), z.literal("N/A")]),
+	avgRMultiple: z.union([z.number(), z.literal("Infinity"), z.literal("N/A")]),
+	decisionQualityScore: z.union([z.number(), z.literal("N/A")]),
+	sortinoRatio: z.union([z.number(), z.literal("N/A")]),
+	calmarRatio: z.union([z.number(), z.literal("N/A")]),
+	longestWinStreak: z.number(),
+	longestLossStreak: z.number(),
+	currentStreakCount: z.number(),
+	currentStreakType: z.enum(["win", "loss", "none"]),
+	avgWinDurationMinutes: z.number(),
+	avgLossDurationMinutes: z.number(),
 });
 
 const VariantFilterSchema = variantIdWithAllSchema.default("all");

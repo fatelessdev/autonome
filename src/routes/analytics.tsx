@@ -138,6 +138,11 @@ function averageAdvancedByModel(stats: AdvancedStats[]): AdvancedStats[] {
 		"failedCount",
 		"invocationCount",
 		"failureRate",
+		"longestWinStreak",
+		"longestLossStreak",
+		"currentStreakCount",
+		"avgWinDurationMinutes",
+		"avgLossDurationMinutes",
 	];
 
 	return Array.from(grouped.entries()).map(([modelName, entries]) => {
@@ -162,6 +167,17 @@ function averageAdvancedByModel(stats: AdvancedStats[]): AdvancedStats[] {
 			failedCount: 0,
 			invocationCount: 0,
 			failureRate: 0,
+			profitFactor: "N/A",
+			avgRMultiple: "N/A",
+			decisionQualityScore: "N/A",
+			sortinoRatio: "N/A",
+			calmarRatio: "N/A",
+			longestWinStreak: 0,
+			longestLossStreak: 0,
+			currentStreakCount: 0,
+			currentStreakType: "none",
+			avgWinDurationMinutes: 0,
+			avgLossDurationMinutes: 0,
 		};
 
 		for (const key of numericKeys) {
@@ -169,6 +185,15 @@ function averageAdvancedByModel(stats: AdvancedStats[]): AdvancedStats[] {
 				entries.map((entry) => entry[key] as number),
 			);
 		}
+
+		// For union-typed fields (profitFactor, avgRMultiple, etc.), just use the first entry's value
+		// since averaging "N/A" or "Infinity" values doesn't make sense
+		result.profitFactor = entries[0]?.profitFactor ?? "N/A";
+		result.avgRMultiple = entries[0]?.avgRMultiple ?? "N/A";
+		result.decisionQualityScore = entries[0]?.decisionQualityScore ?? "N/A";
+		result.sortinoRatio = entries[0]?.sortinoRatio ?? "N/A";
+		result.calmarRatio = entries[0]?.calmarRatio ?? "N/A";
+		result.currentStreakType = entries[0]?.currentStreakType ?? "none";
 
 		return result;
 	});
@@ -509,6 +534,89 @@ function getAdvancedColumns(showVariant: boolean): ColumnDef<AdvancedStats>[] {
 				const val = row.getValue<number>("maxConfidence");
 				return val > 0 ? `${val.toFixed(1)}%` : "â€”";
 			},
+		},
+		{
+			accessorKey: "profitFactor",
+			header: ({ column }) => (
+				<SortableHeader column={column}>Profit Factor</SortableHeader>
+			),
+			cell: ({ row }) => {
+				const val = row.getValue<number | "Infinity" | "N/A">("profitFactor");
+				if (val === "N/A") return "â€”";
+				if (!Number.isFinite(val as number)) return "∞";
+				return (val as number).toFixed(2);
+			},
+		},
+		{
+			accessorKey: "avgRMultiple",
+			header: ({ column }) => (
+				<SortableHeader column={column}>R-Multiple</SortableHeader>
+			),
+			cell: ({ row }) => {
+				const val = row.getValue<number | "Infinity" | "N/A">("avgRMultiple");
+				if (val === "N/A") return "â€”";
+				if (!Number.isFinite(val as number)) return "∞";
+				return (val as number).toFixed(2);
+			},
+		},
+		{
+			accessorKey: "decisionQualityScore",
+			header: ({ column }) => (
+				<SortableHeader column={column}>Decision Quality</SortableHeader>
+			),
+			cell: ({ row }) => {
+				const val = row.getValue<number | "N/A">("decisionQualityScore");
+				if (val === "N/A") return "â€”";
+				return (val as number).toFixed(3);
+			},
+		},
+		{
+			accessorKey: "sortinoRatio",
+			header: ({ column }) => (
+				<SortableHeader column={column}>Sortino</SortableHeader>
+			),
+			cell: ({ row }) => {
+				const val = row.getValue<number | "N/A">("sortinoRatio");
+				if (val === "N/A") return "â€”";
+				return (val as number).toFixed(2);
+			},
+		},
+		{
+			accessorKey: "calmarRatio",
+			header: ({ column }) => (
+				<SortableHeader column={column}>Calmar</SortableHeader>
+			),
+			cell: ({ row }) => {
+				const val = row.getValue<number | "N/A">("calmarRatio");
+				if (val === "N/A") return "â€”";
+				return (val as number).toFixed(2);
+			},
+		},
+		{
+			accessorKey: "longestWinStreak",
+			header: ({ column }) => (
+				<SortableHeader column={column}>Win Streak</SortableHeader>
+			),
+		},
+		{
+			accessorKey: "longestLossStreak",
+			header: ({ column }) => (
+				<SortableHeader column={column}>Loss Streak</SortableHeader>
+			),
+		},
+		{
+			accessorKey: "avgWinDurationMinutes",
+			header: ({ column }) => (
+				<SortableHeader column={column}>Avg Win Hold</SortableHeader>
+			),
+			cell: ({ row }) => formatHoldTime(row.getValue("avgWinDurationMinutes")),
+		},
+		{
+			accessorKey: "avgLossDurationMinutes",
+			header: ({ column }) => (
+				<SortableHeader column={column}>Avg Loss Hold</SortableHeader>
+			),
+			cell: ({ row }) => formatHoldTime(row.getValue("avgLossDurationMinutes")),
 		},
 	);
 

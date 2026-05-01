@@ -46,6 +46,29 @@ export interface AdvancedStats {
 	failedCount: number;
 	invocationCount: number;
 	failureRate: number;
+	// New analytics metrics
+	/** Sum(wins) / abs(sum(losses)). Infinity when no losses, 0 when no wins, "N/A" when no trades */
+	profitFactor: number | "Infinity" | "N/A";
+	/** Mean(wins) / abs(mean(losses)). Same edge cases as profitFactor */
+	avgRMultiple: number | "Infinity" | "N/A";
+	/** Pearson correlation between confidence and realizedPnl. "N/A" when <3 tagged trades */
+	decisionQualityScore: number | "N/A";
+	/** Annualized return / downside deviation. "N/A" when insufficient data */
+	sortinoRatio: number | "N/A";
+	/** Total return % / max drawdown %. "N/A" when no drawdown */
+	calmarRatio: number | "N/A";
+	/** Longest consecutive win streak */
+	longestWinStreak: number;
+	/** Longest consecutive loss streak */
+	longestLossStreak: number;
+	/** Current streak count */
+	currentStreakCount: number;
+	/** Current streak type: "win", "loss", or "none" */
+	currentStreakType: "win" | "loss" | "none";
+	/** Average hold time for winning trades in minutes */
+	avgWinDurationMinutes: number;
+	/** Average hold time for losing trades in minutes */
+	avgLossDurationMinutes: number;
 }
 
 export interface ModelAnalytics {

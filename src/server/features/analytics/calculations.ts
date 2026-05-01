@@ -15,6 +15,7 @@ import {
 	median,
 	tradeSignalToNoiseRatio,
 } from "@/core/shared/trading/calculations";
+import { computePearsonCorrelation } from "@/server/features/trading/analysis/correlationMatrix";
 
 import type {
 	AdvancedStats,
@@ -25,6 +26,228 @@ import type {
 
 // Re-export INITIAL_CAPITAL for backward compatibility
 export { INITIAL_CAPITAL } from "@/core/shared/trading/calculations";
+
+// ==================== New Analytics Metrics ====================
+
+/**
+ * Profit Factor = sum(wins) / abs(sum(losses)).
+ * Answers: "How much does this variant make per dollar lost?"
+ *
+ * Returns:
+ *   - "Infinity" when no losses (all wins)
+ *   - "0.00" when no wins (all losses)
+ *   - "N/A" when no trades
+ */
+export function calculateProfitFactor(pnls: number[]): number | "N/A" {
+	if (pnls.length === 0) return "N/A";
+
+	const wins = pnls.filter((p) => p > 0);
+	const losses = pnls.filter((p) => p < 0);
+
+	const totalWins = wins.reduce((sum, p) => sum + p, 0);
+	const totalLosses = Math.abs(losses.reduce((sum, p) => sum + p, 0));
+
+	if (totalLosses === 0) return totalWins > 0 ? Number.POSITIVE_INFINITY : 0;
+	if (totalWins === 0) return 0;
+
+	return totalWins / totalLosses;
+}
+
+/**
+ * Average R-Multiple = mean(wins) / abs(mean(losses)).
+ * Answers: "Is this variant's average win bigger than its average loss?"
+ *
+ * Returns:
+ *   - "Infinity" when no losses (all wins)
+ *   - "0.00" when no wins (all losses)
+ *   - "N/A" when no trades
+ */
+export function calculateRMultiple(pnls: number[]): number | "N/A" {
+	if (pnls.length === 0) return "N/A";
+
+	const wins = pnls.filter((p) => p > 0);
+	const losses = pnls.filter((p) => p < 0);
+
+	const avgWin = wins.length > 0 ? mean(wins) : 0;
+	const avgLoss = losses.length > 0 ? Math.abs(mean(losses)) : 0;
+
+	if (avgLoss === 0) return avgWin > 0 ? Number.POSITIVE_INFINITY : 0;
+	if (avgWin === 0) return 0;
+
+	return avgWin / avgLoss;
+}
+
+/**
+ * Decision Quality Score = Pearson correlation between confidence and realized P&L.
+ * Answers: "Is this variant's confidence calibrated? Do high-confidence trades perform better?"
+ *
+ * Returns:
+ *   - "N/A" when fewer than 3 confidence-tagged trades
+ *   - number in [-1, 1] otherwise
+ */
+export function calculateDecisionQualityScore(
+	trades: ClosedTradeData[],
+): number | "N/A" {
+	const tagged = trades.filter(
+		(t) => t.confidence !== null && Number.isFinite(t.confidence),
+	);
+
+	if (tagged.length < 3) return "N/A";
+
+	const confidences = tagged.map((t) => t.confidence as number);
+	const pnls = tagged.map((t) => t.realizedPnl);
+
+	const result = computePearsonCorrelation(confidences, pnls);
+	return result ?? "N/A";
+}
+
+/**
+ * Sortino Ratio = annualized return / downside deviation.
+ * Better than Sharpe for asymmetric returns (trading systems).
+ * Only counts negative returns when computing deviation.
+ *
+ * @param returns Array of portfolio period returns (not P&Ls, but % returns)
+ * @param annualizationFactor Number of periods per year (default: 5-min cycles = 105120)
+ */
+export function calculateSortinoRatio(
+	returns: number[],
+	annualizationFactor: number = 365 * 24 * 12,
+): number | "N/A" {
+	if (returns.length < 2) return "N/A";
+
+	const meanReturn = mean(returns);
+	const negativeReturns = returns.filter((r) => r < 0);
+
+	if (negativeReturns.length === 0) {
+		// No negative returns: infinite Sortino if mean > 0
+		return meanReturn > 0 ? Number.POSITIVE_INFINITY : 0;
+	}
+
+	const sumSquaredDownside = negativeReturns.reduce((sum, r) => sum + r * r, 0);
+	const downsideDeviation = Math.sqrt(
+		sumSquaredDownside / negativeReturns.length,
+	);
+
+	if (downsideDeviation < 1e-10)
+		return meanReturn > 0 ? Number.POSITIVE_INFINITY : 0;
+
+	const annualizedReturn = meanReturn * annualizationFactor;
+	const annualizedDownside = downsideDeviation * Math.sqrt(annualizationFactor);
+
+	const ratio = annualizedReturn / annualizedDownside;
+	return Number.isFinite(ratio) && Math.abs(ratio) <= 100 ? ratio : "N/A";
+}
+
+/**
+ * Calmar Ratio = total return % / max drawdown %.
+ * Answers: "Which variant gets the most return per unit of drawdown risk?"
+ *
+ * @param totalReturnPct Total return as percentage (e.g. 20 for 20%)
+ * @param maxDrawdownPct Max drawdown as positive percentage (e.g. 10 for 10%)
+ */
+export function calculateCalmarRatio(
+	totalReturnPct: number,
+	maxDrawdownPct: number,
+): number | "N/A" {
+	if (!(maxDrawdownPct > 0)) return "N/A";
+
+	const ratio = totalReturnPct / maxDrawdownPct;
+	return Number.isFinite(ratio) ? ratio : "N/A";
+}
+
+export interface StreakResult {
+	longestWinStreak: number;
+	longestLossStreak: number;
+	currentStreakCount: number;
+	currentStreakType: "win" | "loss" | "none";
+}
+
+/**
+ * Compute consecutive win/loss streaks from closed trades sorted by closedAt.
+ * Returns longest and current streaks.
+ */
+export function calculateStreaks(trades: ClosedTradeData[]): StreakResult {
+	if (trades.length === 0) {
+		return {
+			longestWinStreak: 0,
+			longestLossStreak: 0,
+			currentStreakCount: 0,
+			currentStreakType: "none",
+		};
+	}
+
+	// Sort by closedAt ascending
+	const sorted = [...trades].sort(
+		(a, b) => a.closedAt.getTime() - b.closedAt.getTime(),
+	);
+
+	let longestWinStreak = 0;
+	let longestLossStreak = 0;
+	let currentRun = 0;
+	let currentIsWin = false;
+
+	for (let i = 0; i < sorted.length; i++) {
+		const isWin = sorted[i].realizedPnl > 0;
+		if (i === 0) {
+			currentRun = 1;
+			currentIsWin = isWin;
+		} else if (isWin === currentIsWin) {
+			currentRun++;
+		} else {
+			// Streak broken — record it
+			if (currentIsWin) {
+				longestWinStreak = Math.max(longestWinStreak, currentRun);
+			} else {
+				longestLossStreak = Math.max(longestLossStreak, currentRun);
+			}
+			currentRun = 1;
+			currentIsWin = isWin;
+		}
+	}
+
+	// Record final streak
+	if (currentIsWin) {
+		longestWinStreak = Math.max(longestWinStreak, currentRun);
+	} else {
+		longestLossStreak = Math.max(longestLossStreak, currentRun);
+	}
+
+	return {
+		longestWinStreak,
+		longestLossStreak,
+		currentStreakCount: currentRun,
+		currentStreakType: currentIsWin ? "win" : "loss",
+	};
+}
+
+export interface DurationDistribution {
+	avgWinDurationMinutes: number;
+	avgLossDurationMinutes: number;
+}
+
+/**
+ * Compute average hold time for winners vs losers.
+ * Answers: "Does this variant cut winners short and let losers run?"
+ */
+export function calculateDurationDistribution(
+	trades: ClosedTradeData[],
+): DurationDistribution {
+	const wins = trades.filter((t) => t.realizedPnl > 0);
+	const losses = trades.filter((t) => t.realizedPnl < 0);
+
+	const avgWinDurationMinutes =
+		wins.length > 0
+			? mean(wins.map((t) => calculateHoldTimeMinutes(t.openedAt, t.closedAt)))
+			: 0;
+	const avgLossDurationMinutes =
+		losses.length > 0
+			? mean(
+					losses.map((t) => calculateHoldTimeMinutes(t.openedAt, t.closedAt)),
+				)
+			: 0;
+
+	return { avgWinDurationMinutes, avgLossDurationMinutes };
+}
 
 /**
  * Calculate overall stats for a model's closed trades
@@ -138,6 +361,17 @@ export function calculateAdvancedStats(
 			maxConfidence: 0,
 			...defaultFailureMetrics,
 			failureRate,
+			profitFactor: "N/A",
+			avgRMultiple: "N/A",
+			decisionQualityScore: "N/A",
+			sortinoRatio: "N/A",
+			calmarRatio: "N/A",
+			longestWinStreak: 0,
+			longestLossStreak: 0,
+			currentStreakCount: 0,
+			currentStreakType: "none",
+			avgWinDurationMinutes: 0,
+			avgLossDurationMinutes: 0,
 		};
 	}
 
@@ -194,6 +428,45 @@ export function calculateAdvancedStats(
 				})()
 			: 0;
 
+	// New analytics metrics
+	const profitFactor = calculateProfitFactor(pnls);
+	const avgRMultiple = calculateRMultiple(pnls);
+	const decisionQualityScore = calculateDecisionQualityScore(trades);
+	const streaks = calculateStreaks(trades);
+	const durationDist = calculateDurationDistribution(trades);
+
+	// Sortino ratio requires portfolio returns (not P&Ls) — compute from closedAt-sorted cumulative equity
+	const sortedByTime = [...trades].sort(
+		(a, b) => a.closedAt.getTime() - b.closedAt.getTime(),
+	);
+	const cumulativeReturns: number[] = [];
+	let runningEquity = currentAccountValue - pnls.reduce((s, p) => s + p, 0);
+	for (const trade of sortedByTime) {
+		runningEquity += trade.realizedPnl;
+		const periodReturn =
+			trade.realizedPnl / (runningEquity - trade.realizedPnl);
+		if (Number.isFinite(periodReturn)) {
+			cumulativeReturns.push(periodReturn);
+		}
+	}
+	const sortinoRatio = calculateSortinoRatio(cumulativeReturns, 365);
+
+	// Calmar ratio: total return % / max drawdown %
+	const totalReturnPct = calculateReturnPercent(currentAccountValue);
+	const maxDrawdownPct = (() => {
+		let peak = Number.NEGATIVE_INFINITY;
+		let maxDd = 0;
+		let equity = currentAccountValue - pnls.reduce((s, p) => s + p, 0);
+		for (const trade of sortedByTime) {
+			equity += trade.realizedPnl;
+			if (equity > peak) peak = equity;
+			const dd = peak > 0 ? ((peak - equity) / peak) * 100 : 0;
+			if (dd > maxDd) maxDd = dd;
+		}
+		return maxDd;
+	})();
+	const calmarRatio = calculateCalmarRatio(totalReturnPct, maxDrawdownPct);
+
 	return {
 		modelId,
 		modelName,
@@ -213,6 +486,14 @@ export function calculateAdvancedStats(
 		maxConfidence,
 		...defaultFailureMetrics,
 		failureRate,
+		profitFactor,
+		avgRMultiple,
+		decisionQualityScore,
+		sortinoRatio,
+		calmarRatio,
+		...streaks,
+		avgWinDurationMinutes: durationDist.avgWinDurationMinutes,
+		avgLossDurationMinutes: durationDist.avgLossDurationMinutes,
 	};
 }
 
