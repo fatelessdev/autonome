@@ -59,6 +59,9 @@ export const env = createEnv({
 
 		// TAAPI.io integration (optional for supplementary indicators)
 		TAAPI_API_KEY: z.string().optional(),
+		TAAPI_API_KEY1: z.string().optional(),
+		TAAPI_API_KEY2: z.string().optional(),
+		TAAPI_API_KEY3: z.string().optional(),
 		FALLBACK_MODEL: z.string().optional(),
 	},
 
@@ -129,6 +132,13 @@ const aihubmixKeyRotator = createApiKeyRotator("AIHubMix", [
 	env.AIHUBMIX_API_KEY2,
 ]);
 
+const taapiKeyRotator = createApiKeyRotator("TAAPI", [
+	env.TAAPI_API_KEY,
+	env.TAAPI_API_KEY1,
+	env.TAAPI_API_KEY2,
+	env.TAAPI_API_KEY3,
+]);
+
 /**
  * Get the next NIM API key using round-robin cycling.
  * This distributes requests across multiple keys to avoid rate limits.
@@ -172,4 +182,20 @@ export function getNextAihubmixApiKey(): string {
  */
 export function getAihubmixApiKeyCount(): number {
 	return aihubmixKeyRotator.getCount();
+}
+
+/**
+ * Get the next TAAPI API key using round-robin cycling.
+ * This distributes requests across multiple keys to avoid rate limits.
+ * On free plan (1 req/15s), 3 keys = 1 request/5s effective rate.
+ */
+export function getNextTaapiKey(): string {
+	return taapiKeyRotator.getNext();
+}
+
+/**
+ * Get all available TAAPI API keys count (for logging/debugging)
+ */
+export function getTaapiKeyCount(): number {
+	return taapiKeyRotator.getCount();
 }

@@ -1,4 +1,4 @@
-import { TAAPI_API_KEY } from "@/env";
+import { getNextTaapiKey, getTaapiKeyCount } from "@/env";
 import { taapiCache } from "./cache";
 import type {
 	ADXResult,
@@ -17,10 +17,11 @@ const BULK_URL = "https://api.taapi.io/bulk";
 const FETCH_TIMEOUT_MS = 30_000;
 
 const getTaapiApiKey = (): string => {
-	if (!TAAPI_API_KEY) {
-		throw new Error("[TAAPI] TAAPI_API_KEY not configured");
+	try {
+		return getNextTaapiKey();
+	} catch {
+		throw new Error("[TAAPI] No TAAPI API keys configured");
 	}
-	return TAAPI_API_KEY;
 };
 
 export class TaapiClient {
@@ -203,7 +204,7 @@ export class TaapiClient {
 	}
 
 	isConfigured(): boolean {
-		return !!TAAPI_API_KEY;
+		return getTaapiKeyCount() > 0;
 	}
 
 	/**
