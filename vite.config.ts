@@ -51,12 +51,6 @@ export default defineConfig({
       "/api": {
         target: API_URL,
         changeOrigin: true,
-        bypass(req) {
-          const url = new URL(req.url ?? "/", "http://localhost");
-          if (url.pathname.startsWith("/api/chat")) {
-            return req.url;
-          }
-        },
       },
     },
   },

@@ -125,7 +125,3 @@ export const incrementModelUsageMutation = (params: {
 }) => {
 	return repo.incrementModelUsage(params.modelId, params.deltas);
 };
-
-export const executeUnsafeQueryMutation = (sqlText: string) => {
-	return repo.executeUnsafeQuery(sqlText);
-};

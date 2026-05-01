@@ -56,7 +56,7 @@ export default {
 		const url = new URL(request.url);
 
 		// Proxy ONLY backend-owned routes to the VPS API.
-		// TanStack Start also serves its own server routes under `/api/*` (e.g. `/api/chat`).
+		// TanStack Start also serves its own server routes under `/api/*`.
 		const shouldProxyToApi =
 			url.pathname.startsWith("/api/rpc") ||
 			url.pathname.startsWith("/api/events") ||

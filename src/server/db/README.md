@@ -7,7 +7,7 @@ This directory is split by persistence responsibility.
 - `tradingRepository.ts`
   - Owns invocations/tool calls/model metrics/portfolio snapshots.
   - Tables: `"Invocations"`, `"ToolCalls"`, `"Models"`, `"PortfolioSize"`.
-  - Used by trading execution, analytics, and chat-tool SQL workflows.
+  - Used by trading execution and analytics.
 
 - `tradingRepository.server.ts`
   - Server-side query/mutation wrappers around `tradingRepository.ts`.
@@ -22,7 +22,6 @@ This directory is split by persistence responsibility.
 
 - Feature code should prefer `*.server.ts` wrappers for query options and semantic mutations.
 - Keep multi-table operations explicit and transactional when possible.
-- Do not import `executeUnsafeQuery` outside chat SQL tooling.
 - Keep symbol semantics unchanged unless a dedicated migration plan is approved.
 
 ## Usage Notes
