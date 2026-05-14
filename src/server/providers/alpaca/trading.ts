@@ -77,29 +77,63 @@ interface AlpacaRawClock {
 
 // ==================== Parsers ====================
 
+function parseRequiredFloat(
+	value: string | null | undefined,
+	fieldName: string,
+): number {
+	const parsed = Number.parseFloat(value ?? "");
+	if (!Number.isFinite(parsed)) {
+		throw new Error(
+			`Invalid Alpaca numeric field ${fieldName}: expected finite number, received ${JSON.stringify(value)}`,
+		);
+	}
+	return parsed;
+}
+
 function parseAccount(raw: AlpacaRawAccount): BrokerAccount {
 	return {
 		id: raw.id,
 		account_number: raw.account_number,
 		status: raw.status,
 		currency: raw.currency,
-		cash: Number.parseFloat(raw.cash),
-		buying_power: Number.parseFloat(raw.buying_power),
-		regt_buying_power: Number.parseFloat(raw.regt_buying_power),
-		daytrading_buying_power: Number.parseFloat(raw.daytrading_buying_power),
-		equity: Number.parseFloat(raw.equity),
-		last_equity: Number.parseFloat(raw.last_equity),
-		long_market_value: Number.parseFloat(raw.long_market_value),
-		short_market_value: Number.parseFloat(raw.short_market_value),
-		portfolio_value: Number.parseFloat(raw.portfolio_value),
+		cash: parseRequiredFloat(raw.cash, "account.cash"),
+		buying_power: parseRequiredFloat(raw.buying_power, "account.buying_power"),
+		regt_buying_power: parseRequiredFloat(
+			raw.regt_buying_power,
+			"account.regt_buying_power",
+		),
+		daytrading_buying_power: parseRequiredFloat(
+			raw.daytrading_buying_power,
+			"account.daytrading_buying_power",
+		),
+		equity: parseRequiredFloat(raw.equity, "account.equity"),
+		last_equity: parseRequiredFloat(raw.last_equity, "account.last_equity"),
+		long_market_value: parseRequiredFloat(
+			raw.long_market_value,
+			"account.long_market_value",
+		),
+		short_market_value: parseRequiredFloat(
+			raw.short_market_value,
+			"account.short_market_value",
+		),
+		portfolio_value: parseRequiredFloat(
+			raw.portfolio_value,
+			"account.portfolio_value",
+		),
 		pattern_day_trader: raw.pattern_day_trader,
 		trading_blocked: raw.trading_blocked,
 		transfers_blocked: raw.transfers_blocked,
 		account_blocked: raw.account_blocked,
 		multiplier: raw.multiplier,
 		shorting_enabled: raw.shorting_enabled,
-		maintenance_margin: Number.parseFloat(raw.maintenance_margin),
-		initial_margin: Number.parseFloat(raw.initial_margin),
+		maintenance_margin: parseRequiredFloat(
+			raw.maintenance_margin,
+			"account.maintenance_margin",
+		),
+		initial_margin: parseRequiredFloat(
+			raw.initial_margin,
+			"account.initial_margin",
+		),
 		daytrade_count: raw.daytrade_count,
 		created_at: raw.created_at,
 	};
@@ -111,19 +145,44 @@ function parsePosition(raw: AlpacaRawPosition): BrokerPosition {
 		symbol: raw.symbol,
 		exchange: raw.exchange,
 		asset_class: raw.asset_class,
-		avg_entry_price: Number.parseFloat(raw.avg_entry_price),
-		qty: Number.parseFloat(raw.qty),
+		avg_entry_price: parseRequiredFloat(
+			raw.avg_entry_price,
+			"position.avg_entry_price",
+		),
+		qty: parseRequiredFloat(raw.qty, "position.qty"),
 		side: raw.side as "long" | "short",
-		market_value: Number.parseFloat(raw.market_value),
-		cost_basis: Number.parseFloat(raw.cost_basis),
-		unrealized_pl: Number.parseFloat(raw.unrealized_pl),
-		unrealized_plpc: Number.parseFloat(raw.unrealized_plpc),
-		unrealized_intraday_pl: Number.parseFloat(raw.unrealized_intraday_pl),
-		unrealized_intraday_plpc: Number.parseFloat(raw.unrealized_intraday_plpc),
-		current_price: Number.parseFloat(raw.current_price),
-		lastday_price: Number.parseFloat(raw.lastday_price),
-		change_today: Number.parseFloat(raw.change_today),
+		market_value: parseRequiredFloat(raw.market_value, "position.market_value"),
+		cost_basis: parseRequiredFloat(raw.cost_basis, "position.cost_basis"),
+		unrealized_pl: parseRequiredFloat(
+			raw.unrealized_pl,
+			"position.unrealized_pl",
+		),
+		unrealized_plpc: parseRequiredFloat(
+			raw.unrealized_plpc,
+			"position.unrealized_plpc",
+		),
+		unrealized_intraday_pl: parseRequiredFloat(
+			raw.unrealized_intraday_pl,
+			"position.unrealized_intraday_pl",
+		),
+		unrealized_intraday_plpc: parseRequiredFloat(
+			raw.unrealized_intraday_plpc,
+			"position.unrealized_intraday_plpc",
+		),
+		current_price: parseRequiredFloat(
+			raw.current_price,
+			"position.current_price",
+		),
+		lastday_price: parseRequiredFloat(
+			raw.lastday_price,
+			"position.lastday_price",
+		),
+		change_today: parseRequiredFloat(raw.change_today, "position.change_today"),
 	};
+}
+
+function createClientOrderId(): string {
+	return `autonome-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`}`;
 }
 
 // ==================== Trading Provider ====================
@@ -204,8 +263,7 @@ export class AlpacaTradingProvider implements BrokerProvider {
 			body.trail_percent = String(params.trail_percent);
 		if (params.extended_hours !== undefined)
 			body.extended_hours = params.extended_hours;
-		if (params.client_order_id !== undefined)
-			body.client_order_id = params.client_order_id;
+		body.client_order_id = params.client_order_id ?? createClientOrderId();
 		if (params.order_class !== undefined) body.order_class = params.order_class;
 		if (params.take_profit !== undefined) {
 			body.take_profit = {

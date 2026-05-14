@@ -135,7 +135,7 @@ export function buildOpenPositionsSection(
 				`held_hours ${position.staleness.hoursHeld.toFixed(1)}`,
 			);
 			stalenessParts.push(
-				`time_dim ${position.staleness.timeHeldScore} | pnl_dim ${position.staleness.pnlActionScore} | funding_dim ${position.staleness.fundingCostScore}`,
+				`time_dim ${position.staleness.timeHeldScore} | pnl_dim ${position.staleness.pnlActionScore} | carry_cost_dim ${position.staleness.fundingCostScore}`,
 			);
 			if (position.staleness.isStale) {
 				stalenessParts.push("⚠ STALE — consider exit");

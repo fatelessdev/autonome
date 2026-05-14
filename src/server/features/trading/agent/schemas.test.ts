@@ -52,6 +52,20 @@ describe("schemas", () => {
 			expect(result.success).toBe(false);
 		});
 
+		it("rejects SHORT entries because execution is spot-only", () => {
+			const result = decisionSchema.safeParse({
+				symbol: "BTC",
+				side: "SHORT",
+				quantity: 0.5,
+				profit_target: 60000,
+				stop_loss: 70000,
+				invalidation_condition: "bearish thesis",
+				confidence: 80,
+			});
+
+			expect(result.success).toBe(false);
+		});
+
 		it("rejects negative quantity", () => {
 			const result = decisionSchema.safeParse({
 				symbol: "BTC",
@@ -83,11 +97,11 @@ describe("schemas", () => {
 		it("allows optional fields to be absent", () => {
 			const result = decisionSchema.safeParse({
 				symbol: "ETH",
-				side: "SHORT",
+				side: "LONG",
 				quantity: 1,
 				profit_target: 2500,
-				stop_loss: 3500,
-				invalidation_condition: "break above resistance",
+				stop_loss: 2000,
+				invalidation_condition: "break below support",
 				confidence: 70,
 			});
 

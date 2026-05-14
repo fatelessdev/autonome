@@ -7,6 +7,10 @@
  */
 
 import { TRADE_CYCLE_INTERVAL } from "@/core/shared/cache/cacheConfig";
+import {
+	SUPPORTED_MARKETS,
+	toAlpacaNewsSymbol,
+} from "@/core/shared/markets/marketMetadata";
 import type { AlpacaNewsResponse, NewsDigestItem } from "./types";
 
 const NEWS_API_URL = "https://data.alpaca.markets/v1beta1/news";
@@ -14,6 +18,7 @@ const FETCH_TIMEOUT_MS = 15_000;
 const CACHE_TTL_MS = TRADE_CYCLE_INTERVAL; // matches trade cycle interval
 const NEWS_LIMIT = 10;
 const NEWS_LOOKBACK_MS = TRADE_CYCLE_INTERVAL; // Last 5 minutes
+const NEWS_SYMBOLS = SUPPORTED_MARKETS.map(toAlpacaNewsSymbol);
 
 interface NewsCacheEntry {
 	items: NewsDigestItem[];
@@ -46,21 +51,10 @@ async function fetchNewsFromAlpaca(credentials: {
 	const now = new Date();
 	const start = new Date(now.getTime() - NEWS_LOOKBACK_MS);
 
-	// Alpaca news uses symbols without "/" (BTCUSD not BTC/USD)
-	// Include all our traded symbols + DOGE for broader crypto context
-	const cryptoSymbols = [
-		"BTCUSD",
-		"ETHUSD",
-		"SOLUSD",
-		"XRPUSD",
-		"DOGEUSD",
-		"HYPEUSD",
-	];
-
 	const params = new URLSearchParams({
 		start: start.toISOString(),
 		end: now.toISOString(),
-		symbols: cryptoSymbols.join(","),
+		symbols: NEWS_SYMBOLS.join(","),
 		limit: String(NEWS_LIMIT),
 		include_content: "true",
 		exclude_contentless: "true",

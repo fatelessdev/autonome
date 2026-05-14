@@ -23,6 +23,14 @@ export class AlpacaError extends Error {
 	}
 }
 
+const MAX_RETRIES = 2;
+const RETRY_BACKOFF_DELAYS_MS = [500, 1_000] as const;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isRetriableStatus = (status: number) =>
+	status === 408 || status === 429 || status >= 500;
+
 export class AlpacaClient {
 	private tradingBaseUrl: string;
 	private dataBaseUrl: string;
@@ -86,41 +94,63 @@ export class AlpacaClient {
 			options.body = JSON.stringify(body);
 		}
 
-		const response = await fetch(url, options);
-
-		if (!response.ok) {
-			const errorBody = await response.text();
-			let errorMessage: string;
-
+		for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+			let response: Response;
 			try {
-				const errorJson = JSON.parse(errorBody) as { message?: string };
-				errorMessage = errorJson.message ?? errorBody;
-			} catch {
-				errorMessage = errorBody;
+				response = await fetch(url, options);
+			} catch (error) {
+				if (attempt < MAX_RETRIES) {
+					await sleep(RETRY_BACKOFF_DELAYS_MS[attempt]);
+					continue;
+				}
+				throw error;
 			}
 
-			const statusErrors: Record<number, string> = {
-				401: "UNAUTHORIZED",
-				403: "FORBIDDEN",
-				404: "NOT_FOUND",
-				422: "INVALID_INPUT",
-				429: "RATE_LIMITED",
-			};
+			if (!response.ok) {
+				const alpacaError = await buildAlpacaError(response);
+				if (isRetriableStatus(response.status) && attempt < MAX_RETRIES) {
+					await sleep(RETRY_BACKOFF_DELAYS_MS[attempt]);
+					continue;
+				}
+				throw alpacaError;
+			}
 
-			const errorCode = statusErrors[response.status] ?? "PROVIDER_ERROR";
-			throw new AlpacaError(
-				`Alpaca ${errorCode} (${response.status}): ${errorMessage}`,
-				errorCode,
-				response.status,
-			);
+			if (response.status === 204) {
+				return undefined as T;
+			}
+
+			return response.json() as Promise<T>;
 		}
 
-		if (response.status === 204) {
-			return undefined as T;
-		}
-
-		return response.json() as Promise<T>;
+		throw new Error("Alpaca request retry loop exhausted unexpectedly");
 	}
+}
+
+async function buildAlpacaError(response: Response): Promise<AlpacaError> {
+	const errorBody = await response.text();
+	let errorMessage: string;
+
+	try {
+		const errorJson = JSON.parse(errorBody) as { message?: string };
+		errorMessage = errorJson.message ?? errorBody;
+	} catch {
+		errorMessage = errorBody;
+	}
+
+	const statusErrors: Record<number, string> = {
+		401: "UNAUTHORIZED",
+		403: "FORBIDDEN",
+		404: "NOT_FOUND",
+		422: "INVALID_INPUT",
+		429: "RATE_LIMITED",
+	};
+
+	const errorCode = statusErrors[response.status] ?? "PROVIDER_ERROR";
+	return new AlpacaError(
+		`Alpaca ${errorCode} (${response.status}): ${errorMessage}`,
+		errorCode,
+		response.status,
+	);
 }
 
 export function createAlpacaClient(config: AlpacaClientConfig): AlpacaClient {

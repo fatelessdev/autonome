@@ -251,25 +251,25 @@ async function aggregateSnapshots(
  * Aggregate raw snapshots from 7-30 days ago into hourly buckets.
  */
 function aggregateToHourly(startDate: Date, endDate: Date): Promise<number> {
-	return aggregateSnapshots(
-		"hour",
-		and(
-			gte(portfolioSize.createdAt, endDate),
-			lt(portfolioSize.createdAt, startDate),
-		)!,
-		false,
+	const filter = and(
+		gte(portfolioSize.createdAt, endDate),
+		lt(portfolioSize.createdAt, startDate),
 	);
+	if (!filter) {
+		throw new Error("Failed to build hourly aggregation filter");
+	}
+	return aggregateSnapshots("hour", filter, false);
 }
 
 /**
  * Aggregate data older than 30 days into daily buckets.
  */
 function aggregateToDaily(cutoffDate: Date): Promise<number> {
-	return aggregateSnapshots(
-		"day",
-		lt(portfolioSize.createdAt, cutoffDate)!,
-		true,
-	);
+	const filter = lt(portfolioSize.createdAt, cutoffDate);
+	if (!filter) {
+		throw new Error("Failed to build daily aggregation filter");
+	}
+	return aggregateSnapshots("day", filter, true);
 }
 
 /**

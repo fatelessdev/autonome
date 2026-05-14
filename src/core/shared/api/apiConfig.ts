@@ -4,6 +4,7 @@
  * Shared utilities for getting the API base URL across the application.
  * Used by oRPC client and SSE connections.
  */
+import { VITE_API_URL } from "@/env";
 
 /**
  * Get the base API URL for making requests to the backend.
@@ -17,8 +18,8 @@
  */
 export function getApiBaseUrl(): string {
 	// Check for environment variable first
-	if (import.meta.env.VITE_API_URL) {
-		return import.meta.env.VITE_API_URL.replace(/\/$/, ""); // Remove trailing slash
+	if (VITE_API_URL) {
+		return VITE_API_URL.replace(/\/$/, ""); // Remove trailing slash
 	}
 
 	// In browser, use relative path (works with Vite proxy in dev)

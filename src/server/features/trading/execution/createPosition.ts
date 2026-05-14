@@ -7,6 +7,7 @@
  */
 
 import {
+	isCryptoMarketSymbol,
 	toAlpacaSymbol,
 	toCanonical,
 } from "@/core/shared/markets/marketMetadata";
@@ -227,6 +228,13 @@ export async function createPosition(
 			results.push({ symbol, side, quantity, success: true });
 			continue;
 		}
+		if (side === "SHORT") {
+			const error =
+				"Spot-only trading does not support opening SHORT positions. Use HOLD for bearish views, or closePosition to exit an owned asset.";
+			console.warn(`[createPosition] Rejected ${symbol}: ${error}`);
+			results.push({ symbol, side, quantity, success: false, error });
+			continue;
+		}
 
 		try {
 			if (!Number.isFinite(quantity) || quantity <= 0) {
@@ -237,7 +245,7 @@ export async function createPosition(
 
 			const alpacaSymbol = toAlpacaSymbol(symbol);
 			const orderQty = Math.abs(quantity);
-			const orderSide = side === "LONG" ? "buy" : "sell";
+			const orderSide = "buy" as const;
 
 			// Minimum trade size guard — fetch a quote to estimate notional
 			const marketData = getMarketDataProvider(
@@ -284,7 +292,7 @@ export async function createPosition(
 			const orderParams: Parameters<typeof trading.createOrder>[0] = {
 				symbol: alpacaSymbol,
 				qty: finalQty,
-				side: orderSide as "buy" | "sell",
+				side: orderSide,
 				type: "market",
 				time_in_force: "gtc",
 			};
@@ -292,7 +300,7 @@ export async function createPosition(
 			// Alpaca doesn't support bracket/oto/oco for crypto.
 			// For crypto: submit simple market order, then place independent SL/TP orders after fill.
 			// For equities: use bracket orders for automatic SL/TP.
-			const isCrypto = alpacaSymbol.includes("/");
+			const isCrypto = isCryptoMarketSymbol(alpacaSymbol);
 
 			if (!isCrypto) {
 				if (stopLoss && profitTarget) {
@@ -365,18 +373,17 @@ export async function createPosition(
 			// Plain "stop" orders are NOT supported for crypto — must use stop_limit
 			// with a limit_price that includes slippage buffer.
 			if (isCrypto && filledPrice > 0) {
-				const exitSide = orderSide === "buy" ? "sell" : "buy";
+				const exitSide = "sell" as const;
 				if (stopLoss) {
 					// Use stop_limit for crypto SL (Alpaca doesn't support plain stop for crypto).
-					// Apply 0.5% slippage buffer: for sells (long SL), limit below stop;
-					// for buys (short SL), limit above stop.
-					const slippageMultiplier = exitSide === "sell" ? 0.995 : 1.005;
+					// Apply 0.5% slippage buffer below stop for long spot exits.
+					const slippageMultiplier = 0.995;
 					const slLimitPrice =
 						Math.round(stopLoss * slippageMultiplier * 100) / 100;
 					await trading.createOrder({
 						symbol: alpacaSymbol,
 						qty: effectiveQty,
-						side: exitSide as "buy" | "sell",
+						side: exitSide,
 						type: "stop_limit",
 						stop_price: stopLoss,
 						limit_price: slLimitPrice,
@@ -387,7 +394,7 @@ export async function createPosition(
 					await trading.createOrder({
 						symbol: alpacaSymbol,
 						qty: effectiveQty,
-						side: exitSide as "buy" | "sell",
+						side: exitSide,
 						type: "limit",
 						limit_price: profitTarget,
 						time_in_force: "gtc",

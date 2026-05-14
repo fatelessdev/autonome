@@ -157,3 +157,56 @@ export const InvocationsResponseSchema = z.object({
 });
 
 // Alpaca paper trading is the only supported execution path.
+
+// ==================== Health Schemas ====================
+
+export const SchedulerHealthSchema = z.object({
+	healthy: z.boolean(),
+	lastRun: z.string().nullable(),
+	ageMs: z.number().nullable(),
+});
+
+export const HealthResponseSchema = z.object({
+	status: z.enum(["ok", "degraded"]),
+	timestamp: z.string(),
+	serverStartedAt: z.string().optional(),
+	uptimeSeconds: z.number().optional(),
+	schedulers: z.object({
+		trade: SchedulerHealthSchema,
+		portfolio: SchedulerHealthSchema,
+	}),
+});
+
+export const RunningModelSchema = z.object({
+	id: z.string(),
+	runningForSeconds: z.number().nullable(),
+});
+
+export const CycleStatsSchema = z.object({
+	successCount: z.number(),
+	failureCount: z.number(),
+	totalModels: z.number(),
+	timestamp: z.string(),
+});
+
+export const DetailedHealthResponseSchema = z.object({
+	timestamp: z.string(),
+	serverStartedAt: z.string().optional(),
+	uptimeSeconds: z.number().optional(),
+	tradeScheduler: z.object({
+		lastRun: z.string().nullable(),
+		ageSeconds: z.number().nullable(),
+		modelsCurrentlyRunning: z.array(RunningModelSchema),
+		workflowManaged: z.boolean(),
+		lastSuccessfulCompletion: z.string().nullable(),
+		lastSuccessAge: z.number().nullable(),
+		lastCycleStats: CycleStatsSchema.nullable(),
+		consecutiveFailedCycles: z.number(),
+	}),
+	portfolioScheduler: z.object({
+		lastRun: z.string().nullable(),
+		ageSeconds: z.number().nullable(),
+		workflowManaged: z.boolean(),
+		initialized: z.boolean(),
+	}),
+});

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { TradingDecisionWithContext } from "../contracts/tradingDecisions";
 import {
 	computeRiskMetrics,
 	enrichOpenPositions,
@@ -204,16 +205,20 @@ describe("openPositionEnrichment", () => {
 				[
 					"BTC",
 					{
+						symbol: "BTC",
+						side: "LONG",
+						quantity: 1.5,
 						profitTarget: 55000,
 						stopLoss: 48000,
 						confidence: 8,
 						status: "FILLED",
+						toolCallId: "tool-call-1",
 						createdAt: new Date("2024-01-15"),
 						invalidationCondition: null,
 						invalidationPrice: null,
 						timeExit: null,
 						cooldownUntil: null,
-					} as any,
+					} satisfies TradingDecisionWithContext,
 				],
 			]);
 

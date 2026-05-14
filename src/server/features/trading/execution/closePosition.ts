@@ -8,6 +8,7 @@
  */
 
 import {
+	isCryptoMarketSymbol,
 	toAlpacaSymbol,
 	toCanonical,
 } from "@/core/shared/markets/marketMetadata";
@@ -147,19 +148,30 @@ export async function closePosition(
 
 		// For crypto: cancel independent SL/TP orders before closing.
 		// Bracket orders (equities) auto-cancel, but crypto uses standalone orders.
-		if (alpacaSymbol.includes("/")) {
+		if (isCryptoMarketSymbol(alpacaSymbol)) {
 			const openOrders = await trading.listOrders({
 				status: "open",
 				symbols: [alpacaSymbol],
 			});
-			for (const order of openOrders) {
-				try {
-					await trading.cancelOrder(order.id);
-				} catch (cancelErr) {
-					throw new Error(
-						`Failed to cancel open crypto order ${order.id} for ${symbol}: ${cancelErr instanceof Error ? cancelErr.message : String(cancelErr)}`,
-					);
-				}
+			const cancellationResults = await Promise.allSettled(
+				openOrders.map((order) => trading.cancelOrder(order.id)),
+			);
+			const cancellationFailures: string[] = [];
+			for (const [index, result] of cancellationResults.entries()) {
+				if (result.status === "fulfilled") continue;
+				const order = openOrders[index];
+				cancellationFailures.push(
+					`${order.id}: ${
+						result.reason instanceof Error
+							? result.reason.message
+							: String(result.reason)
+					}`,
+				);
+			}
+			if (cancellationFailures.length > 0) {
+				throw new Error(
+					`Failed to cancel open crypto exit order(s) for ${symbol}; refusing to close position while stale orders may remain live: ${cancellationFailures.join("; ")}`,
+				);
 			}
 		}
 

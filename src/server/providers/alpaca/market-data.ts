@@ -6,6 +6,7 @@
  * Ported from MAHORAGA/src/providers/alpaca/market-data.ts.
  */
 
+import { isCryptoMarketSymbol } from "@/core/shared/markets/marketMetadata";
 import type {
 	Bar,
 	BarsParams,
@@ -108,14 +109,6 @@ function parseSnapshot(symbol: string, raw: AlpacaSnapshot): Snapshot {
 
 // ==================== Market Data Provider ====================
 
-/**
- * Determines if a symbol is a crypto pair.
- * Alpaca crypto symbols use "BTC/USD" format.
- */
-function isCryptoSymbol(symbol: string): boolean {
-	return symbol.includes("/");
-}
-
 export class AlpacaMarketDataProvider implements MarketDataProvider {
 	constructor(private client: AlpacaClient) {}
 
@@ -126,7 +119,7 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
 	): Promise<Bar[]> {
 		// Crypto uses multi-symbol query param endpoint (no per-symbol path)
 		// Alpaca paginates crypto bars (~46 per page), so we must follow next_page_token
-		if (isCryptoSymbol(symbol)) {
+		if (isCryptoMarketSymbol(symbol)) {
 			const allBars: Bar[] = [];
 			let pageToken: string | undefined;
 			const requestedLimit = params?.limit ?? 1000;
@@ -183,7 +176,7 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
 
 	async getLatestBar(symbol: string): Promise<Bar> {
 		// Crypto uses multi-symbol query param endpoint (no per-symbol path)
-		if (isCryptoSymbol(symbol)) {
+		if (isCryptoMarketSymbol(symbol)) {
 			const response = await this.client.dataRequest<AlpacaLatestBarsResponse>(
 				"GET",
 				"/v1beta3/crypto/us/latest/bars",
@@ -206,8 +199,8 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
 
 	async getLatestBars(symbols: string[]): Promise<Record<string, Bar>> {
 		// Split into stock and crypto symbols
-		const stockSymbols = symbols.filter((s) => !isCryptoSymbol(s));
-		const cryptoSymbols = symbols.filter(isCryptoSymbol);
+		const stockSymbols = symbols.filter((s) => !isCryptoMarketSymbol(s));
+		const cryptoSymbols = symbols.filter(isCryptoMarketSymbol);
 		const result: Record<string, Bar> = {};
 
 		if (stockSymbols.length > 0) {
@@ -237,7 +230,7 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
 
 	async getQuote(symbol: string): Promise<Quote> {
 		// Crypto uses multi-symbol query param endpoint (no per-symbol path)
-		if (isCryptoSymbol(symbol)) {
+		if (isCryptoMarketSymbol(symbol)) {
 			const response = await this.client.dataRequest<AlpacaQuotesResponse>(
 				"GET",
 				"/v1beta3/crypto/us/latest/quotes",
@@ -259,8 +252,8 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
 	}
 
 	async getQuotes(symbols: string[]): Promise<Record<string, Quote>> {
-		const stockSymbols = symbols.filter((s) => !isCryptoSymbol(s));
-		const cryptoSymbols = symbols.filter(isCryptoSymbol);
+		const stockSymbols = symbols.filter((s) => !isCryptoMarketSymbol(s));
+		const cryptoSymbols = symbols.filter(isCryptoMarketSymbol);
 		const result: Record<string, Quote> = {};
 
 		if (stockSymbols.length > 0) {
@@ -290,7 +283,7 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
 
 	async getSnapshot(symbol: string): Promise<Snapshot> {
 		// Crypto uses dedicated endpoint, stocks use per-symbol endpoint
-		if (isCryptoSymbol(symbol)) {
+		if (isCryptoMarketSymbol(symbol)) {
 			return this.getCryptoSnapshot(symbol);
 		}
 
@@ -314,8 +307,8 @@ export class AlpacaMarketDataProvider implements MarketDataProvider {
 	}
 
 	async getSnapshots(symbols: string[]): Promise<Record<string, Snapshot>> {
-		const stockSymbols = symbols.filter((s) => !isCryptoSymbol(s));
-		const cryptoSymbols = symbols.filter(isCryptoSymbol);
+		const stockSymbols = symbols.filter((s) => !isCryptoMarketSymbol(s));
+		const cryptoSymbols = symbols.filter(isCryptoMarketSymbol);
 		const result: Record<string, Snapshot> = {};
 
 		if (stockSymbols.length > 0) {

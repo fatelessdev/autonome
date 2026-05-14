@@ -1,6 +1,7 @@
 ﻿import { gsap } from "gsap";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ExitPlanDialog } from "@/components/trades-sidebar/exit-plan-dialog";
+import { ModelChatTab } from "@/components/trades-sidebar/model-chat-tab";
 import { ModelFilterMenu } from "@/components/trades-sidebar/model-filter-menu";
 import { PositionsTab } from "@/components/trades-sidebar/positions-tab";
 import {
@@ -84,9 +85,8 @@ export default function TradesSidebar({
 
 	const { selectedVariant } = useVariant();
 
-	const { trades, positions, modelOptions, loading } = useTradingDashboardData({
-		variant: selectedVariant,
-	});
+	const { trades, conversations, positions, modelOptions, loading } =
+		useTradingDashboardData({ variant: selectedVariant });
 
 	const filterOptions = useMemo(() => {
 		if (selectedVariant === "all") {
@@ -191,6 +191,28 @@ export default function TradesSidebar({
 		return result;
 	}, [filterMatchers, trades, selectedVariant]);
 
+	const filteredConversations = useMemo(() => {
+		let result = conversations;
+		// First filter by variant (from header tabs)
+		if (selectedVariant !== "all") {
+			result = result.filter(
+				(conversation) => conversation.modelVariant === selectedVariant,
+			);
+		}
+		// Then filter by model
+		if (filterMatchers) {
+			result = result.filter((conversation) =>
+				matchesFilter(
+					filterMatchers,
+					conversation.modelId,
+					conversation.modelLogo,
+					conversation.modelName,
+				),
+			);
+		}
+		return result;
+	}, [conversations, filterMatchers, selectedVariant]);
+
 	const filteredPositions = useMemo(() => {
 		let result = positions;
 		// First filter by variant (from header tabs)
@@ -252,6 +274,14 @@ export default function TradesSidebar({
 					trades={filteredTrades}
 					loading={effectiveLoading}
 					filterMenu={renderFilterMenu("Showing Last 100 Trades")}
+				/>
+			) : null}
+
+			{activeTab === "modelchat" ? (
+				<ModelChatTab
+					conversations={filteredConversations}
+					loading={effectiveLoading}
+					filterMenu={renderFilterMenu("Showing Last 100 Chats")}
 				/>
 			) : null}
 

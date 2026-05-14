@@ -172,6 +172,11 @@ bun run check
 bun run test
 ```
 
+### Test Layout
+- Tests are colocated beside the code they cover using `*.test.ts` or `*.test.tsx`.
+- Keep new tests beside their subject file unless there is already a local pattern that requires otherwise.
+- Run all tests with `bun run test`; run a targeted file with `bunx vitest run path/to/file.test.ts`.
+
 ---
 
 ## 7) Key Files

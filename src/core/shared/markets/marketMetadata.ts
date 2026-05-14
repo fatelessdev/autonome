@@ -111,3 +111,17 @@ export function toAlpacaSymbol(canonical: string): string {
 
 	throw new Error(`Unsupported Alpaca market symbol: ${canonical}`);
 }
+
+export function isCryptoMarketSymbol(symbol: string): boolean {
+	const canonical = toCanonical(symbol) as MarketSymbol;
+	return MARKETS[canonical].assetClass === "crypto";
+}
+
+export function toAlpacaNewsSymbol(symbol: string): string {
+	const canonical = toCanonical(symbol) as MarketSymbol;
+	const market = MARKETS[canonical];
+	if (market.assetClass !== "crypto") {
+		throw new Error(`Alpaca news symbol requires a crypto market: ${symbol}`);
+	}
+	return normalizeComparableSymbol(market.symbol);
+}

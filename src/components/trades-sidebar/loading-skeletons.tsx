@@ -39,6 +39,35 @@ export function TradesListSkeleton({ count = 3 }: { count?: number }) {
 	);
 }
 
+export function ModelChatSkeleton({ count = 3 }: { count?: number }) {
+	return (
+		<div className="space-y-4 p-4">
+			{Array.from({ length: count }, (_, idx) => `chat-skeleton-${idx}`).map(
+				(key) => (
+					<div
+						key={key}
+						className="rounded-md border border-border/60 bg-muted/15 p-4"
+					>
+						<div className="mb-3 flex items-center justify-between">
+							<div className="flex items-center gap-2">
+								<Skeleton className="h-6 w-6 rounded-full" />
+								<Skeleton className="h-4 w-28" />
+							</div>
+							<Skeleton className="h-3 w-20" />
+						</div>
+						<Skeleton className="h-12 w-full rounded-md" />
+						<div className="mt-3 space-y-2">
+							<Skeleton className="h-3 w-1/2" />
+							<Skeleton className="h-3 w-2/3" />
+							<Skeleton className="h-3 w-1/3" />
+						</div>
+					</div>
+				),
+			)}
+		</div>
+	);
+}
+
 export function PositionsListSkeleton({
 	groups = 2,
 	rows = 3,

@@ -5,6 +5,7 @@ import {
 	getRunInfo,
 } from "./analytics";
 import { getDecisionDiary, getMarketState } from "./diary";
+import { getHealth, getSchedulerHealth } from "./health";
 import { getInvocations, getModels } from "./models";
 import {
 	getCryptoPrices,
@@ -44,5 +45,11 @@ export default {
 		getVariants,
 		getVariantStats,
 		getVariantHistory,
+	},
+
+	// System health
+	health: {
+		getHealth,
+		getSchedulerHealth,
 	},
 };

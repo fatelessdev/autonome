@@ -8,8 +8,8 @@ import {
 import { env } from "@/env";
 
 // Port configuration for TanStack Start SSR server
-// FRONTEND_PORT: server-side only, read from process.env
-// VITE_API_URL: client-exposed, read from import.meta.env
+// FRONTEND_PORT is server-only; VITE_API_URL is client-exposed.
+// Both are read through src/env.ts.
 const API_PORT = env.API_PORT;
 const FRONTEND_PORT = env.FRONTEND_PORT;
 const API_URL = env.VITE_API_URL ?? `http://localhost:${API_PORT}`;

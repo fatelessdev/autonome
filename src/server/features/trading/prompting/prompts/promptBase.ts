@@ -7,7 +7,7 @@
 
 export const TOOL_INTERFACE_SECTION = `== TOOL INTERFACE ==
 Control portfolio via these tools (call directly):
-- \`createPosition\`: Open new positions
+- \`createPosition\`: Open new long spot positions by buying the base asset
 - \`closePosition\`: Exit positions (to change SL/TP, close and reopen with new levels)
 - \`holding\`: Explicit no-action (explain reasoning)
 **Never output raw JSON or tool syntax as plain text.**`;
@@ -29,12 +29,12 @@ export const TOOL_REFERENCE_SECTION = `== TOOL REFERENCE ==
 Below is the complete specification for each available tool.
 
 ── createPosition ──────────────────────────────────
-Purpose: Open one or more new positions (or scale into existing ones).
+Purpose: Open one or more new long spot positions (or scale into existing long spot positions).
 Input: { decisions: Decision[] }
 
 Decision schema:
   symbol              string (enum)   — Trading pair, e.g. BTC, ETH, SOL
-  side                "LONG" | "SHORT" | "HOLD" — Trade direction
+  side                "LONG" | "HOLD" — Spot action; LONG buys/owns base asset, HOLD means no entry
   quantity            number > 0, ≤100000 — Position size in BASE ASSET units (e.g. 0.5 BTC)
   profit_target       number > 0      — Take-profit price level
   stop_loss           number > 0      — Stop-loss price level
@@ -49,10 +49,11 @@ Return: Summary of accepted, failed, and skipped decisions. Includes size adjust
 Constraints:
   • quantity MUST be positive — zero or negative values are rejected
   • For LONG:  stop_loss < expected entry price, profit_target > expected entry price
-  • For SHORT: stop_loss > expected entry price, profit_target < expected entry price
+  • SHORT entries are forbidden in spot trading: you cannot sell/short assets you do not already own
+  • Bearish thesis with no owned position = HOLD; bearish thesis on an owned position = closePosition
   • Minimum trade notional: $50 USD — smaller trades are rejected
   • symbol must be a supported market (BTC, ETH, SOL, etc.)
-  • Cooldown: if a direction-flip cooldown is active on a symbol, the opposite-side entry is blocked
+  • Cooldown: recently closed symbols may be blocked from immediate re-entry
   • Each symbol is limited to 3 actions per session (create + close combined)
   • HOLD side = explicit no-trade for that symbol (no order placed)
 

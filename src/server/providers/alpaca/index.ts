@@ -17,23 +17,40 @@ export { AlpacaClient } from "./client";
 export { AlpacaMarketDataProvider } from "./market-data";
 export { AlpacaTradingProvider } from "./trading";
 
+interface CachedTradingProvider {
+	apiSecret: string;
+	provider: AlpacaTradingProvider;
+}
+
+interface ProviderCredentials {
+	apiKey: string;
+	apiSecret: string;
+}
+
 // Cache trading providers per model to avoid creating duplicate clients
-const tradingProviderCache = new Map<string, AlpacaTradingProvider>();
+const tradingProviderCache = new Map<string, CachedTradingProvider>();
 
 // Shared market data provider (market data doesn't depend on which account)
 let sharedMarketDataProvider: AlpacaMarketDataProvider | null = null;
 let sharedMarketDataClient: AlpacaClient | null = null;
+let sharedMarketDataCredentials: ProviderCredentials | null = null;
+
+const credentialsMatch = (
+	cached: ProviderCredentials | null,
+	apiKey: string,
+	apiSecret: string,
+) => cached?.apiKey === apiKey && cached.apiSecret === apiSecret;
 
 /**
  * Get or create a trading provider for a specific model's Alpaca credentials.
- * Cached by apiKey to avoid recreating clients for the same model.
+ * Cached by apiKey and refreshed if the secret changes.
  */
 export function getTradingProvider(
 	alpacaApiKey: string,
 	alpacaApiSecret: string,
 ): AlpacaTradingProvider {
 	const cached = tradingProviderCache.get(alpacaApiKey);
-	if (cached) return cached;
+	if (cached?.apiSecret === alpacaApiSecret) return cached.provider;
 
 	const client = new AlpacaClient({
 		apiKey: alpacaApiKey,
@@ -42,19 +59,28 @@ export function getTradingProvider(
 	});
 
 	const provider = new AlpacaTradingProvider(client);
-	tradingProviderCache.set(alpacaApiKey, provider);
+	tradingProviderCache.set(alpacaApiKey, {
+		apiSecret: alpacaApiSecret,
+		provider,
+	});
 	return provider;
 }
 
 /**
  * Get or create the shared market data provider.
- * Uses the first available credentials — market data is the same for any account.
+ * Market data is the same for any account, but the singleton refreshes when
+ * credentials change so DB-side key rotation does not require a process restart.
  */
 export function getMarketDataProvider(
 	alpacaApiKey: string,
 	alpacaApiSecret: string,
 ): AlpacaMarketDataProvider {
-	if (sharedMarketDataProvider) return sharedMarketDataProvider;
+	if (
+		sharedMarketDataProvider &&
+		credentialsMatch(sharedMarketDataCredentials, alpacaApiKey, alpacaApiSecret)
+	) {
+		return sharedMarketDataProvider;
+	}
 
 	sharedMarketDataClient = new AlpacaClient({
 		apiKey: alpacaApiKey,
@@ -65,6 +91,10 @@ export function getMarketDataProvider(
 	sharedMarketDataProvider = new AlpacaMarketDataProvider(
 		sharedMarketDataClient,
 	);
+	sharedMarketDataCredentials = {
+		apiKey: alpacaApiKey,
+		apiSecret: alpacaApiSecret,
+	};
 	return sharedMarketDataProvider;
 }
 
@@ -108,4 +138,5 @@ export function clearProviderCache(): void {
 	tradingProviderCache.clear();
 	sharedMarketDataProvider = null;
 	sharedMarketDataClient = null;
+	sharedMarketDataCredentials = null;
 }

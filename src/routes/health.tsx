@@ -9,77 +9,11 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/core/lib/utils";
-import { getApiBaseUrl } from "@/core/shared/api/apiConfig";
+import { orpc } from "@/server/orpc/client";
 
 export const Route = createFileRoute("/health")({
 	component: HealthRoute,
 });
-
-type SchedulerHealth = {
-	healthy: boolean;
-	lastRun: string | null;
-	ageMs: number | null;
-};
-
-type RunningModel = {
-	id: string;
-	runningForSeconds: number | null;
-};
-
-type HealthResponse = {
-	status: "ok" | "degraded";
-	timestamp: string;
-	serverStartedAt?: string;
-	uptimeSeconds?: number;
-	schedulers: {
-		trade: SchedulerHealth;
-		portfolio: SchedulerHealth;
-	};
-};
-
-type CycleStats = {
-	successCount: number;
-	failureCount: number;
-	totalModels: number;
-	timestamp: string;
-};
-
-type DetailedHealthResponse = {
-	timestamp: string;
-	serverStartedAt?: string;
-	uptimeSeconds?: number;
-	tradeScheduler: {
-		lastRun: string | null;
-		ageSeconds: number | null;
-		modelsCurrentlyRunning: RunningModel[];
-		intervalHandle: boolean;
-		// New execution health metrics
-		lastSuccessfulCompletion: string | null;
-		lastSuccessAge: number | null;
-		lastCycleStats: CycleStats | null;
-		consecutiveFailedCycles: number;
-	};
-	portfolioScheduler: {
-		lastRun: string | null;
-		ageSeconds: number | null;
-		intervalHandle: boolean;
-		initialized: boolean;
-	};
-};
-
-async function fetchHealth(): Promise<HealthResponse> {
-	const baseUrl = getApiBaseUrl();
-	const res = await fetch(`${baseUrl}/health`);
-	if (!res.ok) throw new Error("Failed to fetch health");
-	return res.json();
-}
-
-async function fetchDetailedHealth(): Promise<DetailedHealthResponse> {
-	const baseUrl = getApiBaseUrl();
-	const res = await fetch(`${baseUrl}/health/schedulers`);
-	if (!res.ok) throw new Error("Failed to fetch detailed health");
-	return res.json();
-}
 
 function formatUptime(seconds: number): string {
 	const days = Math.floor(seconds / 86400);
@@ -98,14 +32,16 @@ function formatUptime(seconds: number): string {
 
 function HealthRoute() {
 	const healthQuery = useQuery({
-		queryKey: ["health"],
-		queryFn: fetchHealth,
+		...orpc.health.getHealth.queryOptions({
+			input: {},
+		}),
 		refetchInterval: 5_000, // Refresh every 5 seconds
 	});
 
 	const detailedQuery = useQuery({
-		queryKey: ["health", "schedulers"],
-		queryFn: fetchDetailedHealth,
+		...orpc.health.getSchedulerHealth.queryOptions({
+			input: {},
+		}),
 		refetchInterval: 5_000,
 	});
 
@@ -224,18 +160,16 @@ function HealthRoute() {
 											</span>
 										</div>
 										<div className="flex justify-between">
-											<span className="text-muted-foreground">
-												Interval Handle:
-											</span>
+											<span className="text-muted-foreground">Runtime:</span>
 											<span
 												className={
-													detailed.tradeScheduler.intervalHandle
+													detailed.tradeScheduler.workflowManaged
 														? "text-green-500"
 														: "text-red-500"
 												}
 											>
-												{detailed.tradeScheduler.intervalHandle
-													? "Active"
+												{detailed.tradeScheduler.workflowManaged
+													? "Workflow managed"
 													: "Missing"}
 											</span>
 										</div>
@@ -415,18 +349,16 @@ function HealthRoute() {
 										</span>
 									</div>
 									<div className="flex justify-between">
-										<span className="text-muted-foreground">
-											Interval Handle:
-										</span>
+										<span className="text-muted-foreground">Runtime:</span>
 										<span
 											className={
-												detailed.portfolioScheduler.intervalHandle
+												detailed.portfolioScheduler.workflowManaged
 													? "text-green-500"
 													: "text-red-500"
 											}
 										>
-											{detailed.portfolioScheduler.intervalHandle
-												? "Active"
+											{detailed.portfolioScheduler.workflowManaged
+												? "Workflow managed"
 												: "Missing"}
 										</span>
 									</div>

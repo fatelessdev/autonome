@@ -71,6 +71,7 @@ vi.mock("@/server/db/ordersRepository.server", () => ({
 }));
 
 vi.mock("@/core/shared/markets/marketMetadata", () => ({
+	isCryptoMarketSymbol: (s: string) => s.includes("/"),
 	toAlpacaSymbol: (s: string) => `${s}/USD`,
 	toCanonical: (s: string) => s.replace("/USD", ""),
 }));
@@ -242,6 +243,18 @@ describe("createPosition", () => {
 		expect(results).toHaveLength(1);
 		expect(results[0].success).toBe(true);
 		expect(mockGetQuote).not.toHaveBeenCalled();
+	});
+
+	it("rejects SHORT entries before reaching Alpaca in spot-only mode", async () => {
+		const results = await createPosition(makeAccount(), [
+			makePosition({ side: "SHORT", quantity: 1 }),
+		]);
+
+		expect(results).toHaveLength(1);
+		expect(results[0].success).toBe(false);
+		expect(results[0].error).toContain("Spot-only trading");
+		expect(mockGetQuote).not.toHaveBeenCalled();
+		expect(mockCreateOrder).not.toHaveBeenCalled();
 	});
 
 	it("caps trade size to available balance when oversized", async () => {

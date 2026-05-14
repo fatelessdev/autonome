@@ -1,6 +1,6 @@
 /**
  * Create Position Tool
- * Opens one or more trading positions atomically
+ * Opens one or more long spot positions atomically
  */
 
 import { tool } from "ai";
@@ -75,7 +75,8 @@ function checkCooldown(
 
 export function createPositionTool(ctx: ToolContext) {
 	return tool({
-		description: "Open one or more positions atomically",
+		description:
+			"Open one or more long spot positions atomically. SHORT entries are unsupported; use holding for bearish views or closePosition to exit owned assets.",
 		inputSchema: z.object({
 			decisions: z.array(decisionSchema),
 		}),
@@ -92,7 +93,7 @@ export function createPositionTool(ctx: ToolContext) {
 				openPositionBySymbol.set(position.symbol.toUpperCase(), position);
 			}
 
-			// decisions is Zod-validated: symbol is enum key, side is "LONG"|"SHORT"|"HOLD", quantity is positive number
+			// decisions is Zod-validated: symbol is enum key, side is "LONG"|"HOLD", quantity is positive number
 			const modern = decisions.map((item) => ({
 				symbol: item.symbol.toUpperCase(),
 				side: item.side,
@@ -138,7 +139,7 @@ export function createPositionTool(ctx: ToolContext) {
 					continue;
 				}
 
-				// side and quantity are Zod-validated: side is enum("LONG"|"SHORT"|"HOLD"), quantity is number().positive()
+				// side and quantity are Zod-validated: side is enum("LONG"|"HOLD"), quantity is number().positive()
 				const validSide = entry.side;
 				const quantity = entry.quantity;
 

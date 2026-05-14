@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+	isCryptoMarketSymbol,
 	isSupportedMarketSymbol,
 	MARKETS,
 	SUPPORTED_MARKETS,
+	toAlpacaNewsSymbol,
 	toAlpacaSymbol,
 	toCanonical,
 } from "./marketMetadata";
@@ -102,6 +104,21 @@ describe("marketMetadata", () => {
 			expect(() => toAlpacaSymbol("DOGE")).toThrow(
 				"Unsupported Alpaca market symbol",
 			);
+		});
+	});
+
+	describe("isCryptoMarketSymbol", () => {
+		it("uses market metadata instead of symbol punctuation", () => {
+			expect(isCryptoMarketSymbol("BTC")).toBe(true);
+			expect(isCryptoMarketSymbol("BTC/USD")).toBe(true);
+			expect(isCryptoMarketSymbol("BTCUSD")).toBe(true);
+		});
+	});
+
+	describe("toAlpacaNewsSymbol", () => {
+		it("uses compact Alpaca news format derived from the registry", () => {
+			expect(toAlpacaNewsSymbol("BTC")).toBe("BTCUSD");
+			expect(toAlpacaNewsSymbol("HYPE/USD")).toBe("HYPEUSD");
 		});
 	});
 });

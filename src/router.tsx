@@ -2,6 +2,7 @@ import * as Sentry from "@sentry/tanstackstart-react";
 import { createRouter } from "@tanstack/react-router";
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
 import { Analytics } from "@vercel/analytics/react";
+import { VITE_SENTRY_DSN } from "@/env";
 import * as TanstackQuery from "@/server/integrations/tanstack-query/root-provider";
 
 // Import the generated route tree
@@ -33,7 +34,7 @@ export function getRouter() {
 
 	if (!router.isServer) {
 		Sentry.init({
-			dsn: import.meta.env.VITE_SENTRY_DSN,
+			dsn: VITE_SENTRY_DSN,
 			integrations: [],
 		});
 	}

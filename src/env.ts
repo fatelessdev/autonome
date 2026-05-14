@@ -1,19 +1,5 @@
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
-
 import { createEnv } from "@t3-oss/env-core";
-import { config as loadEnv } from "dotenv";
 import { z } from "zod";
-
-const cwd = process.cwd();
-const envFiles = [".env", ".env.local"];
-
-for (const file of envFiles) {
-	const fullPath = resolve(cwd, file);
-	if (existsSync(fullPath)) {
-		loadEnv({ path: fullPath, override: true });
-	}
-}
 
 const importMetaEnv =
 	typeof import.meta !== "undefined" && typeof import.meta.env !== "undefined"
@@ -62,6 +48,7 @@ export const env = createEnv({
 		TAAPI_API_KEY1: z.string().optional(),
 		TAAPI_API_KEY2: z.string().optional(),
 		TAAPI_API_KEY3: z.string().optional(),
+		TAAPI_API_KEY4: z.string().optional(),
 		FALLBACK_MODEL: z.string().optional(),
 	},
 
@@ -70,6 +57,7 @@ export const env = createEnv({
 	client: {
 		VITE_APP_TITLE: z.string().min(1).optional(),
 		VITE_API_URL: z.string().url().optional(),
+		VITE_SENTRY_DSN: z.string().url().optional(),
 	},
 
 	runtimeEnv,
@@ -79,6 +67,8 @@ export const env = createEnv({
 // Export convenient aliases
 export const API_URL = env.API_URL;
 export const ALPACA_PAPER = env.ALPACA_PAPER;
+export const VITE_API_URL = env.VITE_API_URL;
+export const VITE_SENTRY_DSN = env.VITE_SENTRY_DSN;
 
 // TAAPI API key for supplementary indicators (optional)
 export const TAAPI_API_KEY = env.TAAPI_API_KEY;
@@ -137,6 +127,7 @@ const taapiKeyRotator = createApiKeyRotator("TAAPI", [
 	env.TAAPI_API_KEY1,
 	env.TAAPI_API_KEY2,
 	env.TAAPI_API_KEY3,
+	env.TAAPI_API_KEY4,
 ]);
 
 /**
