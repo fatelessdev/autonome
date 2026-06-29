@@ -5,8 +5,7 @@
  *
  * This script will:
  * 1. Truncate all tables (cascade)
- * 2. Insert the predefined AI models into the Models table
- *    - Each model gets one row per variant
+ * 2. Insert the predefined AI model accounts into the Models table
  */
 
 import { config } from "dotenv";
@@ -14,8 +13,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { sql } from "drizzle-orm";
 import { Pool } from "pg";
 import { env } from "@/env";
-import { VARIANT_IDS } from "@/core/shared/variants";
-import { ALPACA_KEYS } from "./alpacaKeys";
+import type { VariantId } from "@/core/shared/variants";
 
 // Load environment variables
 config({ path: ".env.local" });
@@ -32,9 +30,33 @@ if (!DATABASE_URL) {
 const pool = new Pool({ connectionString: DATABASE_URL });
 const db = drizzle(pool);
 
-// Active model definitions — openRouter model identifiers
-const MODEL_DEFINITIONS = [
-	"minimaxai/minimax-m2.5",
+type ModelDefinition = {
+	openRouterModelName: string;
+	variant: VariantId;
+	alpacaKeyEnv: string;
+	alpacaSecretEnv: string;
+};
+
+// Active model definitions — one Alpaca paper account per model.
+const MODEL_DEFINITIONS: ModelDefinition[] = [
+	{
+		openRouterModelName: "minimaxai/minimax-m2.7",
+		variant: "Contrarian",
+		alpacaKeyEnv: "ALPACA_MINIMAX_API_KEY",
+		alpacaSecretEnv: "ALPACA_MINIMAX_API_SECRET",
+	},
+	{
+		openRouterModelName: "stepfun-ai/step-3.7-flash",
+		variant: "Trendsurfer",
+		alpacaKeyEnv: "ALPACA_STEP_API_KEY",
+		alpacaSecretEnv: "ALPACA_STEP_API_SECRET",
+	},
+	{
+		openRouterModelName: "nvidia/nemotron-3-ultra-550b-a55b",
+		variant: "Sovereign",
+		alpacaKeyEnv: "ALPACA_NEMOTRON_API_KEY",
+		alpacaSecretEnv: "ALPACA_NEMOTRON_API_SECRET",
+	},
 ];
 
 /**
@@ -48,7 +70,15 @@ function extractModelName(openRouterModelName: string): string {
 	return afterSlash.replace(/:free$/, "");
 }
 
-async function seed() {
+function requireEnvVar(name: string): string {
+	const value = process.env[name];
+	if (!value) {
+		throw new Error(`Missing required seed environment variable: ${name}`);
+	}
+	return value;
+}
+
+export async function seed() {
 	console.log("🌱 Starting database seed...\n");
 
 	try {
@@ -65,48 +95,44 @@ async function seed() {
 
 		console.log("✅ All tables truncated\n");
 
-		// Step 2: Insert models (one row per model-variant combination)
+		// Step 2: Insert models (one row per model/account)
 		console.log("📦 Inserting models...");
 
 		let totalInserted = 0;
-		for (const openRouterModelName of MODEL_DEFINITIONS) {
+		for (const definition of MODEL_DEFINITIONS) {
+			const { openRouterModelName, variant, alpacaKeyEnv, alpacaSecretEnv } =
+				definition;
 			const name = extractModelName(openRouterModelName);
+			const alpacaApiKey = requireEnvVar(alpacaKeyEnv);
+			const alpacaApiSecret = requireEnvVar(alpacaSecretEnv);
 
-			for (const variant of VARIANT_IDS) {
-				const keys = ALPACA_KEYS[variant];
-				if (!keys) {
-					console.warn(`  ⚠ No Alpaca keys found for variant "${variant}", using placeholders`);
-				}
+			await db.execute(sql`
+				INSERT INTO "Models" (
+					"id",
+					"name",
+					"openRouterModelName",
+					"variant",
+					"alpacaApiKey",
+					"alpacaApiSecret",
+					"invocationCount",
+					"totalMinutes"
+				) VALUES (
+					${crypto.randomUUID()},
+					${name},
+					${openRouterModelName},
+					${variant},
+					${alpacaApiKey},
+					${alpacaApiSecret},
+					0,
+					0
+				)
+			`);
 
-				await db.execute(sql`
-					INSERT INTO "Models" (
-						"id",
-						"name",
-						"openRouterModelName",
-						"variant",
-						"alpacaApiKey",
-						"alpacaApiSecret",
-						"invocationCount",
-						"totalMinutes"
-					) VALUES (
-						${crypto.randomUUID()},
-						${name},
-						${openRouterModelName},
-						${variant},
-						${keys?.alpacaApiKey ?? "placeholder-key"},
-						${keys?.alpacaApiSecret ?? "placeholder-secret"},
-						0,
-						0
-					)
-				`);
-
-				console.log(`  ✓ Added: ${name} (${variant})`);
-				totalInserted++;
-			}
+			console.log(`  ✓ Added: ${name} (${variant})`);
+			totalInserted++;
 		}
 
-		console.log(`\n✅ Successfully seeded ${totalInserted} model-variant combinations`);
-		console.log(`   (${MODEL_DEFINITIONS.length} models × ${VARIANT_IDS.length} variants)`);
+		console.log(`\n✅ Successfully seeded ${totalInserted} model accounts`);
 	} catch (error) {
 		console.error("❌ Seed failed:", error);
 		process.exit(1);
@@ -116,5 +142,6 @@ async function seed() {
 	}
 }
 
-// Run the seed
-seed();
+if (import.meta.main) {
+	await seed();
+}

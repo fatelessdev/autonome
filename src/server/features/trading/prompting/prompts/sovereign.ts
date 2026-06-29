@@ -35,19 +35,20 @@ ${DATA_SOURCE_HIERARCHY_SECTION}
 | **ADX (14)** | > 25 | **TRENDING** | Buy Pullbacks (EMA20/VWAP). Ride Breakouts. |
 | **Ichimoku** | Price inside Cloud | **CHOP / NOISE** | **DO NOT TRADE** (Wait for breakout). |
 | **Ichimoku** | Price > Cloud | **BULLISH** | Longs Preferred. |
+| **Ichimoku** | Price < Cloud | **BEARISH** | Do not open new longs; close weak owned positions if thesis is dead. |
 | **VWAP** | Price > VWAP | **PREMIUM** | Bullish Bias. Support in uptrend. |
-| **Supertrend**| LONG/SHORT | **MACRO BIAS** | Do not trade counter-Supertrend unless scalping. |
+| **Supertrend**| LONG/SHORT | **MACRO BIAS** | LONG supports buys; SHORT means bearish context, not permission to open shorts. |
 
 == CORE PHILOSOPHY: FLEXIBLE AGGRESSION ==
 1.  **Regime First:** Check ADX and Cloud. If ADX < 20, do not try to "Surfer" a trend. If Price is inside Cloud, sit on your hands.
 2.  **Institutional Anchor:** Use **VWAP** as your "True North."
     * *In Trends:* Buy when price pulls back to VWAP.
-    * *In Ranges:* Short when price is far above VWAP; Cover at VWAP.
+    * *In Ranges:* Buy lower-band/value pullbacks only. If price is far above VWAP, HOLD unless closing an owned position.
 3.  **Capital Preservation:** A trade without a clear Invalidation Point is gambling. You must define where you are wrong before you enter.
 
 == OPERATIONAL GUARDRAILS ==
 * **Risk:** ~${RISK_PER_TRADE_PCT * 100}% of equity per trade.
-* **Spot Only:** All positions are 1x. Control risk through position sizing.
+* **Spot Only:** All new entries are long spot buys only. No margin, no naked sells, no short openings.
 * **Zombie Rule:** If a position is open > ${ZOMBIE_HOURS}h with < 1R profit, Close it.
 * **Correlation:** Be mindful of stacking Longs on correlated assets (BTC/ETH).
 
@@ -87,7 +88,7 @@ ${SESSION_HEADER}
 ${buildMarketDataBlock(`*Context Guide:*
 1. **Regime:** Use ADX & Ichimoku Cloud (Taapi) to define Trend vs Chop.
 2. **Value:** Use VWAP & EMA20 (Local) for entry/exit levels.
-3. **Sentiment:** Check Funding Rate. Avoid crowded trades.`)}
+3. **Sentiment:** Use news/open-interest context only as secondary confirmation; spot positions have no funding edge.`)}
 
 ${PORTFOLIO_BLOCK}
 
@@ -104,7 +105,7 @@ ${NEWS_BLOCK}
 2. **Regime Check:** Is ADX > 25 (Trend) or < 20 (Range)?
 3. **Execute:**
    * *Trend:* Buy Pullbacks to VWAP.
-   * *Range:* Fade Bollinger Extremes.
+   * *Range:* Buy lower-band/value pullbacks; HOLD at upper-band extremes unless managing an owned position.
    * *Chop:* **HOLD.**
 
 ${CLOSING_INSTRUCTION}

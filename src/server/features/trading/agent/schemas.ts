@@ -19,7 +19,11 @@ export const decisionSchema = z.object({
 	symbol: z
 		.enum(Object.keys(MARKETS) as [string, ...string[]])
 		.describe("Trading pair symbol (e.g., BTC, ETH, SOL)"),
-	side: z.enum(["LONG", "SHORT", "HOLD"]).describe("Trade direction"),
+	side: z
+		.enum(["LONG", "HOLD"])
+		.describe(
+			"Spot-only action. LONG buys/owns the base asset; HOLD means no entry. Opening SHORT positions is not supported.",
+		),
 	quantity: z
 		.number()
 		.positive()
@@ -91,7 +95,7 @@ export type CallOptions = z.infer<typeof callOptionsSchema>;
  */
 export interface NormalizedDecision {
 	symbol: string;
-	side: "LONG" | "SHORT" | "HOLD";
+	side: "LONG" | "HOLD";
 	quantity: number;
 	profitTarget: number | null;
 	stopLoss: number | null;

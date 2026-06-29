@@ -150,8 +150,8 @@ A 0.6 confidence trade gets 60% of the target size. A 0.95 confidence trade gets
 **Source:** Already exists at `src/server/features/analytics/toolCallAnalyzer.ts`
 
 **Additional Enhancement (from Vibetrading):** Add semantic validation rules inspired by Vibetrading's AST-based validation pipeline:
-- SL below entry for longs (above for shorts)
-- Leverage within exchange limits
+- SL below entry for long spot positions
+- Spot-only execution: no leverage, margin, or short openings
 - Quantity above exchange minimum
 - Confidence between 0-100
 
@@ -288,10 +288,10 @@ Signals aggregated per symbol, weighted by source trust × flair multiplier × t
 
 **How it works:** A self-contained exchange simulator that replays historical OHLCV data from CSV files:
 - **Time-traveling price lookup:** `DataFrame.index.asof(current_time)` for latest candle at or before simulation timestamp
-- **Futures position accounting:** Handles position flipping (long→short in one trade) by splitting into reduce + open. Weighted average entry price on scale-in: `(old_notional + new_notional) / (old_qty + new_qty)`
+- **Spot position accounting:** Handles long-only spot scale-in and reduction. Weighted average entry price on scale-in: `(old_notional + new_notional) / (old_qty + new_qty)`. Do not port futures flipping, margin, funding, or short-entry behavior into Autonome.
 - **Limit order fill simulation:** `_should_execute_order()` checks if candle's high/low touched limit price — buys fill when `low <= order_price`, sells fill when `high >= order_price`
-- **Funding payment sweeps:** Iterates through all funding windows between previous and new timestamp, applying payments
-- **Margin accounting:** `locked_margin` tracks total margin deployed, released on position reduction
+- **Fee/cost sweeps:** Applies spot trading costs and slippage assumptions during fills
+- **Cash accounting:** Tracks cash deployed and released on long spot entries/exits
 - **Price cache with LRU eviction:** 500-entry cache with oldest-25% eviction
 
 ```python
@@ -301,14 +301,14 @@ def _should_execute_order(self, order, current_price, high=None, low=None):
     hi = high if high is not None else current_price
     if order["side"] in ("buy", "long"):
         return lo <= order["price"]     # buy fills when low touches limit
-    if order["side"] in ("sell", "short"):
+    if order["side"] == "sell":
         return hi >= order["price"]     # sell fills when high touches limit
 ```
 
 **Key design decision:** Use Autonome's existing agent loop, not Vibetrading's `exec()` pattern. The agent should still use tool calling, but tools hit the backtest sandbox instead of the live exchange. The agent doesn't know it's backtesting.
 
 **Implementation:**
-1. Create `src/server/features/backtester/backtestSandbox.ts` — port position accounting, margin math, limit order fill simulation, funding sweeps
+1. Create `src/server/features/backtester/backtestSandbox.ts` — port spot position accounting, cash accounting, limit order fill simulation, and fee/slippage sweeps
 2. Create `src/server/features/backtester/backtestEngine.ts` — time-stepping loop that calls `rebuildUserPrompt()` at each step and runs agent against historical snapshots
 3. Create `src/server/features/backtester/dataLoader.ts` — load historical candles from CSV or fetch from Alpaca historical APIs and cache
 4. Mock the `ToolContext` so tools read from/write to backtest sandbox instead of live exchange

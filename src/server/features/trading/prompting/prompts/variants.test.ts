@@ -53,6 +53,30 @@ describe("prompts/variants", () => {
 				expect(getVariantConfig(id).temperature).toBe(0);
 			}
 		});
+
+		it("active prompts describe spot-only long entries and do not instruct short entries", () => {
+			const forbiddenEntryPhrases = [
+				/"LONG" \| "SHORT" \| "HOLD"/,
+				/\bshort when\b/i,
+				/\bfor shorts\b/i,
+				/\bopen short\b/i,
+				/\bshort entries?\b/i,
+				/\benter counter-trend\b/i,
+				/\benter breakout\b/i,
+			];
+
+			for (const id of VARIANT_IDS) {
+				const config = getVariantConfig(id);
+				const combinedPrompt = `${config.systemPrompt}\n${config.userPrompt}`;
+
+				expect(combinedPrompt).toMatch(/spot/i);
+				expect(combinedPrompt).toMatch(/LONG/i);
+				expect(combinedPrompt).toMatch(/HOLD/i);
+				for (const phrase of forbiddenEntryPhrases) {
+					expect(combinedPrompt).not.toMatch(phrase);
+				}
+			}
+		});
 	});
 
 	describe("getAllVariants", () => {

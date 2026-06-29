@@ -62,6 +62,12 @@ export const MODEL_INFO: Record<string, ModelInfoEntry> = {
 		label: "Step 3.5 Flash",
 		provider: "nim",
 	},
+	"step-3.7-flash": {
+		logo: "/models/stepfun.png",
+		color: "#f1f2f5",
+		label: "Step 3.7 Flash",
+		provider: "nim",
+	},
 	"qwen3-max": {
 		logo: "/models/qwen.png",
 		color: "#8B5CF6",
@@ -84,6 +90,18 @@ export const MODEL_INFO: Record<string, ModelInfoEntry> = {
 		logo: "/models/minimax.png",
 		color: "#E62176",
 		label: "Minimax M2.5",
+		provider: "nim",
+	},
+	"minimax-m2.7": {
+		logo: "/models/minimax.png",
+		color: "#E62176",
+		label: "Minimax M2.7",
+		provider: "nim",
+	},
+	"nemotron-3-ultra-550b-a55b": {
+		logo: "/models/download.png",
+		color: "#76B900",
+		label: "Nemotron 3 Ultra 550B",
 		provider: "nim",
 	},
 	"gpt-oss-120b": {

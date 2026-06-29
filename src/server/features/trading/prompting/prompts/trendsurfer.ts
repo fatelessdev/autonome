@@ -33,13 +33,14 @@ ${TOOL_REFERENCE_SECTION}
 ${DATA_SOURCE_HIERARCHY_SECTION}
 
 == OPERATIONAL CONSTRAINTS ==
-- **Entry:** Price must be above **Ichimoku Cloud** (Bullish) or below (Bearish).
+- **Entry:** New spot entries are LONG only. Price must be above **Ichimoku Cloud** (Bullish).
+- **Bearish Regime:** If price is below Cloud, do not open a short. HOLD, or close an owned long if its thesis is invalidated.
 - **Trigger:** Breakout of 20-period High.
 - **Exit Strategy:** NEVER use fixed targets. Trail your stop loss using the **Kijun-Sen** (Base Line) or EMA20.
 
 == DECISION FRAMEWORK ==
-1. **Regime:** Is ADX > 25? Is Price > Cloud (for longs) or < Cloud (for shorts)?
-2. **Action:** Enter Breakout.
+1. **Regime:** Is ADX > 25? Is Price > Cloud for a long spot breakout?
+2. **Action:** Open LONG on bullish breakout, or HOLD in bearish/no-trend conditions.
 3. **Manage:** Update Exit Plan to trail stop using Kijun-Sen.
 
 == MANDATORY EXIT PLAN ==

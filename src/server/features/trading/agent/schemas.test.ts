@@ -80,7 +80,7 @@ describe("schemas", () => {
 			expect(result.success).toBe(false);
 		});
 
-		it("allows optional fields to be absent", () => {
+		it("rejects SHORT because spot trading cannot open short positions", () => {
 			const result = decisionSchema.safeParse({
 				symbol: "ETH",
 				side: "SHORT",
@@ -88,6 +88,20 @@ describe("schemas", () => {
 				profit_target: 2500,
 				stop_loss: 3500,
 				invalidation_condition: "break above resistance",
+				confidence: 70,
+			});
+
+			expect(result.success).toBe(false);
+		});
+
+		it("allows optional fields to be absent", () => {
+			const result = decisionSchema.safeParse({
+				symbol: "ETH",
+				side: "LONG",
+				quantity: 1,
+				profit_target: 3500,
+				stop_loss: 2500,
+				invalidation_condition: "break below support",
 				confidence: 70,
 			});
 

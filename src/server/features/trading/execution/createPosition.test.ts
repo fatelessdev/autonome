@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Account } from "@/server/features/trading/contracts/accounts";
+import type { PositionRequest } from "./createPosition";
 
 // Mock the provider module before importing createPosition
 vi.mock("@/server/providers/alpaca", () => {
@@ -101,19 +102,8 @@ const makeAccount = (): Account => ({
 });
 
 const makePosition = (
-	overrides: Partial<{
-		symbol: string;
-		side: "LONG" | "SHORT" | "HOLD";
-		quantity: number;
-		profitTarget: number | null;
-		stopLoss: number | null;
-		invalidationCondition: string | null;
-		invalidationPrice: number | null;
-		timeExit: string | null;
-		cooldownUntil: string | null;
-		confidence: number | null;
-	}> = {},
-) => ({
+	overrides: Partial<PositionRequest> = {},
+): PositionRequest => ({
 	symbol: overrides.symbol ?? "BTC",
 	side: overrides.side ?? "LONG",
 	quantity: overrides.quantity ?? 1,
@@ -242,6 +232,22 @@ describe("createPosition", () => {
 		expect(results).toHaveLength(1);
 		expect(results[0].success).toBe(true);
 		expect(mockGetQuote).not.toHaveBeenCalled();
+	});
+
+	it("rejects SHORT positions before contacting Alpaca", async () => {
+		const invalidShortRequest = {
+			...makePosition({ quantity: 1 }),
+			side: "SHORT",
+		} as unknown as PositionRequest;
+
+		const results = await createPosition(makeAccount(), [invalidShortRequest]);
+
+		expect(results).toHaveLength(1);
+		expect(results[0].success).toBe(false);
+		expect(results[0].error).toContain("Spot-only trading");
+		expect(results[0].error).toContain("SHORT");
+		expect(mockGetQuote).not.toHaveBeenCalled();
+		expect(mockCreateOrder).not.toHaveBeenCalled();
 	});
 
 	it("caps trade size to available balance when oversized", async () => {

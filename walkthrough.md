@@ -106,7 +106,7 @@ Prompts include:
 
 The AI agent (using AI SDK's `ToolLoopAgent`) receives the prompt and can make multiple tool calls:
 
-- **`createPosition`**: Opens a new long/short position
+- **`createPosition`**: Opens or scales into a long spot position
   - Validates minimum trade size ($50)
   - Auto-adjusts if requested size exceeds available balance
   - Submits bracket order to Alpaca (entry + stop loss + take profit)

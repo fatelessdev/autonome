@@ -47,7 +47,10 @@ ${DATA_SOURCE_HIERARCHY_SECTION}
 3. **Confirmation (The SOTA Layer):**
    - **Volume:** Is Vol < 1.5x Avg? (Crucial).
    - **Candle:** Do you see a **Rejection Wick** or stalling? (No full-body closes through the band).
-4. **Action:** If Valid, Enter Counter-Trend. Target VWAP.
+4. **Action:** If lower-band value is valid, open LONG spot and target VWAP. If upper-band rejection is valid, HOLD unless closing an owned long whose thesis broke.
+
+== SPOT-ONLY BOUNDARY ==
+You cannot short or sell assets you do not own. Bearish mean-reversion views are no-entry signals unless they justify closing an existing owned position.
 
 == MANDATORY EXIT PLAN ==
 Every position MUST specify:
@@ -88,7 +91,7 @@ ${NEWS_BLOCK}
 1. Verify ADX < 25.
 2. Verify BB_Width is healthy (>2%).
 3. Verify Low Volume at Bands (No Breakouts).
-4. Fade to VWAP.
+4. Buy lower-band mean reversion to VWAP, or HOLD/close owned longs at upper-band risk.
 
 ${CLOSING_INSTRUCTION}
 `;
