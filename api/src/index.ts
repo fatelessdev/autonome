@@ -6,6 +6,7 @@
  */
 
 import { existsSync, statSync } from "node:fs";
+import { createRequire } from "node:module";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { RPCHandler } from "@orpc/server/fetch";
@@ -119,9 +120,9 @@ app.all("/api/rpc/*", async (c) => {
 
 // ==================== Workflow DevKit Routes ====================
 // The Vite workflow() plugin compiles "use workflow"/"use step" directives into
-// node_modules/.nitro/workflow/. The local world POSTs execution requests to
-// these /.well-known/ routes. We mount the compiled handlers here so the API
-// server can process workflow and step executions.
+// deploy-target-specific function bundles. The local world POSTs execution
+// requests to these /.well-known/ routes. We mount the compiled handlers here so
+// the API server can process workflow and step executions.
 
 // Dynamic imports for compiled workflow handlers.
 // Root cause note:
@@ -129,10 +130,67 @@ app.all("/api/rpc/*", async (c) => {
 // after file renames/refactors, a static specifier can keep serving stale code.
 // We resolve by loading from file URL with mtime cache-busting and waiting for
 // bundles to exist before first use/startup.
-const WORKFLOW_DIR = join(process.cwd(), "node_modules", ".nitro", "workflow");
-const WORKFLOW_FLOW_FILE = join(WORKFLOW_DIR, "workflows.mjs");
-const WORKFLOW_STEP_FILE = join(WORKFLOW_DIR, "steps.mjs");
-const WORKFLOW_WEBHOOK_FILE = join(WORKFLOW_DIR, "webhook.mjs");
+const require = createRequire(import.meta.url);
+
+const LEGACY_WORKFLOW_DIR = join(
+	process.cwd(),
+	"node_modules",
+	".nitro",
+	"workflow",
+);
+const WORKFLOW_BUNDLE_CANDIDATES = {
+	flow: [
+		join(LEGACY_WORKFLOW_DIR, "workflows.mjs"),
+		join(
+			process.cwd(),
+			".vercel",
+			"output",
+			"functions",
+			".well-known",
+			"workflow",
+			"v1",
+			"flow.func",
+			"index.js",
+		),
+	],
+	step: [
+		join(LEGACY_WORKFLOW_DIR, "steps.mjs"),
+		join(
+			process.cwd(),
+			".vercel",
+			"output",
+			"functions",
+			".well-known",
+			"workflow",
+			"v1",
+			"step.func",
+			"index.js",
+		),
+	],
+	webhook: [
+		join(LEGACY_WORKFLOW_DIR, "webhook.mjs"),
+		join(
+			process.cwd(),
+			".vercel",
+			"output",
+			"functions",
+			".well-known",
+			"workflow",
+			"v1",
+			"webhook",
+			"[token].func",
+			"index.js",
+		),
+	],
+} as const;
+
+type WorkflowBundleKind = keyof typeof WORKFLOW_BUNDLE_CANDIDATES;
+
+function findWorkflowBundle(kind: WorkflowBundleKind): string | null {
+	return (
+		WORKFLOW_BUNDLE_CANDIDATES[kind].find((file) => existsSync(file)) ?? null
+	);
+}
 
 async function sleep(ms: number): Promise<void> {
 	await new Promise((resolve) => setTimeout(resolve, ms));
@@ -142,16 +200,16 @@ async function waitForWorkflowBundles(timeoutMs = 20_000): Promise<void> {
 	const start = Date.now();
 	while (true) {
 		if (
-			existsSync(WORKFLOW_FLOW_FILE) &&
-			existsSync(WORKFLOW_STEP_FILE) &&
-			existsSync(WORKFLOW_WEBHOOK_FILE)
+			findWorkflowBundle("flow") &&
+			findWorkflowBundle("step") &&
+			findWorkflowBundle("webhook")
 		) {
 			return;
 		}
 
 		if (Date.now() - start > timeoutMs) {
 			throw new Error(
-				`Workflow bundles not ready in ${timeoutMs}ms at ${WORKFLOW_DIR}`,
+				`Workflow bundles not ready in ${timeoutMs}ms. Checked legacy dir ${LEGACY_WORKFLOW_DIR} and .vercel output functions.`,
 			);
 		}
 
@@ -161,34 +219,42 @@ async function waitForWorkflowBundles(timeoutMs = 20_000): Promise<void> {
 
 async function importFreshWorkflowModule<T>(filePath: string): Promise<T> {
 	const mtimeMs = statSync(filePath).mtimeMs;
+	if (filePath.endsWith(".js")) {
+		const resolved = require.resolve(filePath);
+		delete require.cache[resolved];
+		return require(resolved) as T;
+	}
+
 	const fileUrl = pathToFileURL(filePath).href;
 	const specifier = `${fileUrl}?t=${mtimeMs}`;
 
 	return import(specifier) as Promise<T>;
 }
 
-const loadWorkflowFlowHandler = async () => {
+async function loadWorkflowModule<T>(kind: WorkflowBundleKind): Promise<T> {
 	await waitForWorkflowBundles();
-	const module = await importFreshWorkflowModule<{ POST: typeof fetch }>(
-		WORKFLOW_FLOW_FILE,
-	);
+	const filePath = findWorkflowBundle(kind);
+	if (!filePath) {
+		throw new Error(`Workflow ${kind} bundle not found after readiness check`);
+	}
+	return importFreshWorkflowModule<T>(filePath);
+}
+
+const loadWorkflowFlowHandler = async () => {
+	const module = await loadWorkflowModule<{ POST: typeof fetch }>("flow");
 	return module.POST;
 };
 
 const loadWorkflowStepHandler = async () => {
-	await waitForWorkflowBundles();
-	const module = await importFreshWorkflowModule<{ POST: typeof fetch }>(
-		WORKFLOW_STEP_FILE,
-	);
+	const module = await loadWorkflowModule<{ POST: typeof fetch }>("step");
 	return module.POST;
 };
 
 const loadWebhookHandlers = async () => {
-	await waitForWorkflowBundles();
-	const module = await importFreshWorkflowModule<{
+	const module = await loadWorkflowModule<{
 		POST: typeof fetch;
 		GET: typeof fetch;
-	}>(WORKFLOW_WEBHOOK_FILE);
+	}>("webhook");
 	return { POST: module.POST, GET: module.GET };
 };
 
