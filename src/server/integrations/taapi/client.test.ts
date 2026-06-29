@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { TAAPI_EXCHANGE } from "./client";
 
-describe("client", () => {
-	it("can be imported", async () => {
-		const mod = await import("./client");
-		expect(mod).toBeDefined();
+describe("TAAPI exchange", () => {
+	it("uses Binance spot for free-plan indicator requests", () => {
+		expect(TAAPI_EXCHANGE).toBe("binance");
 	});
 });

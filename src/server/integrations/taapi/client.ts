@@ -16,6 +16,8 @@ import { TAAPI_FREE_PLAN_SYMBOLS } from "./types";
 const BULK_URL = "https://api.taapi.io/bulk";
 const FETCH_TIMEOUT_MS = 30_000;
 
+export const TAAPI_EXCHANGE = "binance" as const;
+
 const getTaapiApiKey = (): string => {
 	try {
 		return getNextTaapiKey();
@@ -118,7 +120,7 @@ export class TaapiClient {
 		const payload: TaapiBulkPayload = {
 			secret: apiKey,
 			construct: {
-				exchange: "binancefutures",
+				exchange: TAAPI_EXCHANGE,
 				symbol,
 				interval,
 				indicators,
