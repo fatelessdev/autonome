@@ -1,4 +1,4 @@
-type ActiveTab = "trades" | "positions";
+type ActiveTab = "trades" | "modelchat" | "positions";
 
 type SidebarTabsProps = {
 	activeTab: ActiveTab;
@@ -7,6 +7,7 @@ type SidebarTabsProps = {
 
 const tabs: { key: ActiveTab; label: string }[] = [
 	{ key: "trades", label: "Completed Trades" },
+	{ key: "modelchat", label: "ModelChat" },
 	{ key: "positions", label: "Positions" },
 ];
 
