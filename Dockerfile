@@ -31,6 +31,8 @@ COPY --from=builder --chown=bunjs:nodejs /app/src/core/shared ./src/core/shared
 COPY --from=builder --chown=bunjs:nodejs /app/src/env.ts ./src/env.ts
 COPY --from=builder --chown=bunjs:nodejs /app/tsconfig.json ./tsconfig.json
 
+RUN mkdir -p /app/.workflow-data && chown bunjs:nodejs /app/.workflow-data
+
 USER bunjs
 
 ENV API_PORT=8081

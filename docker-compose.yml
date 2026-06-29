@@ -10,6 +10,8 @@ services:
     environment:
       DATABASE_URL: postgresql://autonome:autonome_secret@db:5432/autonome
       API_PORT: 8081
+    volumes:
+      - workflow_data:/app/.workflow-data
     depends_on:
       db:
         condition: service_healthy
@@ -60,3 +62,4 @@ services:
 
 volumes:
   postgres_data:
+  workflow_data:
